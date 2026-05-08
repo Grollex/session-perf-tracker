@@ -11,6 +11,24 @@ using Clipboard = System.Windows.Clipboard;
 
 namespace SessionPerfTracker.App.ViewModels;
 
+public enum UpdatePromptChoice
+{
+    UpdateNow,
+    Later,
+    SkipVersion
+}
+
+public sealed class UpdateAvailablePromptEventArgs : EventArgs
+{
+    public UpdateAvailablePromptEventArgs(UpdateCheckResult result)
+    {
+        Result = result;
+    }
+
+    public UpdateCheckResult Result { get; }
+    public UpdatePromptChoice Choice { get; set; } = UpdatePromptChoice.Later;
+}
+
 public sealed class MainWindowViewModel : ObservableObject
 {
     private const double AvgCpuBudgetPercent = 2;
@@ -171,6 +189,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool _automaticallyCheckForUpdates;
     private bool _isCheckingForUpdates;
     private bool _isUpdateAvailable;
+    private bool _isUpdateRestartRequested;
     private bool _minimizeToTrayOnClose = true;
     private bool _globalWatchOnlyOverLimit;
     private bool _globalWatchOnlyCritical;
@@ -192,6 +211,9 @@ public sealed class MainWindowViewModel : ObservableObject
         DiskWriteMbPerSec = MetricReliability.BestEffort
     };
     private UpdateManifest? _availableUpdateManifest;
+
+    public event EventHandler<UpdateAvailablePromptEventArgs>? UpdateAvailablePromptRequested;
+    public event EventHandler? UpdateInstallerLaunched;
 
     public MainWindowViewModel(
         ISessionStore sessionStore,
@@ -775,6 +797,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public string DefaultExportDirectoryText => _defaultExportDirectory;
     public string CurrentVersionText => _updateService.CurrentVersion;
+    public string AppVersionBadgeText => $"v{_updateService.CurrentVersion}";
+    public bool IsUpdateRestartRequested => _isUpdateRestartRequested;
 
     public string UpdateManifestUrlText
     {
@@ -820,6 +844,7 @@ public sealed class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _isCheckingForUpdates, value))
             {
                 OnPropertyChanged(nameof(CanDownloadUpdateInstaller));
+                OnPropertyChanged(nameof(CanSkipAvailableUpdate));
             }
         }
     }
@@ -832,11 +857,13 @@ public sealed class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _isUpdateAvailable, value))
             {
                 OnPropertyChanged(nameof(CanDownloadUpdateInstaller));
+                OnPropertyChanged(nameof(CanSkipAvailableUpdate));
             }
         }
     }
 
     public bool CanDownloadUpdateInstaller => IsUpdateAvailable && !IsCheckingForUpdates;
+    public bool CanSkipAvailableUpdate => IsUpdateAvailable && _availableUpdateManifest is not null;
 
     public string LiveAssignmentStatusText
     {
@@ -2459,6 +2486,30 @@ public sealed class MainWindowViewModel : ObservableObject
     public Task CheckForUpdatesAsync(CancellationToken cancellationToken = default) =>
         CheckForUpdatesCoreAsync(automatic: false, cancellationToken);
 
+    public async Task SkipAvailableUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        if (_availableUpdateManifest is null)
+        {
+            UpdateStatusText = "No update version is available to skip.";
+            return;
+        }
+
+        var skippedVersion = _availableUpdateManifest.Version.Trim().TrimStart('v', 'V');
+        await _thresholdSettingsStore.SaveAsync(
+            _thresholdSettingsStore.Current with
+            {
+                Updates = ReadUpdateSettingsFromUi(_thresholdSettingsStore.Current.Updates.LastCheckedAt) with
+                {
+                    SkippedVersion = skippedVersion
+                }
+            },
+            cancellationToken);
+
+        _availableUpdateManifest = null;
+        IsUpdateAvailable = false;
+        UpdateStatusText = $"Version {skippedVersion} skipped. Automatic checks will ignore it until a newer version is released.";
+    }
+
     public async Task DownloadAndLaunchUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (_availableUpdateManifest is null)
@@ -2478,7 +2529,9 @@ public sealed class MainWindowViewModel : ObservableObject
             DownloadedUpdateInstallerPath = installerPath;
             UpdateStatusText = $"Installer downloaded: {installerPath}. Launching installer...";
             await _updateService.LaunchInstallerAsync(installerPath, cancellationToken);
-            UpdateStatusText = "Installer launched. It will upgrade the existing installation; close the app if the installer asks.";
+            _isUpdateRestartRequested = true;
+            UpdateStatusText = "Installer launched. Session Perf Tracker will exit now so the update can replace the running files.";
+            UpdateInstallerLaunched?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
         {
@@ -4035,7 +4088,10 @@ public sealed class MainWindowViewModel : ObservableObject
         UpdateManifestUrlText = updateSettings.ManifestUrl ?? string.Empty;
         if (updateSettings.LastCheckedAt is { } lastCheckedAt)
         {
-            UpdateStatusText = $"Last update check: {lastCheckedAt.ToLocalTime():MMM dd, HH:mm}.";
+            var skippedText = string.IsNullOrWhiteSpace(updateSettings.SkippedVersion)
+                ? string.Empty
+                : $" Skipped version: {updateSettings.SkippedVersion}.";
+            UpdateStatusText = $"Last update check: {lastCheckedAt.ToLocalTime():MMM dd, HH:mm}.{skippedText}";
         }
     }
 
@@ -4045,7 +4101,8 @@ public sealed class MainWindowViewModel : ObservableObject
         ManifestUrl = string.IsNullOrWhiteSpace(UpdateManifestUrlText)
             ? null
             : UpdateManifestUrlText.Trim(),
-        LastCheckedAt = lastCheckedAt
+        LastCheckedAt = lastCheckedAt,
+        SkippedVersion = _thresholdSettingsStore.Current.Updates.SkippedVersion
     };
 
     private async Task AutoCheckForUpdatesIfNeededAsync(
@@ -4086,6 +4143,37 @@ public sealed class MainWindowViewModel : ObservableObject
                 ? "No release notes in manifest."
                 : result.Manifest.ReleaseNotes;
             UpdateStatusText = result.Status;
+
+            if (result.IsUpdateAvailable && result.Manifest is not null)
+            {
+                var latestVersion = result.Manifest.Version.Trim().TrimStart('v', 'V');
+                var skippedVersion = _thresholdSettingsStore.Current.Updates.SkippedVersion?.Trim().TrimStart('v', 'V');
+                if (automatic
+                    && !string.IsNullOrWhiteSpace(skippedVersion)
+                    && string.Equals(latestVersion, skippedVersion, StringComparison.OrdinalIgnoreCase))
+                {
+                    _availableUpdateManifest = null;
+                    IsUpdateAvailable = false;
+                    UpdateStatusText = $"Version {latestVersion} is skipped. Automatic checks will wait for a newer version.";
+                }
+                else if (automatic && UpdateAvailablePromptRequested is not null)
+                {
+                    var args = new UpdateAvailablePromptEventArgs(result);
+                    UpdateAvailablePromptRequested.Invoke(this, args);
+                    if (args.Choice == UpdatePromptChoice.UpdateNow)
+                    {
+                        await DownloadAndLaunchUpdateAsync(cancellationToken);
+                    }
+                    else if (args.Choice == UpdatePromptChoice.SkipVersion)
+                    {
+                        await SkipAvailableUpdateAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        UpdateStatusText = $"Update {latestVersion} is available. You can install it later from Settings.";
+                    }
+                }
+            }
 
             await _thresholdSettingsStore.SaveAsync(
                 _thresholdSettingsStore.Current with

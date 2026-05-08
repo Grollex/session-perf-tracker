@@ -148,7 +148,8 @@ public sealed class HttpUpdateService : IUpdateService
         Process.Start(new ProcessStartInfo(installerPath)
         {
             UseShellExecute = true,
-            Verb = "runas"
+            Verb = "runas",
+            Arguments = "/CLOSEAPPLICATIONS /RESTARTAPPLICATIONS"
         });
 
         return Task.CompletedTask;

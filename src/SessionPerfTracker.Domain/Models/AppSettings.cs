@@ -75,9 +75,10 @@ public sealed record AppUpdateSettings
 {
     public const string DefaultManifestUrl = "https://github.com/Grollex/session-perf-tracker/releases/latest/download/version.json";
 
-    public bool AutomaticallyCheckForUpdates { get; init; }
+    public bool AutomaticallyCheckForUpdates { get; init; } = true;
     public string? ManifestUrl { get; init; } = DefaultManifestUrl;
     public DateTimeOffset? LastCheckedAt { get; init; }
+    public string? SkippedVersion { get; init; }
 }
 
 public sealed record AppBehaviorSettings

@@ -188,7 +188,16 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
         var manifestUrl = string.IsNullOrWhiteSpace(settings.ManifestUrl)
             ? AppUpdateSettings.DefaultManifestUrl
             : settings.ManifestUrl.Trim();
-        return settings with { ManifestUrl = manifestUrl };
+        var automaticallyCheck = settings.AutomaticallyCheckForUpdates || settings.LastCheckedAt is null;
+        var skippedVersion = string.IsNullOrWhiteSpace(settings.SkippedVersion)
+            ? null
+            : settings.SkippedVersion.Trim().TrimStart('v', 'V');
+        return settings with
+        {
+            AutomaticallyCheckForUpdates = automaticallyCheck,
+            ManifestUrl = manifestUrl,
+            SkippedVersion = skippedVersion
+        };
     }
 
     private static ProfileRecommendationSettings NormalizeRecommendations(ProfileRecommendationSettings? settings)

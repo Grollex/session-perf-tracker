@@ -82,6 +82,8 @@ public partial class MainWindow : Window
             updateService,
             exportsPath,
             updatesPath);
+        _viewModel.UpdateAvailablePromptRequested += OnUpdateAvailablePromptRequested;
+        _viewModel.UpdateInstallerLaunched += OnUpdateInstallerLaunched;
         DataContext = _viewModel;
         InitializeTrayIcon();
         Loaded += OnLoaded;
@@ -97,6 +99,8 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _viewModel.UpdateAvailablePromptRequested -= OnUpdateAvailablePromptRequested;
+        _viewModel.UpdateInstallerLaunched -= OnUpdateInstallerLaunched;
         _notifyIcon?.Dispose();
         _notifyIcon = null;
         _viewModel.Shutdown();
@@ -432,6 +436,12 @@ public partial class MainWindow : Window
     private async void DownloadAndLaunchUpdate_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.DownloadAndLaunchUpdateAsync();
+        ExitForUpdateIfRequested();
+    }
+
+    private async void SkipUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.SkipAvailableUpdateAsync();
     }
 
     private async void ExportSelectedSessionHtml_Click(object sender, RoutedEventArgs e)
@@ -604,5 +614,45 @@ public partial class MainWindow : Window
     private async void RemoveSelectedProcessBan_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.RemoveSelectedProcessBanAsync();
+    }
+
+    private void OnUpdateAvailablePromptRequested(object? sender, UpdateAvailablePromptEventArgs e)
+    {
+        var latestVersion = e.Result.LatestVersion ?? e.Result.Manifest?.Version ?? "new";
+        var notes = string.IsNullOrWhiteSpace(e.Result.Manifest?.ReleaseNotes)
+            ? "No release notes were provided."
+            : e.Result.Manifest.ReleaseNotes;
+
+        var updateNow = MessageBox.Show(
+            this,
+            $"Session Perf Tracker {latestVersion} is available.\n\nCurrent version: {_viewModel.CurrentVersionText}\n\n{notes}\n\nInstall now?\n\nYes = update now\nNo = later\nCancel = skip this version",
+            "Update available",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Information);
+
+        e.Choice = updateNow switch
+        {
+            MessageBoxResult.Yes => UpdatePromptChoice.UpdateNow,
+            MessageBoxResult.Cancel => UpdatePromptChoice.SkipVersion,
+            _ => UpdatePromptChoice.Later
+        };
+    }
+
+    private void OnUpdateInstallerLaunched(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(ExitForUpdateIfRequested);
+    }
+
+    private void ExitForUpdateIfRequested()
+    {
+        if (!_viewModel.IsUpdateRestartRequested)
+        {
+            return;
+        }
+
+        _isExitRequested = true;
+        _notifyIcon?.Dispose();
+        _notifyIcon = null;
+        System.Windows.Application.Current.Shutdown();
     }
 }
