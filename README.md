@@ -87,11 +87,19 @@ Or run PowerShell directly:
 .\scripts\release-one-click.ps1 -Version 0.1.2 -ReleaseNotes "Fixes and UI polish"
 ```
 
-The script builds the installer, generates `version.json`, opens the output folder, and opens the GitHub Release page. Upload both generated files as release assets:
+The script builds the installer, generates `version.json`, creates or updates the GitHub Release, and uploads both release assets automatically through GitHub CLI:
 
 ```text
 artifacts\release\installer\SessionPerfTracker-<version>-win-x64-setup.exe
 artifacts\release\update\version.json
+```
+
+On first use, GitHub CLI may open a browser login. Sign in with an account that can publish releases to `Grollex/session-perf-tracker`.
+
+For a local build without uploading assets, run:
+
+```powershell
+.\scripts\release-one-click.ps1 -Version 0.1.2 -SkipUpload
 ```
 
 When the project is fully hosted in this repository, pushing a tag like `v0.1.2` can also run the GitHub Actions release workflow.

@@ -42,10 +42,13 @@ The helper:
 - compiles the Inno Setup installer;
 - generates `version.json` with the GitHub Release installer URL;
 - verifies required app and SQLite runtime files through `package-windows.ps1`;
+- checks GitHub CLI authentication;
+- creates or updates the GitHub Release;
+- uploads the installer and `version.json` as release assets;
 - opens the installer output folder;
-- opens the GitHub new release page for the version tag.
+- opens the published GitHub Release page.
 
-Upload these two generated files to the GitHub Release assets:
+The two generated assets are:
 
 ```text
 artifacts\release\installer\SessionPerfTracker-0.1.2-win-x64-setup.exe
@@ -58,19 +61,35 @@ Use release tag:
 v0.1.2
 ```
 
-Because the current Codex GitHub connector does not expose release-asset upload, the drag-and-drop upload step remains manual in the local flow.
+On first use, GitHub CLI may ask you to sign in through the browser. Use a GitHub account with release publishing rights for `Grollex/session-perf-tracker`.
 
-## Manual Release Steps
+For a build-only run without upload:
+
+```powershell
+.\scripts\release-one-click.ps1 -Version 0.1.2 -SkipUpload
+```
+
+## Automatic Local Release Steps
 
 1. Run `Release Session Perf Tracker.bat`.
 2. Enter the version, for example `0.1.2`.
 3. Wait for the installer and manifest to be generated.
-4. On the GitHub Release page, use tag `v0.1.2`.
-5. Upload:
+4. If GitHub CLI asks for login, finish the browser login.
+5. The script creates or updates release tag `v0.1.2`.
+6. The script uploads:
    - `SessionPerfTracker-0.1.2-win-x64-setup.exe`
    - `version.json`
-6. Publish the release.
 7. In an older installed app, click Settings -> Storage -> Updates -> Check for updates.
+
+## Manual Fallback
+
+If GitHub CLI authentication is unavailable, run:
+
+```powershell
+.\scripts\release-one-click.ps1 -Version 0.1.2 -SkipUpload
+```
+
+Then create a GitHub Release manually with tag `v0.1.2` and upload the generated installer plus `version.json`.
 
 ## GitHub Actions Release
 
