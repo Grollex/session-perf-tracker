@@ -35,6 +35,24 @@ function Get-CommandPathOrNull([string]$name) {
     return $null
 }
 
+function Invoke-NativeQuiet {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $global:LASTEXITCODE = 0
+    try {
+        $ErrorActionPreference = "Continue"
+        & $FilePath @Arguments *> $null
+        return $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
 function Ensure-GitHubCliAuth {
     $ghPath = Get-CommandPathOrNull "gh"
     if (-not $ghPath) {
@@ -42,8 +60,8 @@ function Ensure-GitHubCliAuth {
     }
 
     Write-Host "Using GitHub CLI: $ghPath" -ForegroundColor DarkGray
-    & gh auth status --hostname github.com *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $authStatus = Invoke-NativeQuiet "gh" "auth" "status" "--hostname" "github.com"
+    if ($authStatus -eq 0) {
         return
     }
 
@@ -56,8 +74,8 @@ function Ensure-GitHubCliAuth {
         throw "GitHub CLI authentication failed."
     }
 
-    & gh auth status --hostname github.com
-    if ($LASTEXITCODE -ne 0) {
+    $authStatus = Invoke-NativeQuiet "gh" "auth" "status" "--hostname" "github.com"
+    if ($authStatus -ne 0) {
         throw "GitHub CLI is still not authenticated."
     }
 }
