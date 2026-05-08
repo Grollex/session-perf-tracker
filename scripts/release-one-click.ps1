@@ -130,16 +130,38 @@ function Publish-GitHubRelease {
     }
 }
 
+function Normalize-ReleaseVersion {
+    param([string]$RawVersion)
+
+    if ([string]::IsNullOrWhiteSpace($RawVersion)) {
+        return $null
+    }
+
+    $normalized = $RawVersion.Trim().TrimStart("v", "V")
+    if ($normalized -match '^\d+\.\d+\.\d+$') {
+        return $normalized
+    }
+
+    return $null
+}
+
 Add-LocalToolPaths
 
-if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = Read-Host "Release version, for example 0.1.2"
+$normalizedVersion = Normalize-ReleaseVersion $Version
+while (-not $normalizedVersion) {
+    if (-not [string]::IsNullOrWhiteSpace($Version)) {
+        Write-Host ""
+        Write-Host "Invalid version: $Version" -ForegroundColor Yellow
+        Write-Host "Use exactly three numbers: 0.1.2 or v0.1.2" -ForegroundColor Yellow
+        Write-Host "Do not use beta/test labels here, because Windows installer metadata needs numeric versions." -ForegroundColor Yellow
+        Write-Host ""
+    }
+
+    $Version = Read-Host "Release version (example: 0.1.2)"
+    $normalizedVersion = Normalize-ReleaseVersion $Version
 }
 
-$Version = $Version.Trim().TrimStart("v")
-if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    throw "Version must look like 0.1.2. Pre-release labels are not supported by the current Windows installer metadata."
-}
+$Version = $normalizedVersion
 
 if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
     $ReleaseNotes = "Session Perf Tracker $Version"
