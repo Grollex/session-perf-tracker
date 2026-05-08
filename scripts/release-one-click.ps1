@@ -95,8 +95,7 @@ function Publish-GitHubRelease {
         $gitPath = Get-CommandPathOrNull "git"
         if ($gitPath) {
             $insideGit = $false
-            & git rev-parse --is-inside-work-tree *> $null
-            $insideGit = $LASTEXITCODE -eq 0
+            $insideGit = (Invoke-NativeQuiet "git" "rev-parse" "--is-inside-work-tree") -eq 0
 
             if ($insideGit) {
                 Write-Host "Pushing current branch before release..." -ForegroundColor Cyan
@@ -105,8 +104,8 @@ function Publish-GitHubRelease {
                     Write-Host "Git push failed or was skipped. Continuing with release upload." -ForegroundColor Yellow
                 }
 
-                & git rev-parse -q --verify "refs/tags/$Tag" *> $null
-                if ($LASTEXITCODE -ne 0) {
+                $tagExists = (Invoke-NativeQuiet "git" "rev-parse" "-q" "--verify" "refs/tags/$Tag") -eq 0
+                if (-not $tagExists) {
                     Write-Host "Creating local tag $Tag..." -ForegroundColor Cyan
                     & git tag -a $Tag -m "Session Perf Tracker $Version"
                     if ($LASTEXITCODE -ne 0) {
@@ -122,8 +121,7 @@ function Publish-GitHubRelease {
             }
         }
 
-        & gh release view $Tag --repo $Repository *> $null
-        $releaseExists = $LASTEXITCODE -eq 0
+        $releaseExists = (Invoke-NativeQuiet "gh" "release" "view" $Tag "--repo" $Repository) -eq 0
 
         if ($releaseExists) {
             Write-Host "GitHub Release $Tag already exists. Uploading assets with --clobber..." -ForegroundColor Cyan
