@@ -36,6 +36,8 @@ Or call the PowerShell helper directly:
 .\scripts\release-one-click.ps1 -Version 0.1.2 -ReleaseNotes "Fixes and UI polish"
 ```
 
+The helper reads the last released version from the repository root `VERSION` file. If you run the `.bat` without passing a version, it suggests the next patch version. For example, if `VERSION` contains `0.1.1`, the prompt suggests `0.1.2`; pressing Enter accepts that default. After a successful build/upload run, `VERSION` is updated to the released version.
+
 The helper:
 
 - builds a Windows x64 self-contained publish;

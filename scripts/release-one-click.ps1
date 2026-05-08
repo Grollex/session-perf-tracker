@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $repository = "Grollex/session-perf-tracker"
+$versionFile = Join-Path $repoRoot "VERSION"
 
 function Add-LocalToolPaths {
     $paths = @(
@@ -145,9 +146,45 @@ function Normalize-ReleaseVersion {
     return $null
 }
 
+function Get-StoredReleaseVersion {
+    if (Test-Path -LiteralPath $versionFile) {
+        $rawVersion = (Get-Content -LiteralPath $versionFile -Raw).Trim()
+        $normalized = Normalize-ReleaseVersion $rawVersion
+        if ($normalized) {
+            return $normalized
+        }
+    }
+
+    return "0.1.0"
+}
+
+function Get-NextPatchVersion {
+    param([string]$CurrentVersion)
+
+    $normalized = Normalize-ReleaseVersion $CurrentVersion
+    if (-not $normalized) {
+        return "0.1.1"
+    }
+
+    $parts = $normalized.Split(".")
+    $major = [int]$parts[0]
+    $minor = [int]$parts[1]
+    $patch = [int]$parts[2] + 1
+    return "$major.$minor.$patch"
+}
+
+function Save-StoredReleaseVersion {
+    param([string]$ReleasedVersion)
+
+    Set-Content -LiteralPath $versionFile -Value $ReleasedVersion -Encoding ASCII
+}
+
 Add-LocalToolPaths
 
 $normalizedVersion = Normalize-ReleaseVersion $Version
+$storedVersion = Get-StoredReleaseVersion
+$suggestedVersion = Get-NextPatchVersion $storedVersion
+
 while (-not $normalizedVersion) {
     if (-not [string]::IsNullOrWhiteSpace($Version)) {
         Write-Host ""
@@ -155,9 +192,16 @@ while (-not $normalizedVersion) {
         Write-Host "Use exactly three numbers: 0.1.2 or v0.1.2" -ForegroundColor Yellow
         Write-Host "Do not use beta/test labels here, because Windows installer metadata needs numeric versions." -ForegroundColor Yellow
         Write-Host ""
+    } else {
+        Write-Host "Last release version from VERSION: $storedVersion" -ForegroundColor DarkGray
+        Write-Host "Suggested next version: $suggestedVersion" -ForegroundColor Cyan
     }
 
-    $Version = Read-Host "Release version (example: 0.1.2)"
+    $Version = Read-Host "Release version [$suggestedVersion]"
+    if ([string]::IsNullOrWhiteSpace($Version)) {
+        $Version = $suggestedVersion
+    }
+
     $normalizedVersion = Normalize-ReleaseVersion $Version
 }
 
@@ -207,6 +251,8 @@ if (-not $SkipUpload) {
         -Repository $repository
 }
 
+Save-StoredReleaseVersion $Version
+
 Write-Host ""
 Write-Host "Release files are ready:" -ForegroundColor Green
 Write-Host "  Installer: $installerPath"
@@ -221,6 +267,8 @@ else {
 }
 Write-Host "Update manifest URL used by the app:"
 Write-Host "  https://github.com/$repository/releases/latest/download/version.json"
+Write-Host "Stored release version updated:"
+Write-Host "  $versionFile -> $Version"
 Write-Host ""
 
 if (-not $NoOpen) {

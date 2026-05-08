@@ -81,6 +81,8 @@ On the packaging machine, use the one-button helper:
 Release Session Perf Tracker.bat
 ```
 
+The helper reads the last released version from `VERSION`, suggests the next patch version, and accepts Enter as "use the suggested version".
+
 Or run PowerShell directly:
 
 ```powershell
