@@ -1,0 +1,29 @@
+# Build outputs
+bin/
+obj/
+artifacts/
+publish/
+dist/
+
+# Local .NET/tooling caches
+.dotnet-home/
+.vs/
+.vscode/
+
+# User/local files
+*.user
+*.suo
+*.log
+*.tmp
+*.cache
+.DS_Store
+Thumbs.db
+
+# Installer outputs
+Output/
+*.exe
+*.msi
+*.msix
+*.zip
+
+# Keep source scripts/configs, ignore generated binaries only.

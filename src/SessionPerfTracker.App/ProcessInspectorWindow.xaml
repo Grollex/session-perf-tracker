@@ -1,0 +1,491 @@
+<Window x:Class="SessionPerfTracker.App.ProcessInspectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Process Inspector"
+        Width="940"
+        Height="650"
+        MinWidth="820"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="#101317"
+        FontFamily="Segoe UI">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <SolidColorBrush x:Key="PanelBrush" Color="#171C21" />
+        <SolidColorBrush x:Key="PanelStrongBrush" Color="#20262D" />
+        <SolidColorBrush x:Key="BorderBrushSoft" Color="#303941" />
+        <SolidColorBrush x:Key="TextBrush" Color="#EDF2F5" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#AAB6C0" />
+        <SolidColorBrush x:Key="GoodBrush" Color="#3EE079" />
+        <SolidColorBrush x:Key="BadBrush" Color="#F05D5E" />
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="MutedText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
+        <Style x:Key="Panel" TargetType="Border">
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#242A31" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2E3740" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#4A5B66" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#1D242B" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#74828D" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#181D22" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#252D34" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#23563A" />
+            <Setter Property="BorderBrush" Value="#3DA76D" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#2B1719" />
+            <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#121920" />
+            <Setter Property="BorderBrush" Value="#3A4650" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#121920" />
+            <Setter Property="Padding" Value="8,6" />
+        </Style>
+
+        <Style TargetType="ListView">
+            <Setter Property="Background" Value="#11171C" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource Panel}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Content="Close"
+                        MinWidth="86"
+                        Click="Close_Click" />
+                <StackPanel>
+                    <TextBlock Text="Process Inspector"
+                               FontSize="22"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding InspectorModeText}"
+                               Style="{StaticResource MutedText}"
+                               Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding InspectorTitle}"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding InspectorTitle}"
+                               Margin="0,10,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="270" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer Grid.Column="0"
+                          VerticalScrollBarVisibility="Hidden"
+                          HorizontalScrollBarVisibility="Disabled"
+                          PanningMode="VerticalOnly">
+                <StackPanel>
+                    <Border Style="{StaticResource Panel}">
+                        <StackPanel>
+                            <TextBlock Text="What is this likely?"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,8" />
+                             <TextBlock Text="{Binding InspectorWhatItDoesText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Panel}">
+                        <Border.Margin>0,12,0,0</Border.Margin>
+                        <StackPanel>
+                            <TextBlock Text="Why it appears"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding InspectorAppearsBecauseText}"
+                                       Style="{StaticResource MutedText}" />
+                            <TextBlock Text="{Binding InspectorRelationText}"
+                                       Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Panel}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InspectorIsGroup}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Application Details"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,10" />
+                            <UniformGrid Columns="2">
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="App / product" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorProductText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorProductText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Exe / group" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorExeText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="Instances / included" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorDescendantsText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Suspicious" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorSuspiciousText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="Install / exe path" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorPathText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorPathText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Company / publisher" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorCompanyText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorCompanyText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="File description" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorDescriptionText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorDescriptionText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Signer" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorSignerText}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <TextBlock Text="Included processes"
+                                       Style="{StaticResource MutedText}"
+                                       FontWeight="SemiBold"
+                                       Margin="0,4,0,8" />
+                            <ListView ItemsSource="{Binding InspectorIncludedProcessRows}"
+                                      MaxHeight="170"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Process" Width="150" DisplayMemberBinding="{Binding Name}" />
+                                        <GridViewColumn Header="PID" Width="58" DisplayMemberBinding="{Binding ProcessIdText}" />
+                                        <GridViewColumn Header="CPU" Width="70" DisplayMemberBinding="{Binding CpuText}" />
+                                        <GridViewColumn Header="RAM" Width="92" DisplayMemberBinding="{Binding RamText}" />
+                                        <GridViewColumn Header="Disk" Width="120" DisplayMemberBinding="{Binding DiskText}" />
+                                        <GridViewColumn Header="Role" Width="125" DisplayMemberBinding="{Binding RoleText}" />
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Panel}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding InspectorIsGroup}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Process Details"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,10" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="Process" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Column="1" Text="{Binding InspectorTitle}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorTitle}" />
+                                <TextBlock Grid.Row="2" Text="PID" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding InspectorPidText}" />
+                                <TextBlock Grid.Row="4" Text="Exe" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InspectorExeText}" />
+                                <TextBlock Grid.Row="6" Text="Full path" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding InspectorPathText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorPathText}" />
+                                <TextBlock Grid.Row="8" Text="Product" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding InspectorProductText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorProductText}" />
+                                <TextBlock Grid.Row="10" Text="Description" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding InspectorDescriptionText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorDescriptionText}" />
+                                <TextBlock Grid.Row="12" Text="Company" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding InspectorCompanyText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorCompanyText}" />
+                                <TextBlock Grid.Row="14" Text="Signer" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="14" Grid.Column="1" Text="{Binding InspectorSignerText}" />
+                                <TextBlock Grid.Row="16" Text="Version / original" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="16" Grid.Column="1">
+                                    <Run Text="{Binding InspectorVersionText, Mode=OneWay}" />
+                                    <Run Text=" / " />
+                                    <Run Text="{Binding InspectorOriginalFileText, Mode=OneWay}" />
+                                </TextBlock>
+                                <TextBlock Grid.Row="18" Text="Command line" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="18" Grid.Column="1" Text="{Binding InspectorCommandLineText}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Panel}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Metrics and Profile"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,10" />
+                            <UniformGrid Columns="2">
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="CPU" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorCpuText}" FontSize="18" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="RAM" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorRamText}" FontSize="18" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,12,10">
+                                    <TextBlock Text="Disk R/W" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorDiskText}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,10">
+                                    <TextBlock Text="Status" Style="{StaticResource MutedText}" />
+                                    <TextBlock Text="{Binding InspectorStatusText}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Profile" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Column="1" Text="{Binding InspectorProfileText}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="2" Text="Health" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding InspectorHealthText}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="4" Text="Reason" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InspectorReasonText}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="6" Text="Recommendation" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding InspectorRecommendationText}" TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Panel}" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Relations"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,10" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" /><RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="Parent" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Column="1" Text="{Binding InspectorParentText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding InspectorParentText}" />
+                                <TextBlock Grid.Row="2" Text="Tree / group" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding InspectorDescendantsText}" />
+                                <TextBlock Grid.Row="4" Text="Membership" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InspectorIncludedText}" TextWrapping="Wrap" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Hidden"
+                          HorizontalScrollBarVisibility="Disabled"
+                          PanningMode="VerticalOnly">
+            <StackPanel>
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="Actions"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,10" />
+                        <Button Content="Monitor this process / group"
+                                Click="Monitor_Click"
+                                IsEnabled="{Binding CanMonitorInspectorTarget}"
+                                Style="{StaticResource PrimaryButton}" />
+                        <Button Content="Open file location"
+                                Click="OpenFileLocation_Click"
+                                IsEnabled="{Binding CanOpenInspectorFileLocation}"
+                                Margin="0,8,0,0" />
+                        <Button Content="Copy full path"
+                                Click="CopyPath_Click"
+                                IsEnabled="{Binding CanCopyInspectorPath}"
+                                Margin="0,8,0,0" />
+                        <UniformGrid Columns="2" Margin="0,8,0,0">
+                            <Button Content="Kill PID"
+                                    Click="KillProcess_Click"
+                                    IsEnabled="{Binding CanKillInspectorTarget}"
+                                    Style="{StaticResource DangerButton}"
+                                    Margin="0,0,6,0" />
+                            <Button Content="{Binding InspectorKillTreeLabel}"
+                                    Click="KillTreeOrGroup_Click"
+                                    IsEnabled="{Binding CanKillInspectorTarget}"
+                                    Style="{StaticResource DangerButton}" />
+                        </UniformGrid>
+
+                        <TextBlock Text="Suspicious watchlist"
+                                   Style="{StaticResource MutedText}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,16,0,6" />
+                        <TextBlock Text="{Binding InspectorSuspiciousText}"
+                                   Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding InspectorSuspiciousLastLaunchText}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,4,0,0" />
+                        <UniformGrid Columns="2" Margin="0,8,0,0">
+                            <Button Content="Mark"
+                                    Click="MarkSuspicious_Click"
+                                    IsEnabled="{Binding CanMarkInspectorSuspicious}"
+                                    Margin="0,0,6,0" />
+                            <Button Content="Remove"
+                                    Click="RemoveSuspicious_Click"
+                                    IsEnabled="{Binding CanRemoveInspectorSuspicious}" />
+                        </UniformGrid>
+
+                        <TextBlock Text="Process ban"
+                                   Style="{StaticResource MutedText}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,16,0,6" />
+                        <TextBlock Text="{Binding InspectorBanText}"
+                                   Style="{StaticResource MutedText}" />
+                        <ComboBox ItemsSource="{Binding ProcessBanDurationOptions}"
+                                  SelectedItem="{Binding SelectedProcessBanDurationOption}"
+                                  DisplayMemberPath="Label"
+                                  IsEnabled="{Binding CanBanInspectorTarget}"
+                                  Margin="0,8,0,0" />
+                        <UniformGrid Columns="2" Margin="0,8,0,0">
+                            <Button Content="Ban"
+                                    Click="BanProcess_Click"
+                                    IsEnabled="{Binding CanBanInspectorTarget}"
+                                    Margin="0,0,6,0" />
+                            <Button Content="Ban + kill"
+                                    Click="BanAndKillProcess_Click"
+                                    IsEnabled="{Binding CanBanInspectorTarget}"
+                                    Style="{StaticResource DangerButton}" />
+                        </UniformGrid>
+
+                        <TextBlock Text="Recommendation"
+                                   Style="{StaticResource MutedText}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,16,0,6" />
+                        <TextBlock Text="{Binding InspectorRecommendationText}"
+                                   Style="{StaticResource MutedText}" />
+                        <Button Content="Open Recommendations"
+                                Click="OpenRecommendation_Click"
+                                IsEnabled="{Binding InspectorHasRecommendation}"
+                                Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Panel}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Inspector note"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6" />
+                        <TextBlock Text="Identity, signer and file metadata are best-effort. Protected or short-lived processes may hide path or publisher details."
+                                   Style="{StaticResource MutedText}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>
