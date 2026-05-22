@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using SessionPerfTracker.Domain.Metrics;
+using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
 using Application = System.Windows.Application;
@@ -46,15 +47,15 @@ public sealed class MainWindowViewModel : ObservableObject
     private const int GlobalWatchSuspiciousSectionIndex = 3;
     private const int GlobalWatchJournalUiLimit = 120;
     private static readonly TimeSpan GlobalWatchJournalCooldown = TimeSpan.FromSeconds(60);
-    private const string TargetModeRunningProcess = "Running process";
-    private const string TargetModeAssignedApps = "Assigned apps / profiles";
-    private const string TargetModeExecutable = "Executable";
-    private const string GlobalSortCpu = "CPU";
-    private const string GlobalSortRam = "RAM";
-    private const string GlobalSortDisk = "Disk";
-    private const string GlobalSortName = "Name";
-    private const string GlobalModeApplications = "Applications";
-    private const string GlobalModeProcesses = "Processes";
+    private string TargetModeRunningProcess => GetText("Ui_RunningProcess");
+    private string TargetModeAssignedApps => GetText("Ui_AssignedAppsProfiles");
+    private string TargetModeExecutable => GetText("Ui_ManualExecutableLaunch");
+    private string GlobalSortCpu => "CPU";
+    private string GlobalSortRam => "RAM";
+    private string GlobalSortDisk => GetText("Ui_Disk");
+    private string GlobalSortName => GetText("Ui_Process");
+    private string GlobalModeApplications => GetText("Ui_AssignedAppsProfiles");
+    private string GlobalModeProcesses => GetText("Ui_IncludedProcesses");
 
     private enum LiveSessionUiState
     {
@@ -78,6 +79,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly IProcessControlService _processControlService;
     private readonly IExportService _exportService;
     private readonly IUpdateService _updateService;
+    private string GetText(string key) => Application.Current.TryFindResource(key) as string ?? key;
     private readonly string _defaultExportDirectory;
     private readonly string _updateDownloadDirectory;
     private readonly List<SelfMonitoringSample> _selfMonitoringSamples = [];
@@ -103,6 +105,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private SuspiciousWatchItemViewModel? _selectedSuspiciousWatchItem;
     private ProcessBanRuleViewModel? _selectedProcessBan;
     private ProcessBanDurationOptionViewModel? _selectedProcessBanDurationOption;
+    private LanguageOptionViewModel? _selectedLanguageOption;
     private TargetOptionViewModel? _selectedRunningTarget;
     private AssignedTargetOptionViewModel? _selectedAssignedTarget;
     private GlobalProcessRowViewModel? _selectedGlobalProcess;
@@ -112,14 +115,14 @@ public sealed class MainWindowViewModel : ObservableObject
     private readonly List<SessionListItemViewModel> _allSessionItems = [];
     private string _storagePath = string.Empty;
     private string _selectedExecutablePath = string.Empty;
-    private string _selectedTargetMode = TargetModeRunningProcess;
+    private string _selectedTargetMode = string.Empty;
     private string _processFilterText = string.Empty;
     private string _sessionSearchText = string.Empty;
-    private string _recordingStatusText = "Idle";
-    private string _storageStatusText = "SQLite storage ready.";
-    private string _liveSnapshotText = "idle";
-    private string _ramDiagnosticText = "No RAM diagnostic snapshot captured.";
-    private string _systemContextText = "No system context snapshot captured.";
+    private string _recordingStatusText = "waiting";
+    private string _storageStatusText = "storage ready";
+    private string _liveSnapshotText = "waiting";
+    private string _ramDiagnosticText = "no snapshot";
+    private string _systemContextText = "no snapshot";
     private string _cpuThresholdPercentText = "80";
     private string _ramThresholdMbText = "4096";
     private string _diskReadThresholdMbPerSecText = "180";
@@ -133,17 +136,17 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _groupingWindowSecondsText = "2";
     private string _snapshotSuppressionSecondsText = "3";
     private string _assignmentExeNameText = "opera.exe";
-    private string _thresholdSettingsStatusText = "Detector thresholds are loaded from settings.";
-    private string _exportStatusText = "Exports are saved to LocalAppData\\SessionPerfTracker\\exports.";
+    private string _thresholdSettingsStatusText = "loaded";
+    private string _exportStatusText = "exports saved to localappdata";
     private string _exportDirectoryText = string.Empty;
     private string _updateManifestUrlText = string.Empty;
-    private string _updateStatusText = "Update checks are manual unless automatic checks are enabled.";
-    private string _updateLatestVersionText = "Not checked";
-    private string _updateReleaseNotesText = "No update checked yet.";
+    private string _updateStatusText = "update check manual";
+    private string _updateLatestVersionText = "not checked";
+    private string _updateReleaseNotesText = "no updates checked yet";
     private string _downloadedUpdateInstallerPath = string.Empty;
-    private string _liveAssignmentStatusText = "Select a target and profile to assign thresholds.";
+    private string _liveAssignmentStatusText = "select target";
     private string _liveWarningText = string.Empty;
-    private string _selfMonitoringStatusText = "warming up";
+    private string _selfMonitoringStatusText = "warmup";
     private string _selfCurrentCpuText = "n/a";
     private string _selfAvgCpuText = "n/a";
     private string _selfPeakCpuText = "n/a";
@@ -152,19 +155,20 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _selfPeakRamText = "n/a";
     private string _selfDiskWriteText = "n/a";
     private string _selfSampleCountText = "0";
-    private string _selfCpuBudgetStatusText = "unknown";
-    private string _selfRamBudgetStatusText = "unknown";
-    private string _selfWritesBudgetStatusText = "configured";
-    private string _selfSnapshotsBudgetStatusText = "event-only";
+    private string _selfCpuBudgetStatusText = "неизвестно";
+    private string _selfRamBudgetStatusText = "неизвестно";
+    private string _selfWritesBudgetStatusText = "настроено";
+    private string _selfSnapshotsBudgetStatusText = "только по событию";
     private string _globalWatchFilterText = string.Empty;
-    private string _globalWatchStatusText = "Global Watch is a lightweight process overview.";
-    private string _globalWatchLastScanText = "Waiting for first scan";
-    private string _globalWatchJournalStatusText = "Watch Journal records profile-aware watch states over time.";
-    private string _profileRecommendationStatusText = "Recommendations appear after repeated over-limit warnings.";
-    private string _suspiciousWatchStatusText = "Mark a selected process or application as suspicious to watch for future launches.";
-    private string _processBanStatusText = "Process bans are enforced by Global Watch while this utility is running.";
-    private string _selectedGlobalWatchSortMode = GlobalSortCpu;
-    private string _selectedGlobalWatchMode = GlobalModeApplications;
+    private string _globalWatchStatusText = "Глобальный обзор показывает лёгкий срез процессов.";
+    private string _globalWatchLastScanText = "Ожидание первого скана";
+    private string _globalWatchJournalStatusText = "Журнал наблюдения пишет состояния процессов относительно профилей.";
+    private string _profileRecommendationStatusText = "Рекомендации появляются после повторных превышений лимитов профиля.";
+    private string _suspiciousWatchStatusText = "Пометь процесс или приложение подозрительным, чтобы отслеживать будущие запуски.";
+    private string _processBanStatusText = "Запреты процессов применяются Global Watch, пока утилита запущена.";
+    private string _languageSettingsStatusText = "Настройки языка загружены.";
+    private string _selectedGlobalWatchSortMode = string.Empty;
+    private string _selectedGlobalWatchMode = string.Empty;
     private string? _selectedGlobalProcessKey;
     private string _activeTargetName = string.Empty;
     private string _activeSessionProfileText = string.Empty;
@@ -198,7 +202,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private bool _autoStopInProgress;
     private bool _manualStopInProgress;
     private LiveSessionUiState _liveSessionState = LiveSessionUiState.ReadyToStart;
-    private string _autoStopStatusText = "Monitoring stopped. Press Start to apply changes.";
+    private string _autoStopStatusText = "Мониторинг остановлен. Нажми Старт, чтобы применить изменения.";
     private IRunningSessionHandle? _activeHandle;
     private CancellationTokenSource? _selfMonitoringCts;
     private CancellationTokenSource? _globalWatchCts;
@@ -246,24 +250,59 @@ public sealed class MainWindowViewModel : ObservableObject
         _defaultExportDirectory = defaultExportDirectory;
         _updateDownloadDirectory = updateDownloadDirectory;
         _exportDirectoryText = defaultExportDirectory;
+        InitializeLocalizedDefaults();
         SamplingOptions = [new SamplingOptionViewModel(1000), new SamplingOptionViewModel(500)];
         RetentionOptions =
         [
-            new RetentionOptionViewModel(1, "1 day"),
-            new RetentionOptionViewModel(7, "7 days"),
-            new RetentionOptionViewModel(30, "30 days"),
-            new RetentionOptionViewModel(90, "90 days"),
-            new RetentionOptionViewModel(null, "Keep until manual delete")
+            new RetentionOptionViewModel(1, $"1 {GetText("Ui_Day")}"),
+            new RetentionOptionViewModel(7, $"7 {GetText("Ui_Days")}"),
+            new RetentionOptionViewModel(30, $"30 {GetText("Ui_Days")}"),
+            new RetentionOptionViewModel(90, $"90 {GetText("Ui_Days")}"),
+            new RetentionOptionViewModel(null, GetText("Ui_RetentionForever"))
         ];
         _selectedSamplingOption = SamplingOptions[0];
         ProcessBanDurationOptions =
         [
-            new ProcessBanDurationOptionViewModel("5 seconds", TimeSpan.FromSeconds(5)),
-            new ProcessBanDurationOptionViewModel("30 seconds", TimeSpan.FromSeconds(30)),
-            new ProcessBanDurationOptionViewModel("1 minute", TimeSpan.FromMinutes(1)),
-            new ProcessBanDurationOptionViewModel("Permanent", null)
+            new ProcessBanDurationOptionViewModel($"5 {GetText("Ui_Seconds")}", TimeSpan.FromSeconds(5)),
+            new ProcessBanDurationOptionViewModel($"30 {GetText("Ui_Seconds")}", TimeSpan.FromSeconds(30)),
+            new ProcessBanDurationOptionViewModel($"1 {GetText("Ui_Minute")}", TimeSpan.FromMinutes(1)),
+            new ProcessBanDurationOptionViewModel(GetText("Ui_Forever"), null)
         ];
         _selectedProcessBanDurationOption = ProcessBanDurationOptions[1];
+        LanguageOptions =
+        [
+            new LanguageOptionViewModel(LocalizationManager.Russian, "Русский"),
+            new LanguageOptionViewModel(LocalizationManager.English, "English")
+        ];
+        _selectedLanguageOption = LanguageOptions[0];
+    }
+
+    private void InitializeLocalizedDefaults()
+    {
+        TargetModes = [TargetModeRunningProcess, TargetModeAssignedApps, TargetModeExecutable];
+        GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName];
+        GlobalWatchModes = [GlobalModeApplications, GlobalModeProcesses];
+        _selectedTargetMode = TargetModeRunningProcess;
+        _selectedGlobalWatchSortMode = GlobalSortCpu;
+        _selectedGlobalWatchMode = GlobalModeApplications;
+
+        _recordingStatusText = GetText("Ui_Waiting");
+        _storageStatusText = GetText("Ui_StorageReady");
+        _liveSnapshotText = GetText("Ui_Waiting");
+        _ramDiagnosticText = GetText("Ui_NoSnapshot");
+        _systemContextText = GetText("Ui_NoSnapshot");
+        _thresholdSettingsStatusText = GetText("Ui_ThresholdsLoaded");
+        _exportStatusText = GetText("Ui_ExportStatusDefault");
+        _updateStatusText = GetText("Ui_UpdateStatusDefault");
+        _updateLatestVersionText = GetText("Ui_NotChecked");
+        _updateReleaseNotesText = GetText("Ui_NoUpdateInfo");
+        _liveAssignmentStatusText = GetText("Ui_LiveAssignmentStatusDefault");
+        _selfMonitoringStatusText = GetText("Ui_Warmup");
+        _globalWatchStatusText = GetText("Ui_GlobalWatchOverviewHint");
+        _globalWatchLastScanText = GetText("Ui_WaitingFirstScan");
+        _globalWatchJournalStatusText = GetText("Ui_JournalWritingStatus");
+        _profileRecommendationStatusText = GetText("Ui_RecommendationsHintStatus");
+        _languageSettingsStatusText = GetText("Ui_LanguageSettingsLoaded");
     }
 
     public ObservableCollection<SessionListItemViewModel> Sessions { get; } = [];
@@ -299,10 +338,11 @@ public sealed class MainWindowViewModel : ObservableObject
     public ObservableCollection<SamplingOptionViewModel> SamplingOptions { get; }
     public ObservableCollection<ProcessBanDurationOptionViewModel> ProcessBanDurationOptions { get; }
     public ObservableCollection<RetentionOptionViewModel> RetentionOptions { get; }
+    public ObservableCollection<LanguageOptionViewModel> LanguageOptions { get; }
     public ObservableCollection<SessionProfileFilterOptionViewModel> SessionProfileFilters { get; } = [];
-    public IReadOnlyList<string> TargetModes { get; } = [TargetModeRunningProcess, TargetModeAssignedApps, TargetModeExecutable];
-    public IReadOnlyList<string> GlobalWatchSortModes { get; } = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName];
-    public IReadOnlyList<string> GlobalWatchModes { get; } = [GlobalModeApplications, GlobalModeProcesses];
+    public IReadOnlyList<string> TargetModes { get; private set; } = [];
+    public IReadOnlyList<string> GlobalWatchSortModes { get; private set; } = [];
+    public IReadOnlyList<string> GlobalWatchModes { get; private set; } = [];
 
     public SessionListItemViewModel? SelectedSession
     {
@@ -453,6 +493,12 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         get => _selectedProcessBanDurationOption;
         set => SetProperty(ref _selectedProcessBanDurationOption, value);
+    }
+
+    public LanguageOptionViewModel? SelectedLanguageOption
+    {
+        get => _selectedLanguageOption;
+        set => SetProperty(ref _selectedLanguageOption, value);
     }
 
     public TargetOptionViewModel? SelectedRunningTarget
@@ -649,6 +695,12 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         get => _minimizeToTrayOnClose;
         set => SetProperty(ref _minimizeToTrayOnClose, value);
+    }
+
+    public string LanguageSettingsStatusText
+    {
+        get => _languageSettingsStatusText;
+        private set => SetProperty(ref _languageSettingsStatusText, value);
     }
 
     public string StoragePath
@@ -1158,15 +1210,18 @@ public sealed class MainWindowViewModel : ObservableObject
         };
     }
 
-    public string LiveSessionTargetText => IsRecording
-        ? _activeTargetName
-        : SelectedTargetMode switch
+    public string LiveSessionTargetText
+    {
+        get
         {
-            TargetModeRunningProcess when SelectedRunningTarget is not null => SelectedRunningTarget.DisplayName,
-            TargetModeAssignedApps when SelectedAssignedTarget is not null => SelectedAssignedTarget.DisplayText,
-            TargetModeExecutable when !string.IsNullOrWhiteSpace(SelectedExecutablePath) => Path.GetFileName(SelectedExecutablePath),
-            _ => "No target selected"
-        };
+            if (IsRecording) return _activeTargetName;
+            var mode = SelectedTargetMode;
+            if (mode == TargetModeRunningProcess && SelectedRunningTarget is not null) return SelectedRunningTarget.DisplayName;
+            if (mode == TargetModeAssignedApps && SelectedAssignedTarget is not null) return SelectedAssignedTarget.DisplayText;
+            if (mode == TargetModeExecutable && !string.IsNullOrWhiteSpace(SelectedExecutablePath)) return Path.GetFileName(SelectedExecutablePath);
+            return "No target selected";
+        }
+    }
 
     public string LiveSessionMetaText =>
         IsRecording
@@ -1243,7 +1298,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public string SelectedGlobalProcessStatusText => SelectedGlobalProcess?.StateText ?? "not selected";
     public string SelectedGlobalProcessProfileText => SelectedGlobalProcess?.ProfileSourceText ?? "n/a";
     public string SelectedGlobalProcessHealthText => SelectedGlobalProcess?.HealthBadgeText ?? "n/a";
-    public string SelectedGlobalProcessReasonText => SelectedGlobalProcess?.ProfileReason ?? "Select a process to see profile-aware health.";
+    public string SelectedGlobalProcessReasonText => SelectedGlobalProcess?.ProfileReason ?? GetText("Ui_SelectProcessProfileHealth");
     public string SelectedGlobalProcessIncludedText => SelectedGlobalProcess?.IncludedProcessSummaryText ?? "n/a";
     public string SelectedGlobalProcessWhatItDoesText
     {
@@ -1252,47 +1307,47 @@ public sealed class MainWindowViewModel : ObservableObject
             var selected = SelectedGlobalProcess;
             if (selected is null)
             {
-                return "Select a running process or application to inspect what it is.";
+                return GetText("Ui_SelectToInspect");
             }
 
             var product = string.IsNullOrWhiteSpace(selected.ProductName) || selected.ProductName == "Unavailable"
                 ? selected.AppName
                 : selected.ProductName;
             var description = string.IsNullOrWhiteSpace(selected.FileDescription) || selected.FileDescription == "Unavailable"
-                ? "No file description was exposed by Windows for this executable."
+                ? GetText("Ui_NoDescriptionExp")
                 : selected.FileDescription;
             var company = string.IsNullOrWhiteSpace(selected.CompanyName) || selected.CompanyName == "Unavailable"
-                ? "publisher unknown"
+                ? GetText("Ui_PublisherUnknown")
                 : selected.CompanyName;
             var role = selected.IsGroup
-                ? $"Global Watch is showing this as an application group with {selected.InstanceCount:N0} running instance(s)."
+                ? string.Format(GetText("Ui_AppGroupRelation"), selected.ExeName, selected.InstanceCount)
                 : selected.Process.ParentProcessId is not null
-                    ? $"This looks like a helper/subprocess under {selected.ParentProcessText}."
+                    ? string.Format(GetText("Ui_SubprocessRelation"), selected.ParentProcessText)
                     : selected.Process.DescendantProcessCount > 0
-                        ? $"This looks like a root/broker process with {selected.Process.DescendantProcessCount:N0} descendant(s)."
-                        : "This looks like a standalone process in the last lightweight scan.";
+                        ? string.Format(GetText("Ui_RootCandidateRelation"), selected.Process.DescendantProcessCount)
+                        : GetText("Ui_StandaloneRelation");
 
-            return $"{product}: {description} Publisher: {company}. {role}";
+            return $"{product}: {description} {GetText("Ui_Company")}: {company}. {role}";
         }
     }
     public string SelectedGlobalProcessInspectorModeText => IsGlobalWatchGroupedMode
-        ? "Applications mode: aggregated application-level view"
-        : "Processes mode: individual process detail view";
+        ? GetText("Ui_ModeAppGroup")
+        : GetText("Ui_ModeIndividual");
     public string SelectedGlobalProcessRelationText => SelectedGlobalProcess is null
-        ? "Select a row to inspect process relationships."
+        ? GetText("Ui_NoRelationData")
         : SelectedGlobalProcess.IsGroup
-            ? $"Application group for {SelectedGlobalProcess.ExeName}; contains {SelectedGlobalProcess.InstanceCount:N0} running instance(s)."
+            ? string.Format(GetText("Ui_AppGroupRelation"), SelectedGlobalProcess.ExeName, SelectedGlobalProcess.InstanceCount)
             : SelectedGlobalProcess.Process.ParentProcessId is not null
-                ? $"Likely helper/subprocess under {SelectedGlobalProcess.ParentProcessText}."
+                ? string.Format(GetText("Ui_SubprocessRelation"), SelectedGlobalProcess.ParentProcessText)
                 : SelectedGlobalProcess.Process.DescendantProcessCount > 0
-                    ? $"Root or broker candidate with {SelectedGlobalProcess.Process.DescendantProcessCount:N0} descendant(s)."
-                    : "Standalone/root process candidate; no descendants were visible in the last scan.";
+                    ? string.Format(GetText("Ui_RootCandidateRelation"), SelectedGlobalProcess.Process.DescendantProcessCount)
+                    : GetText("Ui_StandaloneRelation");
     public string SelectedGlobalProcessAppearsBecauseText => SelectedGlobalProcess is null
-        ? "No selected row."
+        ? GetText("Ui_NoTargetSelected")
         : SelectedGlobalProcess.IsGroup
-            ? "Shown because Global Watch groups currently running processes by exe name in Applications mode."
-            : "Shown because this PID was present in the last lightweight Global Watch scan.";
-    public string SelectedGlobalProcessCommandLineText => "Not captured in lightweight scan.";
+            ? GetText("Ui_AppModeReason")
+            : GetText("Ui_PidScanReason");
+    public string SelectedGlobalProcessCommandLineText => GetText("Ui_NotCaptured");
     public string SelectedGlobalProcessSuspiciousLastLaunchText
     {
         get
@@ -1308,17 +1363,19 @@ public sealed class MainWindowViewModel : ObservableObject
                 .OrderByDescending(item => item.Timestamp)
                 .FirstOrDefault();
 
-            return launch is null
-                ? "No suspicious launch logged after mark."
-                : $"Last launch: {launch.Timestamp.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
-                    + (launch.ParentProcessId is null
-                        ? string.Empty
-                        : $" from {(string.IsNullOrWhiteSpace(launch.ParentProcessName) ? "Unknown" : launch.ParentProcessName)} ({launch.ParentProcessId})");
+            if (launch is null) return GetText("Ui_NoSuspiciousLaunch");
+
+            var time = launch.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            var parent = launch.ParentProcessId is null
+                ? string.Empty
+                : $" {GetText("Ui_From")} {(string.IsNullOrWhiteSpace(launch.ParentProcessName) ? "Unknown" : launch.ParentProcessName)} ({launch.ParentProcessId})";
+
+            return string.Format(GetText("Ui_LastLaunch"), time) + parent;
         }
     }
     public string GlobalWatchEmptyStateText => IsGlobalWatchGroupedMode
-        ? "No applications match the current Global Watch filters."
-        : "No processes match the current Global Watch filters.";
+        ? GetText("Ui_NoAppsMatch")
+        : GetText("Ui_NoProcessesMatch");
     public bool HasGlobalWatchRows => GlobalWatchProcesses.Count > 0;
     public bool CanInspectSelectedGlobalProcess => SelectedGlobalProcess is not null;
     public bool CanOpenSelectedGlobalProcessFileLocation => TryGetSelectedGlobalProcessUsablePath(out var path)
@@ -1375,14 +1432,14 @@ public sealed class MainWindowViewModel : ObservableObject
     public string InspectorCpuText => _processInspectorTarget?.CpuText ?? "n/a";
     public string InspectorRamText => _processInspectorTarget?.RamText ?? "n/a";
     public string InspectorDiskText => _processInspectorTarget?.DiskText ?? "n/a";
-    public string InspectorStatusText => _processInspectorTarget?.StatusText ?? "not running";
+    public string InspectorStatusText => _processInspectorTarget?.StatusText ?? GetText("Ui_NotRunning");
     public string InspectorProfileText => _processInspectorTarget?.ProfileText ?? "n/a";
     public string InspectorHealthText => _processInspectorTarget?.HealthText ?? "n/a";
-    public string InspectorReasonText => _processInspectorTarget?.ReasonText ?? "Select a target to inspect.";
+    public string InspectorReasonText => _processInspectorTarget?.ReasonText ?? GetText("Ui_NoTargetSelected");
     public string InspectorIncludedText => _processInspectorTarget?.IncludedText ?? "n/a";
-    public string InspectorRelationText => _processInspectorTarget?.RelationText ?? "No process relationship data.";
-    public string InspectorAppearsBecauseText => _processInspectorTarget?.AppearsBecauseText ?? "No selected target.";
-    public string InspectorCommandLineText => _processInspectorTarget?.CommandLineText ?? "Not captured.";
+    public string InspectorRelationText => _processInspectorTarget?.RelationText ?? GetText("Ui_NoRelationData");
+    public string InspectorAppearsBecauseText => _processInspectorTarget?.AppearsBecauseText ?? GetText("Ui_NoTargetSelected");
+    public string InspectorCommandLineText => _processInspectorTarget?.CommandLineText ?? GetText("Ui_NotCaptured");
     public bool InspectorIsGroup => _processInspectorTarget?.IsGroup ?? false;
     public IReadOnlyList<GlobalProcessMemberViewModel> InspectorIncludedProcessRows => _processInspectorTarget?.IncludedProcessRows ?? [];
     public string InspectorWhatItDoesText
@@ -1392,23 +1449,23 @@ public sealed class MainWindowViewModel : ObservableObject
             var target = _processInspectorTarget;
             if (target is null)
             {
-                return "No inspector target loaded.";
+                return GetText("Ui_NoInspectorTarget");
             }
 
             var product = string.IsNullOrWhiteSpace(target.ProductName) || target.ProductName.Contains("unknown", StringComparison.OrdinalIgnoreCase)
                 ? target.ExeName
                 : target.ProductName;
             var description = string.IsNullOrWhiteSpace(target.FileDescription) || target.FileDescription == "Unavailable"
-                ? "No file description is available for this executable."
+                ? GetText("Ui_NoDescription")
                 : target.FileDescription;
             var company = string.IsNullOrWhiteSpace(target.CompanyName) || target.CompanyName.Contains("unknown", StringComparison.OrdinalIgnoreCase)
-                ? "publisher unknown"
+                ? GetText("Ui_PublisherUnknown")
                 : target.CompanyName;
             var running = target.IsRunning
-                ? "It is currently running in the latest Global Watch scan."
-                : "It is not running in the latest Global Watch scan, so metrics/tree details are saved best-effort context.";
+                ? GetText("Ui_InspectorRunningHint")
+                : GetText("Ui_InspectorNotRunningHint");
 
-            return $"{product}: {description} Publisher: {company}. {running}";
+            return $"{product}: {description} {GetText("Ui_Company")}: {company}. {running}";
         }
     }
 
@@ -1500,8 +1557,8 @@ public sealed class MainWindowViewModel : ObservableObject
         !IsRecording
         && (SelectedTargetMode switch
         {
-            TargetModeExecutable => !string.IsNullOrWhiteSpace(SelectedExecutablePath),
-            TargetModeAssignedApps => SelectedAssignedTarget?.RunningProcessId is not null,
+            var mode when mode == TargetModeExecutable => !string.IsNullOrWhiteSpace(SelectedExecutablePath),
+            var mode when mode == TargetModeAssignedApps => SelectedAssignedTarget?.RunningProcessId is not null,
             _ => SelectedRunningTarget is not null
         });
 
@@ -1509,20 +1566,29 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public bool CanMonitorSelectedGlobalProcess => SelectedGlobalProcess is not null;
 
-    public string TargetReadinessText => SelectedTargetMode switch
+    public string TargetReadinessText
     {
-        TargetModeExecutable => string.IsNullOrWhiteSpace(SelectedExecutablePath)
-            ? "Choose an executable in the manual launch section."
-            : $"Ready to launch and track {Path.GetFileName(SelectedExecutablePath)}.",
-        TargetModeAssignedApps => SelectedAssignedTarget is null
-            ? "No assigned app selected."
-            : SelectedAssignedTarget.RunningProcessId is null
-                ? $"{SelectedAssignedTarget.ExeName} is not running. Start it manually, then refresh."
-                : $"Ready to attach to {SelectedAssignedTarget.ExeName} ({SelectedAssignedTarget.RunningStatus}).",
-        _ => SelectedRunningTarget is null
-            ? "Select a running process."
-            : $"Ready to attach to {SelectedRunningTarget.DisplayName}."
-    };
+        get
+        {
+            if (SelectedTargetMode == TargetModeExecutable)
+            {
+                return string.IsNullOrWhiteSpace(SelectedExecutablePath)
+                    ? "Choose an executable in the manual launch section."
+                    : $"Ready to launch and track {Path.GetFileName(SelectedExecutablePath)}.";
+            }
+            if (SelectedTargetMode == TargetModeAssignedApps)
+            {
+                return SelectedAssignedTarget is null
+                    ? "No assigned app selected."
+                    : SelectedAssignedTarget.RunningProcessId is null
+                        ? $"{SelectedAssignedTarget.ExeName} is not running. Start it manually, then refresh."
+                        : $"Ready to attach to {SelectedAssignedTarget.ExeName} ({SelectedAssignedTarget.RunningStatus}).";
+            }
+            return SelectedRunningTarget is null
+                ? "Select a running process."
+                : $"Ready to attach to {SelectedRunningTarget.DisplayName}.";
+        }
+    }
 
     public string ActiveThresholdSourceText => ResolveActiveThresholdSourceText();
     public string LiveConfigTargetText => LiveSessionTargetText;
@@ -1611,6 +1677,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         StoragePath = storagePath;
         var thresholds = await _thresholdSettingsStore.LoadAsync(cancellationToken);
+        ApplyLanguageSettingsToUi(thresholds.Language);
         LoadThresholdSettingsIntoUi(thresholds);
         RefreshGlobalWatchJournalCollection();
         RefreshSuspiciousWatchCollections();
@@ -2159,6 +2226,23 @@ public sealed class MainWindowViewModel : ObservableObject
         ThresholdSettingsStatusText = MinimizeToTrayOnClose
             ? "Close button will keep Session Perf Tracker running in the tray."
             : "Close button will exit Session Perf Tracker.";
+    }
+
+    public async Task SaveLanguageSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        var languageCode = SelectedLanguageOption?.LanguageCode ?? AppLanguageSettings.DefaultLanguageCode;
+        languageCode = LocalizationManager.NormalizeLanguageCode(languageCode);
+        await _thresholdSettingsStore.SaveAsync(
+            _thresholdSettingsStore.Current with
+            {
+                Language = _thresholdSettingsStore.Current.Language with { LanguageCode = languageCode }
+            },
+            cancellationToken);
+
+        ApplyLanguageSettingsToUi(_thresholdSettingsStore.Current.Language);
+        LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
+            ? "Язык приложения: русский."
+            : "Application language: English.";
     }
 
     public async Task SaveSelectedProfileAsync(CancellationToken cancellationToken = default)
@@ -3568,7 +3652,7 @@ public sealed class MainWindowViewModel : ObservableObject
         SuspiciousWatchStatusText = "Suspicious mark removed. Existing launch history is kept for review.";
     }
 
-    private static GlobalWatchJournalEntry CreateGlobalWatchJournalEntry(
+    private GlobalWatchJournalEntry CreateGlobalWatchJournalEntry(
         GlobalProcessRowViewModel row,
         DateTimeOffset capturedAt,
         string healthState,
@@ -3894,7 +3978,7 @@ public sealed class MainWindowViewModel : ObservableObject
             _activeSessionProfileText = string.Empty;
             _autoStopInProgress = false;
             _manualStopInProgress = false;
-            _autoStopStatusText = "Monitoring stopped. Press Start to apply changes.";
+            _autoStopStatusText = GetText("Ui_MonitoringStoppedChanges");
             SetLiveSessionState(nextState);
             NotifyLivePanelProperties();
             NotifyTargetSelectionProperties();
@@ -4013,6 +4097,7 @@ public sealed class MainWindowViewModel : ObservableObject
         CaptureDiskRead = settings.Capture.CaptureDiskRead;
         CaptureDiskWrite = settings.Capture.CaptureDiskWrite;
         MinimizeToTrayOnClose = settings.Behavior.MinimizeToTrayOnClose;
+        ApplyLanguageSettingsToUi(settings.Language);
         SelectedRetentionOption = RetentionOptions.FirstOrDefault(option => option.Days == settings.Retention.RetentionDays)
             ?? RetentionOptions.FirstOrDefault(option => option.Days == 30)
             ?? RetentionOptions.FirstOrDefault();
@@ -4062,6 +4147,18 @@ public sealed class MainWindowViewModel : ObservableObject
         RefreshGlobalWatchJournalCollection();
         RefreshSuspiciousWatchCollections();
         NotifyTargetSelectionProperties();
+    }
+
+    private void ApplyLanguageSettingsToUi(AppLanguageSettings settings)
+    {
+        var languageCode = LocalizationManager.NormalizeLanguageCode(settings.LanguageCode);
+        SelectedLanguageOption = LanguageOptions.FirstOrDefault(option =>
+            option.LanguageCode.Equals(languageCode, StringComparison.OrdinalIgnoreCase))
+            ?? LanguageOptions.FirstOrDefault();
+        LocalizationManager.ApplyLanguage(languageCode);
+        LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
+            ? "Язык приложения: русский."
+            : "Application language: English.";
     }
 
     private void ApplyExportSettingsToUi(ExportSettings exportSettings)
@@ -4336,21 +4433,30 @@ public sealed class MainWindowViewModel : ObservableObject
             filtered = filtered.Where(process => process.IsNearLimit);
         }
 
-        filtered = SelectedGlobalWatchSortMode switch
+        if (SelectedGlobalWatchSortMode == GlobalSortRam)
         {
-            GlobalSortRam => filtered
+            filtered = filtered
                 .OrderByDescending(process => process.MemoryMb ?? 0)
-                .ThenByDescending(process => process.CpuPercent ?? 0),
-            GlobalSortDisk => filtered
+                .ThenByDescending(process => process.CpuPercent ?? 0);
+        }
+        else if (SelectedGlobalWatchSortMode == GlobalSortDisk)
+        {
+            filtered = filtered
                 .OrderByDescending(process => process.DiskTotalMbPerSec)
-                .ThenByDescending(process => process.CpuPercent ?? 0),
-            GlobalSortName => filtered
+                .ThenByDescending(process => process.CpuPercent ?? 0);
+        }
+        else if (SelectedGlobalWatchSortMode == GlobalSortName)
+        {
+            filtered = filtered
                 .OrderBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(process => process.ProcessId),
-            _ => filtered
+                .ThenBy(process => process.ProcessId);
+        }
+        else
+        {
+            filtered = filtered
                 .OrderByDescending(process => process.CpuPercent ?? 0)
-                .ThenByDescending(process => process.MemoryMb ?? 0)
-        };
+                .ThenByDescending(process => process.MemoryMb ?? 0);
+        }
 
         var previousKey = preferredSelectionKey
             ?? _selectedGlobalProcessKey
@@ -5326,7 +5432,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         _autoStopInProgress = true;
         _manualStopInProgress = false;
-        _autoStopStatusText = "Monitoring stopped. Press Start to apply changes.";
+        _autoStopStatusText = GetText("Ui_MonitoringStoppedChanges");
         RecordingStatusText = _autoStopStatusText;
         LiveWarningText = _autoStopStatusText;
         LiveSnapshotText = $"stopping: {reason}";
@@ -5343,7 +5449,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         _autoStopInProgress = true;
         _manualStopInProgress = false;
-        _autoStopStatusText = "Monitoring stopped. Press Start to apply capture changes.";
+        _autoStopStatusText = GetText("Ui_MonitoringStoppedCapture");
         RecordingStatusText = _autoStopStatusText;
         LiveWarningText = _autoStopStatusText;
         LiveSnapshotText = $"stopping: {reason}";
@@ -5364,22 +5470,14 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task<TargetDescriptor?> ResolveSelectedRecordingTargetAsync(CancellationToken cancellationToken)
     {
-        return SelectedTargetMode switch
-        {
-            TargetModeExecutable => await _targetResolver.ResolveExecutableAsync(
-                SelectedExecutablePath,
-                IncludeChildProcesses,
-                cancellationToken),
-            TargetModeAssignedApps when SelectedAssignedTarget?.RunningProcessId is int processId => await _targetResolver.ResolveProcessAsync(
-                processId,
-                IncludeChildProcesses,
-                cancellationToken),
-            TargetModeRunningProcess when SelectedRunningTarget is not null => await _targetResolver.ResolveProcessAsync(
-                SelectedRunningTarget.ProcessId,
-                IncludeChildProcesses,
-                cancellationToken),
-            _ => null
-        };
+        var mode = SelectedTargetMode;
+        if (mode == TargetModeExecutable)
+            return await _targetResolver.ResolveExecutableAsync(SelectedExecutablePath, IncludeChildProcesses, cancellationToken);
+        if (mode == TargetModeAssignedApps && SelectedAssignedTarget?.RunningProcessId is int processId)
+            return await _targetResolver.ResolveProcessAsync(processId, IncludeChildProcesses, cancellationToken);
+        if (mode == TargetModeRunningProcess && SelectedRunningTarget is not null)
+            return await _targetResolver.ResolveProcessAsync(SelectedRunningTarget.ProcessId, IncludeChildProcesses, cancellationToken);
+        return null;
     }
 
     private SamplingSettings CreateSamplingSettings(TargetDescriptor target)
@@ -5430,18 +5528,12 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private async Task<TargetDescriptor?> ResolveSelectedAttachTargetAsync(CancellationToken cancellationToken)
     {
-        return SelectedTargetMode switch
-        {
-            TargetModeAssignedApps when SelectedAssignedTarget?.RunningProcessId is int processId => await _targetResolver.ResolveProcessAsync(
-                processId,
-                IncludeChildProcesses,
-                cancellationToken),
-            TargetModeRunningProcess when SelectedRunningTarget is not null => await _targetResolver.ResolveProcessAsync(
-                SelectedRunningTarget.ProcessId,
-                IncludeChildProcesses,
-                cancellationToken),
-            _ => null
-        };
+        var mode = SelectedTargetMode;
+        if (mode == TargetModeAssignedApps && SelectedAssignedTarget?.RunningProcessId is int processId)
+            return await _targetResolver.ResolveProcessAsync(processId, IncludeChildProcesses, cancellationToken);
+        if (mode == TargetModeRunningProcess && SelectedRunningTarget is not null)
+            return await _targetResolver.ResolveProcessAsync(SelectedRunningTarget.ProcessId, IncludeChildProcesses, cancellationToken);
+        return null;
     }
 
     private string ResolveActiveThresholdSourceText()
@@ -5473,8 +5565,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private TargetDescriptor? GetSelectedTargetDescriptorForThresholdSource() => SelectedTargetMode switch
     {
-        TargetModeAssignedApps => null,
-        TargetModeExecutable => string.IsNullOrWhiteSpace(SelectedExecutablePath)
+        var mode when mode == TargetModeAssignedApps => null,
+        var mode when mode == TargetModeExecutable => string.IsNullOrWhiteSpace(SelectedExecutablePath)
             ? null
             : new TargetDescriptor
             {
@@ -5489,8 +5581,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private string? GetSelectedTargetExeNameForThresholdSource() => SelectedTargetMode switch
     {
-        TargetModeAssignedApps => SelectedAssignedTarget?.ExeName,
-        TargetModeExecutable => Path.GetFileName(SelectedExecutablePath),
+        var mode when mode == TargetModeAssignedApps => SelectedAssignedTarget?.ExeName,
+        var mode when mode == TargetModeExecutable => Path.GetFileName(SelectedExecutablePath),
         _ => SelectedRunningTarget is null ? null : GetExeNameFromTarget(SelectedRunningTarget.Target)
     };
 
@@ -5727,7 +5819,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 : $"{metric.Label}: not collected in this build");
     }
 
-    private static IEnumerable<SessionDetailFactViewModel> CreateSessionDetailFacts(SessionRecord session)
+    private IEnumerable<SessionDetailFactViewModel> CreateSessionDetailFacts(SessionRecord session)
     {
         var facts = new List<SessionDetailFactViewModel>
         {
@@ -5810,15 +5902,15 @@ public sealed class MainWindowViewModel : ObservableObject
         return enabled.Count == 0 ? "No metrics enabled" : string.Join(", ", enabled);
     }
 
-    private static string FormatSessionStatus(SessionStatus status) => status switch
+    private string FormatSessionStatus(SessionStatus status) => status switch
     {
-        SessionStatus.Completed => "Completed",
-        SessionStatus.Running => "Recording",
-        SessionStatus.Stopped => "Stopped by user",
-        SessionStatus.ExternalExit => "Closed externally",
-        SessionStatus.UnexpectedExit => "Unexpected exit",
-        SessionStatus.CrashLikeExit => "Crash-like exit",
-        SessionStatus.Planned => "Not recorded",
+        SessionStatus.Completed => GetText("Ui_StatusCompleted"),
+        SessionStatus.Running => GetText("Ui_StatusRecording"),
+        SessionStatus.Stopped => GetText("Ui_StatusStoppedByUser"),
+        SessionStatus.ExternalExit => GetText("Ui_StatusClosedExternally"),
+        SessionStatus.UnexpectedExit => GetText("Ui_StatusUnexpectedExit"),
+        SessionStatus.CrashLikeExit => GetText("Ui_StatusCrashLikeExit"),
+        SessionStatus.Planned => GetText("Ui_StatusNotRecorded"),
         _ => status.ToString()
     };
 
@@ -5827,7 +5919,7 @@ public sealed class MainWindowViewModel : ObservableObject
             ? summary.StabilityStatus.ToString()
             : $"{summary.StabilityStatus}: {summary.StabilityReason}";
 
-    private static string FormatExit(SessionSummary summary)
+    private string FormatExit(SessionSummary summary)
     {
         if (!string.IsNullOrWhiteSpace(summary.ExitReason))
         {
@@ -5836,7 +5928,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
         return summary.ExitKind switch
         {
-            SessionExitKind.NormalStop => "Normal stop in utility",
+            SessionExitKind.NormalStop => GetText("Ui_ExitNormalStop"),
             SessionExitKind.ExternalClose => "External close / graceful exit",
             SessionExitKind.UnexpectedExit => "Unexpected exit",
             SessionExitKind.CrashLikeExit => "Crash-like exit",

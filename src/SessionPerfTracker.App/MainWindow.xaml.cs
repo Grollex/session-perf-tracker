@@ -322,6 +322,11 @@ public partial class MainWindow : Window
         await _viewModel.SaveAppBehaviorSettingsAsync();
     }
 
+    private async void SaveLanguageSettings_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.SaveLanguageSettingsAsync();
+    }
+
     private async void SaveSelectedProfile_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.SaveSelectedProfileAsync();

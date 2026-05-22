@@ -177,6 +177,9 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
         var updates = settingsRows.TryGetValue("updates", out var updatesJson)
             ? Deserialize<AppUpdateSettings>(updatesJson) ?? new AppUpdateSettings()
             : new AppUpdateSettings();
+        var language = settingsRows.TryGetValue("language", out var languageJson)
+            ? Deserialize<AppLanguageSettings>(languageJson) ?? new AppLanguageSettings()
+            : new AppLanguageSettings();
         var selectedProfileId = settingsRows.TryGetValue("selected_profile_id", out var selectedProfileJson)
             ? Deserialize<string>(selectedProfileJson) ?? ThresholdProfileDefaults.BrowsersChatsId
             : ThresholdProfileDefaults.BrowsersChatsId;
@@ -198,7 +201,8 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
             WatchJournal = watchJournal,
             SuspiciousWatchlist = suspiciousWatchlist,
             ProcessBans = processBans,
-            Updates = updates
+            Updates = updates,
+            Language = language
         };
     }
 
@@ -229,6 +233,7 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
         await InsertSettingAsync(connection, transaction, "suspicious_watchlist", settings.SuspiciousWatchlist, cancellationToken);
         await InsertSettingAsync(connection, transaction, "process_bans", settings.ProcessBans, cancellationToken);
         await InsertSettingAsync(connection, transaction, "updates", settings.Updates, cancellationToken);
+        await InsertSettingAsync(connection, transaction, "language", settings.Language, cancellationToken);
 
         for (var index = 0; index < settings.Profiles.Count; index++)
         {

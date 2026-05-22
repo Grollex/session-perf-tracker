@@ -1,3 +1,5 @@
+using System.Windows;
+using Application = System.Windows.Application;
 using System.Diagnostics;
 using System.IO;
 using SessionPerfTracker.Domain.Abstractions;
@@ -13,6 +15,8 @@ public sealed class SessionListItemViewModel
         Session = session;
     }
 
+    private static string GetText(string key) => Application.Current?.TryFindResource(key) as string ?? key;
+
     public SessionRecord Session { get; }
     public string Id => Session.Id;
     public string DisplayName => Session.Target.DisplayName;
@@ -20,7 +24,7 @@ public sealed class SessionListItemViewModel
     public string StartedText => Session.StartedAt.ToLocalTime().ToString("MMM dd, HH:mm");
     public string StartedFullText => Session.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
     public string DurationText => FormatDuration(Session.Summary.Duration);
-    public string ChildTrackingText => Session.Target.IncludeChildProcesses ? "child ON" : "child OFF";
+    public string ChildTrackingText => Session.Target.IncludeChildProcesses ? GetText("Ui_ChildOn") : GetText("Ui_ChildOff");
     public string SamplingText => $"{Session.Sampling.IntervalMs} ms";
     public bool IsDemoSession => Session.Id.Contains("mock", StringComparison.OrdinalIgnoreCase)
         || (Session.Notes?.Contains("Mock", StringComparison.OrdinalIgnoreCase) ?? false);
@@ -33,8 +37,8 @@ public sealed class SessionListItemViewModel
         : IsShortSession
             ? "Very short"
             : "Recorded session";
-    public string StabilityText => $"Stability: {Session.Summary.StabilityStatus}";
-    public string StabilityReason => Session.Summary.StabilityReason ?? "No stability summary.";
+    public string StabilityText => $"{GetText("Ui_Stability")}: {Session.Summary.StabilityStatus}";
+    public string StabilityReason => Session.Summary.StabilityReason ?? GetText("Ui_NoStabilitySummary");
     public string StartupText => Session.Summary.LongStartupMs is null
         ? "Startup: no long startup event"
         : $"Startup: {TimeSpan.FromMilliseconds(Session.Summary.LongStartupMs.Value).TotalSeconds:N1}s";
@@ -42,7 +46,7 @@ public sealed class SessionListItemViewModel
         ? "Exit: crash-like"
         : Session.Summary.ExitKind switch
         {
-            SessionExitKind.NormalStop => "Exit: stopped in utility",
+            SessionExitKind.NormalStop => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitNormalStop")}",
             SessionExitKind.ExternalClose => "Exit: external close / graceful",
             SessionExitKind.UnexpectedExit => "Exit: unexpected",
             SessionExitKind.CrashLikeExit => "Exit: crash-like",
@@ -54,13 +58,13 @@ public sealed class SessionListItemViewModel
     public string CompareLabel => SessionLabel;
     public string StatusText => Session.Status switch
     {
-        SessionStatus.Completed => "Completed",
-        SessionStatus.Running => "Recording",
-        SessionStatus.Stopped => "Stopped by user",
-        SessionStatus.ExternalExit => "Closed externally",
-        SessionStatus.UnexpectedExit => "Ended unexpectedly",
-        SessionStatus.CrashLikeExit => "Crash-like exit",
-        SessionStatus.Planned => "Not recorded",
+        SessionStatus.Completed => GetText("Ui_StatusCompleted"),
+        SessionStatus.Running => GetText("Ui_StatusRecording"),
+        SessionStatus.Stopped => GetText("Ui_StatusStoppedByUser"),
+        SessionStatus.ExternalExit => GetText("Ui_StatusClosedExternally"),
+        SessionStatus.UnexpectedExit => GetText("Ui_StatusUnexpectedExit"),
+        SessionStatus.CrashLikeExit => GetText("Ui_StatusCrashLikeExit"),
+        SessionStatus.Planned => GetText("Ui_StatusNotRecorded"),
         _ => Session.Status.ToString()
     };
     public string EventCountText => Session.Summary.EventCount.ToString("N0");
@@ -119,6 +123,20 @@ public sealed class SamplingOptionViewModel
     public string Label => $"{IntervalMs} ms";
 
     public override string ToString() => Label;
+}
+
+public sealed class LanguageOptionViewModel
+{
+    public LanguageOptionViewModel(string languageCode, string displayName)
+    {
+        LanguageCode = languageCode;
+        DisplayName = displayName;
+    }
+
+    public string LanguageCode { get; }
+    public string DisplayName { get; }
+
+    public override string ToString() => DisplayName;
 }
 
 public sealed class RetentionOptionViewModel
@@ -751,29 +769,28 @@ public sealed class ProcessInspectorTargetViewModel
         ModeText = modeText;
         ExeName = string.IsNullOrWhiteSpace(exeName) ? "n/a" : exeName;
         DisplayName = string.IsNullOrWhiteSpace(displayName) ? Title : displayName;
-        FullPath = string.IsNullOrWhiteSpace(fullPath) ? "Unavailable" : fullPath;
+        FullPath = string.IsNullOrWhiteSpace(fullPath) ? GetText("Ui_Unavailable") : fullPath;
         NormalizedFullPath = NormalizePath(normalizedFullPath, fullPath);
-        ProductName = string.IsNullOrWhiteSpace(productName) ? "Unknown product" : productName;
-        FileDescription = string.IsNullOrWhiteSpace(fileDescription) ? "Unavailable" : fileDescription;
-        CompanyName = string.IsNullOrWhiteSpace(companyName) ? "Unknown company" : companyName;
-        SignerStatus = string.IsNullOrWhiteSpace(signerStatus) ? "Unknown signer" : signerStatus;
-        Version = string.IsNullOrWhiteSpace(version) ? "Unavailable" : version;
-        OriginalFileName = string.IsNullOrWhiteSpace(originalFileName) ? "Unavailable" : originalFileName;
+        ProductName = string.IsNullOrWhiteSpace(productName) ? GetText("Ui_UnknownProduct") : productName;
+        FileDescription = string.IsNullOrWhiteSpace(fileDescription) ? GetText("Ui_Unavailable") : fileDescription;
+        CompanyName = string.IsNullOrWhiteSpace(companyName) ? GetText("Ui_UnknownCompany") : companyName;
+        SignerStatus = string.IsNullOrWhiteSpace(signerStatus) ? GetText("Ui_UnknownSigner") : signerStatus;
+        Version = string.IsNullOrWhiteSpace(version) ? GetText("Ui_Unavailable") : version;
+        OriginalFileName = string.IsNullOrWhiteSpace(originalFileName) ? GetText("Ui_Unavailable") : originalFileName;
         ParentText = string.IsNullOrWhiteSpace(parentText) ? "n/a" : parentText;
         DescendantsText = string.IsNullOrWhiteSpace(descendantsText) ? "n/a" : descendantsText;
         PidText = string.IsNullOrWhiteSpace(pidText) ? "n/a" : pidText;
         CpuText = string.IsNullOrWhiteSpace(cpuText) ? "n/a" : cpuText;
         RamText = string.IsNullOrWhiteSpace(ramText) ? "n/a" : ramText;
         DiskText = string.IsNullOrWhiteSpace(diskText) ? "n/a" : diskText;
-        StatusText = string.IsNullOrWhiteSpace(statusText) ? "not running" : statusText;
+        StatusText = string.IsNullOrWhiteSpace(statusText) ? GetText("Ui_NotRunning") : statusText;
         ProfileText = string.IsNullOrWhiteSpace(profileText) ? "n/a" : profileText;
         HealthText = string.IsNullOrWhiteSpace(healthText) ? "n/a" : healthText;
-        ReasonText = string.IsNullOrWhiteSpace(reasonText) ? "No watch reason available." : reasonText;
+        ReasonText = string.IsNullOrWhiteSpace(reasonText) ? GetText("Ui_NoTargetSelected") : reasonText;
         IncludedText = string.IsNullOrWhiteSpace(includedText) ? "n/a" : includedText;
-        RelationText = string.IsNullOrWhiteSpace(relationText) ? "No live process tree is available." : relationText;
-        AppearsBecauseText = string.IsNullOrWhiteSpace(appearsBecauseText) ? "Loaded from saved watch data." : appearsBecauseText;
-        CommandLineText = string.IsNullOrWhiteSpace(commandLineText) ? "Not captured in lightweight scan." : commandLineText;
-        IsGroup = isGroup;
+        RelationText = string.IsNullOrWhiteSpace(relationText) ? GetText("Ui_NoRelationData") : relationText;
+        AppearsBecauseText = string.IsNullOrWhiteSpace(appearsBecauseText) ? GetText("Ui_NoTargetSelected") : appearsBecauseText;
+        CommandLineText = string.IsNullOrWhiteSpace(commandLineText) ? GetText("Ui_NotCaptured") : commandLineText;        IsGroup = isGroup;
         IsRunning = isRunning;
         ActiveRow = activeRow;
         IncludedProcessRows = includedProcessRows ?? [];
@@ -813,6 +830,8 @@ public sealed class ProcessInspectorTargetViewModel
     public bool HasUsablePath => !string.IsNullOrWhiteSpace(NormalizedFullPath)
         && !string.Equals(FullPath, "Unavailable", StringComparison.OrdinalIgnoreCase);
 
+    private static string GetText(string key) => System.Windows.Application.Current?.TryFindResource(key) as string ?? key;
+
     public static ProcessInspectorTargetViewModel FromGlobalProcess(
         GlobalProcessRowViewModel row,
         string sourceText,
@@ -820,24 +839,23 @@ public sealed class ProcessInspectorTargetViewModel
     {
         var title = row.IsGroup ? row.AppName : row.DisplayName;
         var modeText = row.IsGroup || isApplicationsMode
-            ? "Applications mode: aggregated application-level view"
-            : "Processes mode: individual process detail view";
+            ? GetText("Ui_ModeAppGroup")
+            : GetText("Ui_ModeIndividual");
         var descendantsText = row.IsGroup
-            ? $"{row.InstanceCount:N0} instances; {row.IncludedProcesses.Count:N0} included processes"
-            : $"{row.DescendantCountText} descendants";
+            ? $"{row.InstanceCount:N0} {GetText("Ui_Instances")}; {row.IncludedProcesses.Count:N0} {GetText("Ui_IncludedProc")}"
+            : $"{row.DescendantCountText} {GetText("Ui_Descendants")}";
         var relationText = row.IsGroup
-            ? $"Application group for {row.ExeName}; contains {row.InstanceCount:N0} running instance(s)."
+            ? string.Format(GetText("Ui_AppGroupRelation"), row.ExeName, row.InstanceCount)
             : row.Process.ParentProcessId is not null
-                ? $"Likely helper/subprocess under {row.ParentProcessText}."
+                ? string.Format(GetText("Ui_SubprocessRelation"), row.ParentProcessText)
                 : row.Process.DescendantProcessCount > 0
-                    ? $"Root or broker candidate with {row.Process.DescendantProcessCount:N0} descendant(s)."
-                    : "Standalone/root process candidate; no descendants were visible in the last scan.";
+                    ? string.Format(GetText("Ui_RootCandidateRelation"), row.Process.DescendantProcessCount)
+                    : GetText("Ui_StandaloneRelation");
         var appearsBecauseText = row.IsGroup
-            ? "Shown because Global Watch groups currently running processes by exe name in Applications mode."
-            : "Shown because this PID was present in the last lightweight Global Watch scan.";
+            ? GetText("Ui_AppModeReason")
+            : GetText("Ui_PidScanReason");
 
-        return new ProcessInspectorTargetViewModel(
-            title,
+        return new ProcessInspectorTargetViewModel(            title,
             sourceText,
             modeText,
             row.ExeName,

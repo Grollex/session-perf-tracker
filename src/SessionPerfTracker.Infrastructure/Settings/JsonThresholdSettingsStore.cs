@@ -87,7 +87,8 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             WatchJournal = NormalizeWatchJournal(settings.WatchJournal),
             SuspiciousWatchlist = NormalizeSuspiciousWatchlist(settings.SuspiciousWatchlist),
             ProcessBans = NormalizeProcessBans(settings.ProcessBans),
-            Updates = NormalizeUpdates(settings.Updates)
+            Updates = NormalizeUpdates(settings.Updates),
+            Language = NormalizeLanguage(settings.Language)
         };
     }
 
@@ -197,6 +198,27 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             AutomaticallyCheckForUpdates = automaticallyCheck,
             ManifestUrl = manifestUrl,
             SkippedVersion = skippedVersion
+        };
+    }
+
+    private static AppLanguageSettings NormalizeLanguage(AppLanguageSettings? settings)
+    {
+        settings ??= new AppLanguageSettings();
+        var languageCode = string.IsNullOrWhiteSpace(settings.LanguageCode)
+            ? AppLanguageSettings.DefaultLanguageCode
+            : settings.LanguageCode.Trim();
+
+        languageCode = languageCode.Equals("en", StringComparison.OrdinalIgnoreCase)
+            ? "en-US"
+            : languageCode.Equals("ru", StringComparison.OrdinalIgnoreCase)
+                ? "ru-RU"
+                : languageCode;
+
+        return settings with
+        {
+            LanguageCode = languageCode.Equals("en-US", StringComparison.OrdinalIgnoreCase)
+                ? "en-US"
+                : AppLanguageSettings.DefaultLanguageCode
         };
     }
 

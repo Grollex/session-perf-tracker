@@ -19,6 +19,7 @@ public sealed record CpuRamThresholdSettings
     public ProcessBanSettings ProcessBans { get; init; } = new();
     public AppUpdateSettings Updates { get; init; } = new();
     public AppBehaviorSettings Behavior { get; init; } = new();
+    public AppLanguageSettings Language { get; init; } = new();
 
     public ThresholdLimitValues ToGlobalLimits() => new()
     {
@@ -84,6 +85,13 @@ public sealed record AppUpdateSettings
 public sealed record AppBehaviorSettings
 {
     public bool MinimizeToTrayOnClose { get; init; } = true;
+}
+
+public sealed record AppLanguageSettings
+{
+    public const string DefaultLanguageCode = "ru-RU";
+
+    public string LanguageCode { get; init; } = DefaultLanguageCode;
 }
 
 public sealed record UpdateManifest

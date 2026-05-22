@@ -27,3 +27,15 @@ Output/
 *.zip
 
 # Keep source scripts/configs, ignore generated binaries only.
+
+# OpenCode agent config
+opencode.*
+opencode.json
+opencode.jsonc
+sandbox/
+clipboard_content.txt
+scripts/check-omniroute-models.ps1
+
+# Agent session data
+._agent_memory/
+_opencode_*/
