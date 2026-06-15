@@ -1,27 +1,59 @@
-﻿# Session Perf Tracker - AI Agent Guide
+# 🚀 Session Perf Tracker
 
-Welcome, Agent. This file provides critical context for understanding and modifying this codebase.
+**Session Perf Tracker** — это мощный инструмент для тех, кто хочет держать свою Windows под полным контролем. Если обычный Диспетчер задач кажется вам "пустым", а система внезапно начинает тормозить из-за фоновых процессов — это приложение для вас.
 
-## Project Essence
-Session Perf Tracker is a Windows desktop application for performance monitoring and process control. It targets power users and gamers who need to identify and manage "noisy" or suspicious processes.
+![Session Perf Tracker](https://raw.githubusercontent.com/Grollex/session-perf-tracker/main/docs/images/banner.png) *(замените на реальный путь к скриншоту, если он есть)*
 
-## Architecture: Clean Architecture
-This project follows a layered approach to separate concerns:
-1. **Domain**: Pure business logic, models, and abstractions. **ZERO dependencies** on other projects or Windows-specific APIs.
-2. **Infrastructure**: Implementation of abstractions (WMI, WinAPI, Storage, Collectors). Depends on **Domain**.
-3. **App (WPF)**: UI layer using MVVM. Depends on **Domain** and **Infrastructure**.
+---
 
-## Tech Stack
-- **Language**: C# 12+ / .NET 8
-- **UI**: WPF (XAML)
-- **MVVM**: CommunityToolkit.Mvvm
-- **Storage**: JSON and SQLite
-- **Communication**: Inter-process monitoring via WMI and Windows Performance Counters.
+## 🔥 В чем "сок" приложения?
 
-## AI Instructions
-- **Modifying Logic**: Always check the Domain abstractions before changing Infrastructure implementations.
-- **UI Changes**: Follow MVVM strictly. Do not put logic in code-behind (.xaml.cs) unless it is strictly UI-related.
-- **Localization**: Strings are managed in src/SessionPerfTracker.App/Localization/. Update both RU and EN files.
-- **Testing**: Look for existing patterns in the project before adding new services.
+Это не просто монитор ресурсов. Это интеллектуальная система управления процессами, которая помогает:
 
-Refer to layer-specific README.md files in src/ subdirectories for deeper technical details.
+1.  **🔍 Находить "тихих убийц" производительности**:
+    Приложение отслеживает не только текущую нагрузку, но и ведет **Журнал (Journal)**. Вы увидите, какой процесс "спайкал" CPU или забивал диск, пока вы играли или работали, даже если это длилось всего секунду.
+
+2.  **🛡️ Автоматические запреты (Process Bans)**:
+    Надоело, что какой-то апдейтер или фоновая служба лезет в систему в неподходящий момент? Вы можете добавить процесс в черный список. Приложение может не только **убить** его, но и **запретить** повторный запуск.
+
+3.  **📈 Анализ сессий (Performance Sessions)**:
+    Запускайте мониторинг конкретной игры или тяжелого софта (например, Premiere Pro). По завершении вы получите детальный отчет: среднее потребление, пики, события (фризы, нехватка RAM) и экспорт в CSV/HTML.
+
+4.  **⚡ Система Анти-Шума (Anti-Noise)**:
+    Интеллектуальные фильтры позволяют отсекать мелкие колебания и фокусироваться только на реальных аномалиях производительности. Вы не будете отвлекаться на мусорные уведомления.
+
+5.  **🧠 Умные рекомендации**:
+    Система сама анализирует поведение приложений и предлагает оптимальные профили (например, "Браузеры", "Игры", "Headless"), чтобы вы точно знали, когда процесс вышел за рамки дозволенного.
+
+6.  **🔬 Глубокая диагностика**:
+    В один клик можно сделать **снимок RAM** или **системного контекста**, чтобы понять, что именно вызвало сбой или утечку памяти.
+
+---
+
+## 🛠 Ключевые функции
+
+*   **Global Watch**: Обзор всей системы в реальном времени с подсветкой подозрительной активности.
+*   **Targeted Monitoring**: Привязка профилей к конкретным EXE.
+*   **Comparison Engine**: Сравнивайте две разные сессии (например, игру с разными настройками графики), чтобы увидеть разницу в нагрузке.
+*   **Suspicious Watchlist**: Автоматическое отслеживание новых и подозрительных процессов.
+*   **Self-Monitoring**: Программа потребляет минимум ресурсов и сама сообщает о своем "оверхеде".
+
+---
+
+## 🚀 Как начать?
+
+1.  Скачайте последний релиз со страницы [Releases](https://github.com/Grollex/session-perf-tracker/releases).
+2.  Запустите `SessionPerfTracker.exe`.
+3.  Настройте свои пороги (Thresholds) в настройках или используйте пресеты.
+4.  Наслаждайтесь чистой и быстрой системой!
+
+---
+
+## 👨‍💻 Разработчикам и Агентам
+
+Проект построен на **Clean Architecture (.NET 8 + WPF)**. 
+- Подробности архитектуры и инструкции для AI-агентов находятся в [AGENTS.md](./AGENTS.md).
+- Локализация (RU/EN) поддерживается через XAML Resource Dictionaries.
+
+---
+*Сделано с любовью к производительности. Grollex.*
