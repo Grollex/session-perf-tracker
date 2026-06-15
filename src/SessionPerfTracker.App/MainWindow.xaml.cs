@@ -97,6 +97,7 @@ public partial class MainWindow : Window
     {
         Loaded -= OnLoaded;
         await _viewModel.InitializeAsync(_storagePath);
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -227,36 +228,54 @@ public partial class MainWindow : Window
     private void SortGlobalWatchProcess_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByProcess();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchPid_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByPid();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchCpu_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByCpu();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchRam_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByRam();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchDisk_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByDisk();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchProfile_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByProfile();
+        UpdateGlobalWatchSortHeaders();
     }
 
     private void SortGlobalWatchHealth_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SortGlobalWatchByHealth();
+        UpdateGlobalWatchSortHeaders();
+    }
+
+    private void UpdateGlobalWatchSortHeaders()
+    {
+        GlobalWatchProcessHeaderButton.Content = _viewModel.GlobalWatchProcessHeaderText;
+        GlobalWatchPidHeaderButton.Content = _viewModel.GlobalWatchPidHeaderText;
+        GlobalWatchCpuHeaderButton.Content = _viewModel.GlobalWatchCpuHeaderText;
+        GlobalWatchRamHeaderButton.Content = _viewModel.GlobalWatchRamHeaderText;
+        GlobalWatchDiskHeaderButton.Content = _viewModel.GlobalWatchDiskHeaderText;
+        GlobalWatchProfileHeaderButton.Content = _viewModel.GlobalWatchProfileHeaderText;
+        GlobalWatchHealthHeaderButton.Content = _viewModel.GlobalWatchHealthHeaderText;
     }
 
     private async void MonitorGlobalProcess_Click(object sender, RoutedEventArgs e)
