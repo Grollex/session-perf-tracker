@@ -275,10 +275,7 @@ public static class ThresholdProfileDefaults
     public static Dictionary<string, string> CreateDefaultAssignments() =>
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["opera.exe"] = BrowsersChatsId,
-            ["discord.exe"] = BrowsersChatsId,
-            ["telegram.exe"] = BrowsersChatsId,
-            ["HorizonForbiddenWest.exe"] = GamesId
+            ["chrome.exe"] = BrowsersChatsId
         };
 
     private static ThresholdProfile CreateProfile(

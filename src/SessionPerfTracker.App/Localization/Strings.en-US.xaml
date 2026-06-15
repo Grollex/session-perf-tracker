@@ -349,4 +349,12 @@
     <system:String x:Key="Ui_StartupNoLongEvent">Startup: no long startup event</system:String>
     <system:String x:Key="Ui_ExitPrefix">Exit</system:String>
     <system:String x:Key="Ui_RunningPid">Running (PID {0})</system:String>
+    <system:String x:Key="Ui_ProfileLightBackground">Light background</system:String>
+    <system:String x:Key="Ui_ProfileBrowsersChats">Browsers / chats</system:String>
+    <system:String x:Key="Ui_ProfileGames">Games</system:String>
+    <system:String x:Key="Ui_ProfileHardcore">Hardcore</system:String>
+    <system:String x:Key="Ui_ProfileCustom">Custom</system:String>
+    <system:String x:Key="Ui_EditableSuffix">editable</system:String>
+    <system:String x:Key="Ui_Auto">Auto</system:String>
+    <system:String x:Key="Ui_Example">example</system:String>
 </ResourceDictionary>

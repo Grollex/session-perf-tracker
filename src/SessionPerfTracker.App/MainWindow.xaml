@@ -4,14 +4,18 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="{Binding AppVersionBadgeText, StringFormat=Session Perf Tracker {0}}"
+        Title="{Binding AppWindowTitle}"
         Icon="Assets/app.ico"
-        Width="1180"
-        Height="760"
-        MinWidth="980"
-        MinHeight="640"
+        Width="1420"
+        Height="860"
+        MinWidth="1220"
+        MinHeight="720"
+        WindowStartupLocation="CenterScreen"
         Background="#101317"
         FontFamily="Segoe UI">
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo Description="{Binding AppWindowTitle}" />
+    </Window.TaskbarItemInfo>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
@@ -574,6 +578,37 @@
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="Padding" Value="6,6" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+
+        <Style x:Key="TableHeaderSortButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="HeaderButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -1377,7 +1412,6 @@
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="150" />
                         </Grid.ColumnDefinitions>
                         <Grid>
                             <TextBox Text="{Binding GlobalWatchFilterText, UpdateSourceTrigger=PropertyChanged}"
@@ -1399,12 +1433,7 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </Grid>
-                        <ComboBox Grid.Column="1"
-                                  ItemsSource="{Binding GlobalWatchSortModes}"
-                                  SelectedItem="{Binding SelectedGlobalWatchSortMode}"
-                                  Margin="12,0,0,0" />
                         <StackPanel Grid.Row="2"
-                                    Grid.ColumnSpan="2"
                                     Orientation="Horizontal">
                             <CheckBox Content="{DynamicResource Ui_OnlyOverLimit}"
                                       IsChecked="{Binding GlobalWatchOnlyOverLimit}"
@@ -1424,7 +1453,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="14" />
-                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="320" />
                         </Grid.ColumnDefinitions>
 
                         <Border Grid.Column="0" Style="{StaticResource Panel}">
@@ -1440,18 +1469,52 @@
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListView.View>
                                         <GridView>
-                                            <GridViewColumn Header="{DynamicResource Ui_ApplicationProcess}" Width="178">
+                                            <GridViewColumn Width="250">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchProcessHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchProcess_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
                                                     </DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>
-                                            <GridViewColumn Header="{DynamicResource Ui_PidOrCount}" Width="70" DisplayMemberBinding="{Binding PidOrCountText}" />
-                                            <GridViewColumn Header="{DynamicResource Ui_CPU}" Width="58" DisplayMemberBinding="{Binding CpuText}" />
-                                            <GridViewColumn Header="{DynamicResource Ui_RAM}" Width="88" DisplayMemberBinding="{Binding MemoryText}" />
-                                            <GridViewColumn Header="{DynamicResource Ui_Disk}" Width="82" DisplayMemberBinding="{Binding DiskTotalText}" />
-                                            <GridViewColumn Header="{DynamicResource Ui_Profile}" Width="76">
+                                            <GridViewColumn Width="90" DisplayMemberBinding="{Binding PidOrCountText}">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchPidHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchPid_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
+                                            </GridViewColumn>
+                                            <GridViewColumn Width="78" DisplayMemberBinding="{Binding CpuText}">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchCpuHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchCpu_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
+                                            </GridViewColumn>
+                                            <GridViewColumn Width="110" DisplayMemberBinding="{Binding MemoryText}">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchRamHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchRam_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
+                                            </GridViewColumn>
+                                            <GridViewColumn Width="110" DisplayMemberBinding="{Binding DiskTotalText}">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchDiskHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchDisk_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
+                                            </GridViewColumn>
+                                            <GridViewColumn Width="104">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchProfileHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchProfile_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <Border Padding="7,2"
@@ -1467,7 +1530,12 @@
                                                     </DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>
-                                            <GridViewColumn Header="{DynamicResource Ui_Health}" Width="76">
+                                            <GridViewColumn Width="92">
+                                                <GridViewColumn.Header>
+                                                    <Button Content="{Binding DataContext.GlobalWatchHealthHeaderText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            Click="SortGlobalWatchHealth_Click"
+                                                            Style="{StaticResource TableHeaderSortButton}" />
+                                                </GridViewColumn.Header>
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <Border Padding="7,2"

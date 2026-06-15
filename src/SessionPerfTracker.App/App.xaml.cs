@@ -1,5 +1,10 @@
 using System.Windows;
 using System.Threading;
+using System.Text.Json;
+using System.IO;
+using Microsoft.Data.Sqlite;
+using SessionPerfTracker.App.Localization;
+using SessionPerfTracker.Domain.Models;
 
 namespace SessionPerfTracker.App;
 
@@ -33,6 +38,8 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        LocalizationManager.ApplyLanguage(ResolveStartupLanguage());
+
         _showWindowWaitHandle = ThreadPool.RegisterWaitForSingleObject(
             _showWindowEvent,
             (_, _) => Dispatcher.BeginInvoke(ShowExistingMainWindow),
@@ -53,6 +60,64 @@ public partial class App : System.Windows.Application
         }
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
+    }
+
+    private static string ResolveStartupLanguage()
+    {
+        try
+        {
+            var appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "SessionPerfTracker");
+            var dbPath = Path.Combine(appDataPath, "sessionperftracker.db");
+            if (File.Exists(dbPath))
+            {
+                var connectionString = new SqliteConnectionStringBuilder
+                {
+                    DataSource = dbPath,
+                    Mode = SqliteOpenMode.ReadOnly
+                }.ToString();
+                using var connection = new SqliteConnection(connectionString);
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = "SELECT value_json FROM settings WHERE key = 'language' LIMIT 1;";
+                if (command.ExecuteScalar() is string languageJson)
+                {
+                    return ReadLanguageCode(languageJson);
+                }
+            }
+
+            var legacySettingsPath = Path.Combine(appDataPath, "settings.json");
+            if (File.Exists(legacySettingsPath))
+            {
+                return ReadLegacyLanguageCode(File.ReadAllText(legacySettingsPath));
+            }
+        }
+        catch
+        {
+        }
+
+        return AppLanguageSettings.DefaultLanguageCode;
+    }
+
+    private static string ReadLanguageCode(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.TryGetProperty(nameof(AppLanguageSettings.LanguageCode), out var languageCode)
+            ? LocalizationManager.NormalizeLanguageCode(languageCode.GetString())
+            : AppLanguageSettings.DefaultLanguageCode;
+    }
+
+    private static string ReadLegacyLanguageCode(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.TryGetProperty(nameof(CpuRamThresholdSettings.Language), out var language)
+            && language.TryGetProperty(nameof(AppLanguageSettings.LanguageCode), out var languageCode))
+        {
+            return LocalizationManager.NormalizeLanguageCode(languageCode.GetString());
+        }
+
+        return AppLanguageSettings.DefaultLanguageCode;
     }
 
     private void ShowExistingMainWindow()

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using SessionPerfTracker.App.ViewModels;
 using SessionPerfTracker.Domain.Services;
@@ -84,6 +85,7 @@ public partial class MainWindow : Window
             updatesPath);
         _viewModel.UpdateAvailablePromptRequested += OnUpdateAvailablePromptRequested;
         _viewModel.UpdateInstallerLaunched += OnUpdateInstallerLaunched;
+        _viewModel.LanguageRestartRequested += OnLanguageRestartRequested;
         DataContext = _viewModel;
         InitializeTrayIcon();
         Loaded += OnLoaded;
@@ -101,6 +103,7 @@ public partial class MainWindow : Window
     {
         _viewModel.UpdateAvailablePromptRequested -= OnUpdateAvailablePromptRequested;
         _viewModel.UpdateInstallerLaunched -= OnUpdateInstallerLaunched;
+        _viewModel.LanguageRestartRequested -= OnLanguageRestartRequested;
         _notifyIcon?.Dispose();
         _notifyIcon = null;
         _viewModel.Shutdown();
@@ -122,7 +125,7 @@ public partial class MainWindow : Window
             {
                 _notifyIcon.ShowBalloonTip(
                     2500,
-                    "Session Perf Tracker is still running",
+                    $"{_viewModel.AppWindowTitle} is still running",
                     "Use the tray icon to reopen it or choose Exit to quit.",
                     WinForms.ToolTipIcon.Info);
                 _trayNotificationShown = true;
@@ -133,12 +136,12 @@ public partial class MainWindow : Window
     private void InitializeTrayIcon()
     {
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add("Open", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
+        menu.Items.Add($"Open {_viewModel.AppWindowTitle}", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitFromTray));
 
         _notifyIcon = new WinForms.NotifyIcon
         {
-            Text = "Session Perf Tracker",
+            Text = _viewModel.AppWindowTitle,
             Icon = LoadTrayIcon(),
             ContextMenuStrip = menu,
             Visible = true
@@ -219,6 +222,41 @@ public partial class MainWindow : Window
     private async void RefreshGlobalWatch_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.RefreshGlobalWatchAsync();
+    }
+
+    private void SortGlobalWatchProcess_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByProcess();
+    }
+
+    private void SortGlobalWatchPid_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByPid();
+    }
+
+    private void SortGlobalWatchCpu_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByCpu();
+    }
+
+    private void SortGlobalWatchRam_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByRam();
+    }
+
+    private void SortGlobalWatchDisk_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByDisk();
+    }
+
+    private void SortGlobalWatchProfile_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByProfile();
+    }
+
+    private void SortGlobalWatchHealth_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SortGlobalWatchByHealth();
     }
 
     private async void MonitorGlobalProcess_Click(object sender, RoutedEventArgs e)
@@ -325,6 +363,39 @@ public partial class MainWindow : Window
     private async void SaveLanguageSettings_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.SaveLanguageSettingsAsync();
+    }
+
+    private void OnLanguageRestartRequested(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(RestartApplication);
+    }
+
+    private void RestartApplication()
+    {
+        var executablePath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+        {
+            return;
+        }
+
+        try
+        {
+            _isExitRequested = true;
+            _notifyIcon?.Visible = false;
+            var escapedPath = executablePath.Replace("\"", "\"\"");
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c timeout /t 1 /nobreak >nul & start \"\" \"{escapedPath}\"",
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                UseShellExecute = false
+            });
+            Close();
+        }
+        catch
+        {
+        }
     }
 
     private async void SaveSelectedProfile_Click(object sender, RoutedEventArgs e)

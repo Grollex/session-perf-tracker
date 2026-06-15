@@ -54,6 +54,9 @@ public sealed class MainWindowViewModel : ObservableObject
     private string GlobalSortRam => "RAM";
     private string GlobalSortDisk => GetText("Ui_Disk");
     private string GlobalSortName => GetText("Ui_Process");
+    private string GlobalSortPid => GetText("Ui_PidOrCount");
+    private string GlobalSortProfile => GetText("Ui_Profile");
+    private string GlobalSortHealth => GetText("Ui_Health");
     private string GlobalModeApplications => GetText("Ui_AssignedAppsProfiles");
     private string GlobalModeProcesses => GetText("Ui_IncludedProcesses");
 
@@ -170,6 +173,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _selectedGlobalWatchSortMode = string.Empty;
     private string _selectedGlobalWatchMode = string.Empty;
     private string? _selectedGlobalProcessKey;
+    private bool _globalWatchSortDescending = true;
     private string _activeTargetName = string.Empty;
     private string _activeSessionProfileText = string.Empty;
     private string _lastCompletedSessionText = string.Empty;
@@ -218,6 +222,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public event EventHandler<UpdateAvailablePromptEventArgs>? UpdateAvailablePromptRequested;
     public event EventHandler? UpdateInstallerLaunched;
+    public event EventHandler? LanguageRestartRequested;
 
     public MainWindowViewModel(
         ISessionStore sessionStore,
@@ -280,7 +285,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private void InitializeLocalizedDefaults()
     {
         TargetModes = [TargetModeRunningProcess, TargetModeAssignedApps, TargetModeExecutable];
-        GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName];
+        GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName, GlobalSortPid, GlobalSortProfile, GlobalSortHealth];
         GlobalWatchModes = [GlobalModeApplications, GlobalModeProcesses];
         _selectedTargetMode = TargetModeRunningProcess;
         _selectedGlobalWatchSortMode = GlobalSortCpu;
@@ -343,6 +348,13 @@ public sealed class MainWindowViewModel : ObservableObject
     public IReadOnlyList<string> TargetModes { get; private set; } = [];
     public IReadOnlyList<string> GlobalWatchSortModes { get; private set; } = [];
     public IReadOnlyList<string> GlobalWatchModes { get; private set; } = [];
+    public string GlobalWatchProcessHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_ApplicationProcess"), GlobalSortName);
+    public string GlobalWatchPidHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_PidOrCount"), GlobalSortPid);
+    public string GlobalWatchCpuHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_CPU"), GlobalSortCpu);
+    public string GlobalWatchRamHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_RAM"), GlobalSortRam);
+    public string GlobalWatchDiskHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Disk"), GlobalSortDisk);
+    public string GlobalWatchProfileHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Profile"), GlobalSortProfile);
+    public string GlobalWatchHealthHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Health"), GlobalSortHealth);
 
     public SessionListItemViewModel? SelectedSession
     {
@@ -850,6 +862,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public string DefaultExportDirectoryText => _defaultExportDirectory;
     public string CurrentVersionText => _updateService.CurrentVersion;
     public string AppVersionBadgeText => $"v{_updateService.CurrentVersion}";
+    public string AppWindowTitle => $"Session Perf Tracker {AppVersionBadgeText}";
     public bool IsUpdateRestartRequested => _isUpdateRestartRequested;
 
     public string UpdateManifestUrlText
@@ -1104,9 +1117,46 @@ public sealed class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedGlobalWatchSortMode, value))
             {
                 ApplyGlobalWatchFilterAndSort();
+                NotifyGlobalWatchSortHeaderProperties();
             }
         }
     }
+
+    public void ToggleGlobalWatchSort(string sortMode)
+    {
+        if (string.IsNullOrWhiteSpace(sortMode))
+        {
+            return;
+        }
+
+        if (string.Equals(_selectedGlobalWatchSortMode, sortMode, StringComparison.Ordinal))
+        {
+            _globalWatchSortDescending = !_globalWatchSortDescending;
+        }
+        else
+        {
+            _selectedGlobalWatchSortMode = sortMode;
+            OnPropertyChanged(nameof(SelectedGlobalWatchSortMode));
+            _globalWatchSortDescending = sortMode != GlobalSortName && sortMode != GlobalSortProfile;
+        }
+
+        ApplyGlobalWatchFilterAndSort();
+        NotifyGlobalWatchSortHeaderProperties();
+    }
+
+    public void SortGlobalWatchByProcess() => ToggleGlobalWatchSort(GlobalSortName);
+
+    public void SortGlobalWatchByPid() => ToggleGlobalWatchSort(GlobalSortPid);
+
+    public void SortGlobalWatchByCpu() => ToggleGlobalWatchSort(GlobalSortCpu);
+
+    public void SortGlobalWatchByRam() => ToggleGlobalWatchSort(GlobalSortRam);
+
+    public void SortGlobalWatchByDisk() => ToggleGlobalWatchSort(GlobalSortDisk);
+
+    public void SortGlobalWatchByProfile() => ToggleGlobalWatchSort(GlobalSortProfile);
+
+    public void SortGlobalWatchByHealth() => ToggleGlobalWatchSort(GlobalSortHealth);
 
     public string SelectedGlobalWatchMode
     {
@@ -2232,6 +2282,7 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         var languageCode = SelectedLanguageOption?.LanguageCode ?? AppLanguageSettings.DefaultLanguageCode;
         languageCode = LocalizationManager.NormalizeLanguageCode(languageCode);
+        var previousLanguageCode = LocalizationManager.NormalizeLanguageCode(_thresholdSettingsStore.Current.Language.LanguageCode);
         await _thresholdSettingsStore.SaveAsync(
             _thresholdSettingsStore.Current with
             {
@@ -2240,9 +2291,18 @@ public sealed class MainWindowViewModel : ObservableObject
             cancellationToken);
 
         ApplyLanguageSettingsToUi(_thresholdSettingsStore.Current.Language);
+        if (languageCode.Equals(previousLanguageCode, StringComparison.OrdinalIgnoreCase))
+        {
+            LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
+                ? "Язык уже выбран. Перезапуск не нужен."
+                : "Language already selected. Restart is not needed.";
+            return;
+        }
+
         LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
-            ? "Язык приложения: русский."
-            : "Application language: English.";
+            ? "Язык сохранён. Приложение перезапускается..."
+            : "Language saved. Restarting the app...";
+        LanguageRestartRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task SaveSelectedProfileAsync(CancellationToken cancellationToken = default)
@@ -4140,7 +4200,9 @@ public sealed class MainWindowViewModel : ObservableObject
             .OrderBy(assignment => assignment.Key, StringComparer.OrdinalIgnoreCase)
             .Select(assignment => new AppProfileAssignmentViewModel(
                 assignment.Key,
-                profileNames.TryGetValue(assignment.Value, out var profileName) ? profileName : assignment.Value)));
+                profileNames.TryGetValue(assignment.Value, out var profileName)
+                    ? UiText.ProfileName(assignment.Value, profileName)
+                    : assignment.Value)));
         SelectedAppProfileAssignment = AppProfileAssignments.FirstOrDefault();
         RefreshAssignedTargets();
         RefreshRecommendationCollections();
@@ -4155,7 +4217,6 @@ public sealed class MainWindowViewModel : ObservableObject
         SelectedLanguageOption = LanguageOptions.FirstOrDefault(option =>
             option.LanguageCode.Equals(languageCode, StringComparison.OrdinalIgnoreCase))
             ?? LanguageOptions.FirstOrDefault();
-        LocalizationManager.ApplyLanguage(languageCode);
         LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
             ? "Язык приложения: русский."
             : "Application language: English.";
@@ -4433,30 +4494,7 @@ public sealed class MainWindowViewModel : ObservableObject
             filtered = filtered.Where(process => process.IsNearLimit);
         }
 
-        if (SelectedGlobalWatchSortMode == GlobalSortRam)
-        {
-            filtered = filtered
-                .OrderByDescending(process => process.MemoryMb ?? 0)
-                .ThenByDescending(process => process.CpuPercent ?? 0);
-        }
-        else if (SelectedGlobalWatchSortMode == GlobalSortDisk)
-        {
-            filtered = filtered
-                .OrderByDescending(process => process.DiskTotalMbPerSec)
-                .ThenByDescending(process => process.CpuPercent ?? 0);
-        }
-        else if (SelectedGlobalWatchSortMode == GlobalSortName)
-        {
-            filtered = filtered
-                .OrderBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(process => process.ProcessId);
-        }
-        else
-        {
-            filtered = filtered
-                .OrderByDescending(process => process.CpuPercent ?? 0)
-                .ThenByDescending(process => process.MemoryMb ?? 0);
-        }
+        filtered = SortGlobalWatchRows(filtered);
 
         var previousKey = preferredSelectionKey
             ?? _selectedGlobalProcessKey
@@ -4490,6 +4528,76 @@ public sealed class MainWindowViewModel : ObservableObject
             .ThenByDescending(process => process.DiskTotalMbPerSec)
             .ThenByDescending(process => process.MemoryMb ?? 0)
             .Take(3));
+    }
+
+    private IEnumerable<GlobalProcessRowViewModel> SortGlobalWatchRows(IEnumerable<GlobalProcessRowViewModel> rows)
+    {
+        if (SelectedGlobalWatchSortMode == GlobalSortRam)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.MemoryMb ?? 0).ThenByDescending(process => process.CpuPercent ?? 0)
+                : rows.OrderBy(process => process.MemoryMb ?? 0).ThenBy(process => process.CpuPercent ?? 0);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortDisk)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.DiskTotalMbPerSec).ThenByDescending(process => process.CpuPercent ?? 0)
+                : rows.OrderBy(process => process.DiskTotalMbPerSec).ThenBy(process => process.CpuPercent ?? 0);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortName)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.Name, StringComparer.OrdinalIgnoreCase).ThenByDescending(process => process.ProcessId)
+                : rows.OrderBy(process => process.Name, StringComparer.OrdinalIgnoreCase).ThenBy(process => process.ProcessId);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortPid)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.IsGroup ? process.InstanceCount : process.ProcessId).ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderBy(process => process.IsGroup ? process.InstanceCount : process.ProcessId).ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortProfile)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.ProfileBadgeText, StringComparer.OrdinalIgnoreCase).ThenByDescending(process => process.CpuPercent ?? 0)
+                : rows.OrderBy(process => process.ProfileBadgeText, StringComparer.OrdinalIgnoreCase).ThenByDescending(process => process.CpuPercent ?? 0);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortHealth)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.ProfileSeverityRank).ThenByDescending(process => process.CpuPercent ?? 0)
+                : rows.OrderBy(process => process.ProfileSeverityRank).ThenByDescending(process => process.CpuPercent ?? 0);
+        }
+
+        return _globalWatchSortDescending
+            ? rows.OrderByDescending(process => process.CpuPercent ?? 0).ThenByDescending(process => process.MemoryMb ?? 0)
+            : rows.OrderBy(process => process.CpuPercent ?? 0).ThenBy(process => process.MemoryMb ?? 0);
+    }
+
+    private string FormatGlobalWatchSortHeader(string label, string sortMode)
+    {
+        if (!string.Equals(SelectedGlobalWatchSortMode, sortMode, StringComparison.Ordinal))
+        {
+            return label;
+        }
+
+        return $"{label} {(_globalWatchSortDescending ? "↓" : "↑")}";
+    }
+
+    private void NotifyGlobalWatchSortHeaderProperties()
+    {
+        OnPropertyChanged(nameof(GlobalWatchProcessHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchPidHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchCpuHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchRamHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchDiskHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchProfileHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchHealthHeaderText));
     }
 
     private GlobalProcessRowViewModel? GetSelectedGlobalWatchRow()

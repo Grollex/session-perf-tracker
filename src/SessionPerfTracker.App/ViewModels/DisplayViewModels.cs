@@ -8,6 +8,24 @@ using SessionPerfTracker.Domain.Models;
 
 namespace SessionPerfTracker.App.ViewModels;
 
+internal static class UiText
+{
+    public static string Get(string key) => Application.Current?.TryFindResource(key) as string ?? key;
+
+    public static string Format(string key, params object[] args) =>
+        string.Format(Get(key), args);
+
+    public static string ProfileName(string profileId, string fallbackName) => profileId switch
+    {
+        ThresholdProfileDefaults.LightBackgroundId => Get("Ui_ProfileLightBackground"),
+        ThresholdProfileDefaults.BrowsersChatsId => Get("Ui_ProfileBrowsersChats"),
+        ThresholdProfileDefaults.GamesId => Get("Ui_ProfileGames"),
+        ThresholdProfileDefaults.HardcoreId => Get("Ui_ProfileHardcore"),
+        ThresholdProfileDefaults.CustomId => Get("Ui_ProfileCustom"),
+        _ => fallbackName
+    };
+}
+
 public sealed class SessionListItemViewModel
 {
     public SessionListItemViewModel(SessionRecord session)
@@ -211,8 +229,8 @@ public sealed class ThresholdProfileOptionViewModel
     public ThresholdProfileOptionViewModel(ThresholdProfile profile)
     {
         Id = profile.Id;
-        Name = profile.Name;
-        DisplayName = profile.IsPreset ? profile.Name : $"{profile.Name} (editable)";
+        Name = UiText.ProfileName(profile.Id, profile.Name);
+        DisplayName = profile.IsPreset ? Name : $"{Name} ({UiText.Get("Ui_EditableSuffix")})";
     }
 
     public string Id { get; }
@@ -227,14 +245,14 @@ public sealed class SessionProfileOptionViewModel
     public SessionProfileOptionViewModel()
     {
         IsAuto = true;
-        DisplayName = "Auto";
+        DisplayName = UiText.Get("Ui_Auto");
     }
 
     public SessionProfileOptionViewModel(ThresholdProfile profile)
     {
         ProfileId = profile.Id;
-        ProfileName = profile.Name;
-        DisplayName = profile.IsPreset ? profile.Name : $"{profile.Name} (editable)";
+        ProfileName = UiText.ProfileName(profile.Id, profile.Name);
+        DisplayName = profile.IsPreset ? ProfileName : $"{ProfileName} ({UiText.Get("Ui_EditableSuffix")})";
         Limits = profile.Limits;
     }
 
@@ -253,11 +271,15 @@ public sealed class AppProfileAssignmentViewModel
     {
         ExeName = exeName;
         ProfileName = profileName;
-        DisplayText = $"{exeName} -> {profileName}";
+        IsExample = exeName.Equals("chrome.exe", StringComparison.OrdinalIgnoreCase);
+        DisplayText = IsExample
+            ? $"{exeName} -> {profileName} ({UiText.Get("Ui_Example")})"
+            : $"{exeName} -> {profileName}";
     }
 
     public string ExeName { get; }
     public string ProfileName { get; }
+    public bool IsExample { get; }
     public string DisplayText { get; }
 
     public override string ToString() => DisplayText;
@@ -274,10 +296,12 @@ public sealed class AssignedTargetOptionViewModel
     {
         ExeName = exeName;
         ProfileId = profileId;
-        ProfileName = profileName;
+        ProfileName = UiText.ProfileName(profileId, profileName);
         RunningProcessId = runningProcessId;
         RunningDisplayName = runningDisplayName;
-        RunningStatus = runningProcessId is null ? "Not running" : $"Running (PID {runningProcessId})";
+        RunningStatus = runningProcessId is null
+            ? UiText.Get("Ui_NotRunning")
+            : UiText.Format("Ui_RunningPid", runningProcessId);
         DisplayText = $"{ExeName} - {ProfileName} - {RunningStatus}";
     }
 
@@ -308,6 +332,7 @@ public sealed class GlobalProcessRowViewModel
         bool isAssignedProfile,
         ThresholdLimitValues profileLimits)
     {
+        profileName = UiText.ProfileName(profileId, profileName);
         Process = process;
         ExeName = exeName;
         AppName = Prefer(process.ProductName, process.FileDescription, process.Name);
@@ -384,6 +409,7 @@ public sealed class GlobalProcessRowViewModel
         bool isAssignedProfile,
         ThresholdLimitValues profileLimits)
     {
+        profileName = UiText.ProfileName(profileId, profileName);
         var orderedRows = rows
             .OrderByDescending(row => row.CpuPercent ?? 0)
             .ThenByDescending(row => row.MemoryMb ?? 0)
