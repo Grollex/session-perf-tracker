@@ -576,8 +576,8 @@
             <Setter Property="Background" Value="#141A1F" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
-            <Setter Property="Padding" Value="6,6" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         </Style>
 
         <Style x:Key="TableHeaderSortButton" TargetType="Button">
@@ -585,8 +585,9 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="6,6" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -913,34 +914,9 @@
                                                FontWeight="SemiBold" />
                                 </Border>
                                 <TextBlock Text="{DynamicResource Ui_Target}" FontSize="13" FontWeight="SemiBold" Margin="0,2,0,6" />
-                                <TextBlock Text="{DynamicResource Ui_Source}" Style="{StaticResource MutedText}" />
-                                <ComboBox ItemsSource="{Binding TargetModes}"
-                                          SelectedItem="{Binding SelectedTargetMode}" />
-                                <Border Margin="0,10,0,0"
-                                        Padding="10"
-                                        CornerRadius="8"
-                                        Background="#12191F"
-                                        BorderBrush="{StaticResource BorderBrushSoft}"
-                                        BorderThickness="1">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding TargetReadinessText}"
-                                                   Style="{StaticResource MutedText}"
-                                                   TextWrapping="Wrap"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   MaxHeight="40"
-                                                   ToolTip="{Binding TargetReadinessText}" />
-                                        <TextBlock Text="{Binding ActiveThresholdSourceText}"
-                                                   Style="{StaticResource MutedText}"
-                                                   Margin="0,4,0,0"
-                                                   TextWrapping="Wrap"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   MaxHeight="40"
-                                                   ToolTip="{Binding ActiveThresholdSourceText}" />
-                                    </StackPanel>
-                                </Border>
 
                                 <StackPanel Visibility="{Binding IsRunningProcessMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <DockPanel Margin="0,12,0,0">
+                                    <DockPanel>
                                         <TextBlock Text="{DynamicResource Ui_RunningProcess}" Style="{StaticResource MutedText}" />
                                         <Button DockPanel.Dock="Right"
                                                 Content="{DynamicResource Ui_Refresh}"
@@ -1026,26 +1002,32 @@
                                             IsEnabled="{Binding CanStop}" />
                                 </UniformGrid>
 
-                                <TextBlock Text="{DynamicResource Ui_Assignments}" FontSize="13" FontWeight="SemiBold" Margin="0,18,0,6" />
-                                <TextBlock Text="{DynamicResource Ui_AssignCurrentTarget}" Style="{StaticResource MutedText}" />
-                                <DockPanel Margin="0,6,0,0">
-                                    <Button DockPanel.Dock="Right"
-                                            Content="{DynamicResource Ui_Assign}"
-                                            Click="AssignCurrentTargetProfile_Click"
-                                            MinHeight="30"
-                                            Padding="10,0"
-                                            Margin="8,0,0,0" />
-                                    <ComboBox ItemsSource="{Binding ThresholdProfiles}"
-                                              SelectedItem="{Binding SelectedLiveAssignmentProfile}"
-                                              DisplayMemberPath="DisplayName" />
-                                </DockPanel>
-                                <TextBlock Text="{Binding LiveAssignmentStatusText}"
-                                           Style="{StaticResource MutedText}"
-                                           TextWrapping="Wrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxHeight="42"
-                                           ToolTip="{Binding LiveAssignmentStatusText}"
-                                           Margin="0,6,0,0" />
+                                <Expander Header="{DynamicResource Ui_Assignments}"
+                                          Foreground="{StaticResource TextBrush}"
+                                          Margin="0,14,0,0"
+                                          IsExpanded="False">
+                                    <StackPanel Margin="0,8,0,0">
+                                        <TextBlock Text="{DynamicResource Ui_AssignCurrentTarget}" Style="{StaticResource MutedText}" />
+                                        <DockPanel Margin="0,6,0,0">
+                                            <Button DockPanel.Dock="Right"
+                                                    Content="{DynamicResource Ui_Assign}"
+                                                    Click="AssignCurrentTargetProfile_Click"
+                                                    MinHeight="30"
+                                                    Padding="10,0"
+                                                    Margin="8,0,0,0" />
+                                            <ComboBox ItemsSource="{Binding ThresholdProfiles}"
+                                                      SelectedItem="{Binding SelectedLiveAssignmentProfile}"
+                                                      DisplayMemberPath="DisplayName" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding LiveAssignmentStatusText}"
+                                                   Style="{StaticResource MutedText}"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxHeight="42"
+                                                   ToolTip="{Binding LiveAssignmentStatusText}"
+                                                   Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Expander>
 
                                 <Expander Header="{DynamicResource Ui_Diagnostics}"
                                           Foreground="{StaticResource TextBrush}"
@@ -1113,7 +1095,8 @@
                                 <TextBlock Text="{Binding LiveSnapshotScopeText}"
                                            Style="{StaticResource MutedText}"
                                            TextWrapping="Wrap"
-                                           Margin="0,2,0,10" />
+                                           Margin="0,2,0,10"
+                                           Visibility="{Binding HasActiveLiveMetrics, Converter={StaticResource BoolToVisibilityConverter}}" />
                                 <Border Visibility="{Binding ShowLiveSnapshotEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
                                         Padding="12"
                                         CornerRadius="8"
@@ -1123,34 +1106,43 @@
                                     <StackPanel>
                                         <TextBlock Text="{Binding LiveSnapshotEmptyText}"
                                                    Style="{StaticResource MutedText}" />
-                                        <UniformGrid Columns="2" Margin="0,10,0,0">
-                                            <Border Style="{StaticResource SummaryTile}">
-                                                <StackPanel>
+                                        <Expander Header="{DynamicResource Ui_CapturePreview}"
+                                                  Foreground="{StaticResource TextBrush}"
+                                                  Margin="0,8,0,0"
+                                                  IsExpanded="False">
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,8">
                                                     <TextBlock Text="{DynamicResource Ui_Target}" Style="{StaticResource MutedText}" />
                                                     <TextBlock Text="{Binding LiveConfigTargetText}"
                                                                FontWeight="SemiBold"
                                                                TextTrimming="CharacterEllipsis"
                                                                ToolTip="{Binding LiveConfigTargetText}" />
                                                 </StackPanel>
-                                            </Border>
-                                            <Border Style="{StaticResource SummaryTile}" Margin="0,0,0,10">
-                                                <StackPanel>
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
                                                     <TextBlock Text="{DynamicResource Ui_Collectors}" Style="{StaticResource MutedText}" />
                                                     <TextBlock Text="{Binding LiveConfigCollectorsText}"
                                                                FontWeight="SemiBold"
                                                                TextWrapping="Wrap" />
                                                 </StackPanel>
-                                            </Border>
-                                            <Border Style="{StaticResource SummaryTile}">
-                                                <StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,8">
                                                     <TextBlock Text="{DynamicResource Ui_Profile}" Style="{StaticResource MutedText}" />
                                                     <TextBlock Text="{Binding ActiveThresholdSourceText}"
                                                                FontWeight="SemiBold"
-                                                               TextWrapping="Wrap" />
+                                                               TextWrapping="Wrap"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTip="{Binding ActiveThresholdSourceText}" />
                                                 </StackPanel>
-                                            </Border>
-                                            <Border Style="{StaticResource SummaryTile}" Margin="0,0,0,10">
-                                                <StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
                                                     <TextBlock Text="{DynamicResource Ui_Capture}" Style="{StaticResource MutedText}" />
                                                     <TextBlock FontWeight="SemiBold">
                                                         <Run Text="{Binding LiveConfigSamplingText, Mode=OneWay}" />
@@ -1159,8 +1151,13 @@
                                                     </TextBlock>
                                                     <TextBlock Text="{Binding LiveConfigMonitorText}" Style="{StaticResource MutedText}" />
                                                 </StackPanel>
-                                            </Border>
-                                        </UniformGrid>
+                                                <TextBlock Grid.Row="2"
+                                                           Grid.ColumnSpan="2"
+                                                           Text="{Binding LiveSnapshotScopeText}"
+                                                           Style="{StaticResource MutedText}"
+                                                           TextWrapping="Wrap" />
+                                            </Grid>
+                                        </Expander>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -1603,9 +1600,13 @@
                         </Border>
 
                         <Border Grid.Column="2" Style="{StaticResource Panel}">
+                            <ScrollViewer VerticalScrollBarVisibility="Hidden"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          CanContentScroll="False"
+                                          PanningMode="VerticalOnly">
                             <Grid>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <StackPanel>
@@ -1861,6 +1862,7 @@
                                                Margin="0,10,0,0" />
                                 </StackPanel>
                             </Grid>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                         </Grid>

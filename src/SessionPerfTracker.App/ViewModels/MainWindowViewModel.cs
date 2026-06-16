@@ -173,7 +173,7 @@ public sealed class MainWindowViewModel : ObservableObject
     private string _selectedGlobalWatchSortMode = string.Empty;
     private string _selectedGlobalWatchMode = string.Empty;
     private string? _selectedGlobalProcessKey;
-    private bool _globalWatchSortDescending = true;
+    private bool _globalWatchSortDescending;
     private string _activeTargetName = string.Empty;
     private string _activeSessionProfileText = string.Empty;
     private string _lastCompletedSessionText = string.Empty;
@@ -256,7 +256,11 @@ public sealed class MainWindowViewModel : ObservableObject
         _updateDownloadDirectory = updateDownloadDirectory;
         _exportDirectoryText = defaultExportDirectory;
         InitializeLocalizedDefaults();
-        SamplingOptions = [new SamplingOptionViewModel(1000), new SamplingOptionViewModel(500)];
+        SamplingOptions =
+        [
+            new SamplingOptionViewModel(1000, $"1000 ms ({GetText("Ui_Recommended")})"),
+            new SamplingOptionViewModel(500)
+        ];
         RetentionOptions =
         [
             new RetentionOptionViewModel(1, $"1 {GetText("Ui_Day")}"),
@@ -288,7 +292,7 @@ public sealed class MainWindowViewModel : ObservableObject
         GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName, GlobalSortPid, GlobalSortProfile, GlobalSortHealth];
         GlobalWatchModes = [GlobalModeApplications, GlobalModeProcesses];
         _selectedTargetMode = TargetModeRunningProcess;
-        _selectedGlobalWatchSortMode = GlobalSortCpu;
+        _selectedGlobalWatchSortMode = GlobalSortName;
         _selectedGlobalWatchMode = GlobalModeApplications;
 
         _recordingStatusText = GetText("Ui_Waiting");
@@ -861,7 +865,7 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public string DefaultExportDirectoryText => _defaultExportDirectory;
     public string CurrentVersionText => _updateService.CurrentVersion;
-    public string AppVersionBadgeText => $"v{_updateService.CurrentVersion}";
+    public string AppVersionBadgeText => $"v{FormatDisplayVersion(_updateService.CurrentVersion)}";
     public string AppWindowTitle => $"Session Perf Tracker {AppVersionBadgeText}";
     public bool IsUpdateRestartRequested => _isUpdateRestartRequested;
 
@@ -5739,6 +5743,16 @@ public sealed class MainWindowViewModel : ObservableObject
 
     private static bool HasEventKind(PerformanceEvent performanceEvent, EventKind kind) =>
         performanceEvent.Kind == kind || performanceEvent.GroupedKinds.Contains(kind);
+
+    private static string FormatDisplayVersion(string version)
+    {
+        var normalized = version.Trim();
+        return Version.TryParse(normalized, out var parsed) && parsed.Build == -1 && parsed.Revision == -1 && parsed.Minor >= 0 && parsed.Major >= 0
+            ? parsed.Minor == 0 ? parsed.Major.ToString(CultureInfo.InvariantCulture) : $"{parsed.Major}.{parsed.Minor}"
+            : normalized.EndsWith(".0", StringComparison.Ordinal) && normalized.Count(character => character == '.') == 2
+                ? normalized[..^2]
+                : normalized;
+    }
 
     private static string FormatDuration(TimeSpan duration) =>
         $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";

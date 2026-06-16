@@ -19,6 +19,7 @@
     <system:String x:Key="Ui_Session">Сессия</system:String>
     <system:String x:Key="Ui_SessionProfile">Профиль сессии</system:String>
     <system:String x:Key="Ui_Sampling">Частота сбора</system:String>
+    <system:String x:Key="Ui_Recommended">рекомендуется</system:String>
     <system:String x:Key="Ui_IncludeChildProcesses">Включить дочерние процессы</system:String>
     <system:String x:Key="Ui_LiveMonitor">Живой мониторинг</system:String>
     <system:String x:Key="Ui_Start">Старт</system:String>
@@ -31,6 +32,7 @@
     <system:String x:Key="Ui_SystemContextSnapshot">Снимок системного контекста</system:String>
     <system:String x:Key="Ui_Events">События</system:String>
     <system:String x:Key="Ui_CurrentSnapshot">Текущий снимок</system:String>
+    <system:String x:Key="Ui_CapturePreview">Предпросмотр записи</system:String>
     <system:String x:Key="Ui_TargetConfig">Цель</system:String>
     <system:String x:Key="Ui_Collectors">Сборщики</system:String>
     <system:String x:Key="Ui_Profile">Профиль</system:String>

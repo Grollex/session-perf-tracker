@@ -19,6 +19,7 @@
     <system:String x:Key="Ui_Session">Session</system:String>
     <system:String x:Key="Ui_SessionProfile">Session profile</system:String>
     <system:String x:Key="Ui_Sampling">Sampling</system:String>
+    <system:String x:Key="Ui_Recommended">recommended</system:String>
     <system:String x:Key="Ui_IncludeChildProcesses">Include child processes</system:String>
     <system:String x:Key="Ui_LiveMonitor">Live monitor</system:String>
     <system:String x:Key="Ui_Start">Start</system:String>
@@ -31,6 +32,7 @@
     <system:String x:Key="Ui_SystemContextSnapshot">System context snapshot</system:String>
     <system:String x:Key="Ui_Events">Events</system:String>
     <system:String x:Key="Ui_CurrentSnapshot">Current Snapshot</system:String>
+    <system:String x:Key="Ui_CapturePreview">Capture preview</system:String>
     <system:String x:Key="Ui_TargetConfig">Target</system:String>
     <system:String x:Key="Ui_Collectors">Collectors</system:String>
     <system:String x:Key="Ui_Profile">Profile</system:String>

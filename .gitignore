@@ -33,6 +33,8 @@ opencode.*
 opencode.json
 opencode.jsonc
 sandbox/
+sandbox
+src/OpenCodeChat/
 clipboard_content.txt
 scripts/check-omniroute-models.ps1
 

@@ -132,13 +132,16 @@ public sealed class TargetOptionViewModel
 
 public sealed class SamplingOptionViewModel
 {
-    public SamplingOptionViewModel(int intervalMs)
+    public SamplingOptionViewModel(int intervalMs, string? label = null)
     {
         IntervalMs = intervalMs;
+        Label = string.IsNullOrWhiteSpace(label)
+            ? $"{IntervalMs} ms"
+            : label;
     }
 
     public int IntervalMs { get; }
-    public string Label => $"{IntervalMs} ms";
+    public string Label { get; }
 
     public override string ToString() => Label;
 }
