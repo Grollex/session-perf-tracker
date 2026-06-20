@@ -184,3 +184,18 @@ There is no background updater service, forced update, or delta patching.
 - Confirm Start Menu shortcut works.
 - Confirm manual update check reaches the GitHub Release manifest.
 - Confirm uninstall removes Program Files files but keeps user data.
+
+## Verified Local Outputs
+
+The local build-only release workflow was verified with version `1.5.0` using
+`release-one-click.ps1 -SkipUpload -NoOpen`. It produced:
+
+```text
+artifacts\release\win-x64\publish\SessionPerfTracker.App.exe
+artifacts\release\dist\SessionPerfTracker-1.5.0-win-x64-self-contained.zip
+artifacts\release\installer\SessionPerfTracker-1.5.0-win-x64-setup.exe
+artifacts\release\update\version.json
+```
+
+`-SkipUpload` does not publish a GitHub Release or push a tag, but it does update
+the root `VERSION` file to the supplied version.

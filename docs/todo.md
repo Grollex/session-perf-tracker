@@ -2,13 +2,16 @@
 
 ## Agent Memory Follow-Ups
 
-- Confirm the intended role difference between `New project` and `New project - Development`.
-- Add verified test commands if a test project is introduced.
-- Add packaging output expectations after the next successful package run.
-- Record confirmed update/release workflow details after the next release dry run.
+- [x] Confirm folder roles: `New project` is the current v1.5.0 main copy; `New project - Development` is a legacy v0.1.4 worktree.
+- [x] Add and verify unit tests with `dotnet test SessionPerfTracker.slnx -c Release`.
+- [x] Verify packaging outputs: self-contained publish, ZIP, installer, and update manifest.
+- [x] Confirm the release workflow with `release-one-click.ps1 -SkipUpload -NoOpen`.
 
 ## Product Follow-Ups
 
+- [x] Split the six main screens into focused UserControls with shared resources.
+- [x] Split MainWindowViewModel into core, Live Monitoring, Global Watch, Sessions, and Settings partial modules.
+- [x] Update the vulnerable SQLite native dependency.
 - Preserve current MVP behavior while improving localized UI and process inspection.
 - Keep performance monitoring lightweight.
 - Keep process-control actions explicit and recoverable.

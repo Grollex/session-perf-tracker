@@ -37,7 +37,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\release-one-click
 
 ## Tests
 
-No test project was found in the first pass. Do not invent a test command until tests exist.
+```powershell
+dotnet test "SessionPerfTracker.slnx" -c Release
+```
+
+The solution currently includes `SessionPerfTracker.UnitTests`.
 
 ## Tool Diagnostics
 

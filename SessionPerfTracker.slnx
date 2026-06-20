@@ -3,5 +3,6 @@
     <Project Path="src/SessionPerfTracker.App/SessionPerfTracker.App.csproj" />
     <Project Path="src/SessionPerfTracker.Domain/SessionPerfTracker.Domain.csproj" />
     <Project Path="src/SessionPerfTracker.Infrastructure/SessionPerfTracker.Infrastructure.csproj" />
+    <Project Path="src/SessionPerfTracker.UnitTests/SessionPerfTracker.UnitTests.csproj" />
   </Folder>
 </Solution>
