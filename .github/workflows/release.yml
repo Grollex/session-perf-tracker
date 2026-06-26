@@ -55,6 +55,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore .\SessionPerfTracker.slnx
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build .\SessionPerfTracker.slnx -c Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: dotnet test .\SessionPerfTracker.slnx -c Release --no-build --no-restore
+
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -69,6 +81,12 @@ jobs:
             -BuildInstaller `
             -InstallerBaseUrl $installerBaseUrl `
             -ReleaseNotes "${{ steps.version.outputs.notes }}"
+
+      - name: Smoke test packaged app
+        shell: pwsh
+        run: |
+          .\scripts\test-packaged-app.ps1 `
+            -ExecutablePath .\artifacts\release\win-x64\publish\SessionPerfTracker.App.exe
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

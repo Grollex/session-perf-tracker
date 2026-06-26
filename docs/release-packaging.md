@@ -95,7 +95,19 @@ Then create a GitHub Release manually with tag `v0.1.2` and upload the generated
 
 ## GitHub Actions Release
 
-The repository includes `.github/workflows/release.yml`.
+The repository includes:
+
+- `.github/workflows/ci.yml` for pull requests and pushes to `main`;
+- `.github/workflows/release.yml` for tagged/manual releases.
+
+The CI workflow:
+
+- restores the solution on `windows-latest`;
+- builds the solution in Release configuration;
+- runs the unit tests;
+- creates a Windows x64 self-contained package;
+- smoke-tests the packaged executable with `scripts/test-packaged-app.ps1`;
+- uploads the self-contained ZIP as a workflow artifact.
 
 After the full source project is in GitHub, either:
 
@@ -112,8 +124,10 @@ The workflow:
 
 - runs on `windows-latest`;
 - installs .NET 10;
+- restores, builds, and tests the solution in Release configuration;
 - installs Inno Setup with Chocolatey;
 - runs `scripts/package-windows.ps1 -BuildInstaller`;
+- smoke-tests the packaged executable with `scripts/test-packaged-app.ps1`;
 - generates SHA256-backed `version.json`;
 - publishes the installer and manifest as GitHub Release assets.
 
@@ -176,7 +190,8 @@ There is no background updater service, forced update, or delta patching.
 
 ## Release Readiness Checklist
 
-- Start the app from the publish folder.
+- Run `scripts/test-packaged-app.ps1` against the publish folder.
+- Start the app from the publish folder for manual visual confirmation.
 - Confirm the app icon is visible.
 - Confirm `%LocalAppData%\SessionPerfTracker\sessionperftracker.db` is created or reused.
 - Confirm Settings -> Storage -> Updates contains the default GitHub manifest URL.

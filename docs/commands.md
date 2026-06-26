@@ -32,6 +32,7 @@ dotnet run --project "src\SessionPerfTracker.App\SessionPerfTracker.App.csproj"
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\package-windows.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\test-packaged-app.ps1" -ExecutablePath ".\artifacts\release\win-x64\publish\SessionPerfTracker.App.exe"
 powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\release-one-click.ps1"
 ```
 

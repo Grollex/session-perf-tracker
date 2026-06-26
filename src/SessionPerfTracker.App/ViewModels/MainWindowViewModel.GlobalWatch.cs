@@ -7,6 +7,7 @@ using SessionPerfTracker.Domain.Metrics;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
+using SessionPerfTracker.Domain.Services;
 using Application = System.Windows.Application;
 using Clipboard = System.Windows.Clipboard;
 
@@ -14,6 +15,8 @@ namespace SessionPerfTracker.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly ProcessActionSafetyPolicy ProcessActionSafety = ProcessActionSafetyPolicy.Default;
+
     public void ToggleGlobalWatchSort(string sortMode)
     {
         if (string.IsNullOrWhiteSpace(sortMode))
@@ -225,12 +228,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var result = await _processControlService.KillProcessAsync(
-            activeRow.ProcessId,
-            "manual Process Inspector hard kill",
+        await RunManualKillActionAsync(
+            activeRow,
+            killTreeOrGroup: false,
+            statusAction: GetText("Ui_ActionInspectorHardKill"),
+            confirmationAction: GetText("Ui_ActionKillInspectorPid"),
+            GetText("Ui_ReasonManualInspectorHardKill"),
             cancellationToken);
-        GlobalWatchStatusText = FormatProcessControlResult("Inspector hard kill", result);
-        await RefreshGlobalWatchAsync(cancellationToken);
     }
 
     public async Task KillInspectorTreeOrGroupAsync(CancellationToken cancellationToken = default)
@@ -241,17 +245,15 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var result = await KillGlobalWatchRowTreeOrGroupAsync(
+        await RunManualKillActionAsync(
             activeRow,
+            killTreeOrGroup: true,
+            statusAction: activeRow.IsGroup ? GetText("Ui_ActionInspectorAppGroupHardKill") : GetText("Ui_ActionInspectorProcessTreeHardKill"),
+            confirmationAction: activeRow.IsGroup ? GetText("Ui_ActionKillInspectorAppGroup") : GetText("Ui_ActionKillInspectorProcessTree"),
             activeRow.IsGroup
-                ? "manual Process Inspector app-group hard kill"
-                : "manual Process Inspector process-tree hard kill",
+                ? GetText("Ui_ReasonManualInspectorAppGroupHardKill")
+                : GetText("Ui_ReasonManualInspectorProcessTreeHardKill"),
             cancellationToken);
-
-        GlobalWatchStatusText = FormatProcessControlResult(
-            activeRow.IsGroup ? "Inspector app-group hard kill" : "Inspector process-tree hard kill",
-            result);
-        await RefreshGlobalWatchAsync(cancellationToken);
     }
 
     public async Task MarkInspectorSuspiciousAsync(CancellationToken cancellationToken = default)
@@ -697,12 +699,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var result = await _processControlService.KillProcessAsync(
-            selected.ProcessId,
-            "manual Global Watch hard kill",
+        await RunManualKillActionAsync(
+            selected,
+            killTreeOrGroup: false,
+            statusAction: GetText("Ui_ActionManualHardKill"),
+            confirmationAction: GetText("Ui_ActionKillSelectedPid"),
+            GetText("Ui_ReasonManualGlobalWatchHardKill"),
             cancellationToken);
-        GlobalWatchStatusText = FormatProcessControlResult("Manual hard kill", result);
-        await RefreshGlobalWatchAsync(cancellationToken);
     }
 
     public async Task KillSelectedGlobalProcessTreeOrGroupAsync(CancellationToken cancellationToken = default)
@@ -714,17 +717,15 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var result = await KillGlobalWatchRowTreeOrGroupAsync(
+        await RunManualKillActionAsync(
             selected,
+            killTreeOrGroup: true,
+            statusAction: selected.IsGroup ? GetText("Ui_ActionManualAppGroupHardKill") : GetText("Ui_ActionManualProcessTreeHardKill"),
+            confirmationAction: selected.IsGroup ? GetText("Ui_ActionKillSelectedAppGroup") : GetText("Ui_ActionKillSelectedProcessTree"),
             selected.IsGroup
-                ? "manual Global Watch app-group hard kill"
-                : "manual Global Watch process-tree hard kill",
+                ? GetText("Ui_ReasonManualGlobalWatchAppGroupHardKill")
+                : GetText("Ui_ReasonManualGlobalWatchProcessTreeHardKill"),
             cancellationToken);
-
-        GlobalWatchStatusText = FormatProcessControlResult(
-            selected.IsGroup ? "Manual app-group hard kill" : "Manual process-tree hard kill",
-            result);
-        await RefreshGlobalWatchAsync(cancellationToken);
     }
 
     public Task BanSelectedGlobalProcessAsync(CancellationToken cancellationToken = default) =>
@@ -786,94 +787,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!TryGetSelectedGlobalProcessUsablePath(out _)
-            || string.IsNullOrWhiteSpace(selected.NormalizedFullPath))
-        {
-            ProcessBanStatusText = "Full path is unavailable; cannot create a ban.";
-            return;
-        }
-
-        var duration = SelectedProcessBanDurationOption ?? ProcessBanDurationOptions.First();
-        var now = DateTimeOffset.UtcNow;
-        var settings = _thresholdSettingsStore.Current;
-        var processBans = settings.ProcessBans;
-        var active = processBans.Active
-            .Where(item => !string.Equals(item.NormalizedPath, selected.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var rule = new ProcessBanRule
-        {
-            Id = $"ban_{Guid.NewGuid():N}",
-            NormalizedPath = selected.NormalizedFullPath,
-            ExeName = NormalizeExeNameForAssignment(selected.ExeName),
-            ProductName = selected.ProductName,
-            CompanyName = selected.CompanyName,
-            SignerStatus = selected.SignerStatus,
-            CreatedAt = now,
-            ExpiresAt = duration.Duration is null ? null : now + duration.Duration.Value,
-            DurationLabel = duration.Label,
-            Reason = "Manual ban from Global Watch."
-        };
-        active.Insert(0, rule);
-
-        var history = processBans.History.ToList();
-        history.Insert(0, CreateProcessBanEvent(
-            rule,
-            "ban_created",
+        await RunManualBanActionAsync(
+            CreateAuditTarget(selected),
             selected,
-            terminatedCount: 0,
-            details: killAfterBan
-                ? "Created from Global Watch; selected target will be killed immediately."
-                : "Created from Global Watch."));
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                ProcessBans = processBans with
-                {
-                    Active = active,
-                    History = history
-                }
-            },
+            "Global Watch",
+            killAfterBan,
             cancellationToken);
-
-        RefreshProcessBanCollections();
         NotifySelectedGlobalProcessProperties();
-        ProcessBanStatusText = $"{rule.ExeName} banned for {rule.DurationLabel}. Enforcement happens on Global Watch scans while this utility is running.";
-
-        if (killAfterBan)
-        {
-            var result = await KillGlobalWatchRowTreeOrGroupAsync(
-                selected,
-                "manual ban plus hard kill",
-                cancellationToken);
-            var latestSettings = _thresholdSettingsStore.Current;
-            var latestProcessBans = latestSettings.ProcessBans;
-            var latestHistory = latestProcessBans.History.ToList();
-            latestHistory.Insert(0, CreateProcessBanEvent(
-                rule,
-                "ban_kill",
-                selected,
-                result.TerminatedCount,
-                result.Messages.Count == 0
-                    ? "Ban + kill executed immediately."
-                    : string.Join(" ", result.Messages.Take(3))));
-            await _thresholdSettingsStore.SaveAsync(
-                latestSettings with
-                {
-                    ProcessBans = latestProcessBans with
-                    {
-                        History = latestHistory
-                            .OrderByDescending(entry => entry.Timestamp)
-                            .Take(latestProcessBans.MaxHistory)
-                            .ToList()
-                    }
-                },
-                cancellationToken);
-            RefreshProcessBanCollections();
-            ProcessBanStatusText = $"{rule.ExeName} banned for {rule.DurationLabel}; {result.TerminatedCount:N0} running process{(result.TerminatedCount == 1 ? string.Empty : "es")} killed now.";
-            GlobalWatchStatusText = FormatProcessControlResult("Ban + hard kill", result);
-            await RefreshGlobalWatchAsync(cancellationToken);
-        }
     }
 
     private async Task BanInspectorTargetCoreAsync(bool killAfterBan, CancellationToken cancellationToken)
@@ -885,23 +805,194 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        if (!TryGetInspectorUsablePath(out _))
+        await RunManualBanActionAsync(
+            CreateAuditTarget(target),
+            target.ActiveRow,
+            $"Process Inspector ({target.SourceText})",
+            killAfterBan,
+            cancellationToken);
+        NotifyInspectorTargetProperties();
+    }
+
+    private async Task RunManualKillActionAsync(
+        GlobalProcessRowViewModel row,
+        bool killTreeOrGroup,
+        string statusAction,
+        string confirmationAction,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var target = CreateAuditTarget(row);
+        var durationText = GetText("Ui_Na");
+        var scopeText = killTreeOrGroup
+            ? FormatTreeOrGroupScope(row)
+            : FormatText("Ui_ScopeSinglePid", row.ProcessId);
+        var impactText = killTreeOrGroup
+            ? FormatTreeOrGroupImpact(row)
+            : FormatText("Ui_ImpactSinglePidKill", row.ProcessId);
+
+        await AddProcessActionAuditEventAsync(
+            target,
+            "kill_requested",
+            durationText,
+            terminatedCount: 0,
+            FormatText("Ui_AuditRequestedActionScope", confirmationAction, scopeText),
+            cancellationToken);
+
+        var safety = AssessGlobalWatchRowForAction(row, requiresPath: false);
+        if (!safety.IsAllowed)
         {
-            ProcessBanStatusText = "Full path is unavailable; cannot create a ban.";
+            await AddProcessActionAuditEventAsync(
+                target,
+                "kill_blocked",
+                durationText,
+                terminatedCount: 0,
+                safety.Reason,
+                cancellationToken);
+            GlobalWatchStatusText = FormatText("Ui_ActionBlockedReason", confirmationAction, safety.Reason);
+            ProcessBanStatusText = FormatText("Ui_DestructiveActionBlockedFor", target.ExeName);
             return;
         }
 
+        if (!RequestDestructiveProcessActionConfirmation(
+            GetText("Ui_ConfirmDestructiveActionTitle"),
+            confirmationAction,
+            target.TargetText,
+            target.DisplayPath,
+            durationText,
+            scopeText,
+            impactText))
+        {
+            await AddProcessActionAuditEventAsync(
+                target,
+                "kill_cancelled",
+                durationText,
+                terminatedCount: 0,
+                GetText("Ui_AuditUserCancelledConfirmation"),
+                cancellationToken);
+            GlobalWatchStatusText = FormatText("Ui_ActionCancelled", confirmationAction);
+            ProcessBanStatusText = FormatText("Ui_DestructiveActionCancelledFor", target.ExeName);
+            return;
+        }
+
+        await AddProcessActionAuditEventAsync(
+            target,
+            "kill_confirmed",
+            durationText,
+            terminatedCount: 0,
+            FormatText("Ui_AuditUserConfirmedAction", confirmationAction),
+            cancellationToken);
+
+        var result = killTreeOrGroup
+            ? await KillGlobalWatchRowTreeOrGroupAsync(row, reason, cancellationToken)
+            : await _processControlService.KillProcessAsync(row.ProcessId, reason, cancellationToken);
+
+        await AddProcessActionAuditEventAsync(
+            target,
+            "kill_executed",
+            durationText,
+            result.TerminatedCount,
+            FormatProcessControlMessages(result),
+            cancellationToken);
+        ProcessBanStatusText = FormatText("Ui_KillActionAuditedFor", target.ExeName);
+        GlobalWatchStatusText = FormatProcessControlResult(statusAction, result);
+        await RefreshGlobalWatchAsync(cancellationToken);
+    }
+
+    private async Task RunManualBanActionAsync(
+        ProcessActionAuditTarget target,
+        GlobalProcessRowViewModel? activeRow,
+        string origin,
+        bool killAfterBan,
+        CancellationToken cancellationToken)
+    {
         var duration = SelectedProcessBanDurationOption ?? ProcessBanDurationOptions.First();
+        var actionText = killAfterBan
+            ? GetText("Ui_ActionCreateBanKillNow")
+            : GetText("Ui_ActionCreateBan");
+        var scopeText = GetText("Ui_BanScopeFullPath");
+        var impactText = killAfterBan
+            ? activeRow is null
+                ? GetText("Ui_BanImpactNoRunning")
+                : FormatTreeOrGroupImpact(activeRow)
+            : GetText("Ui_BanImpactNoImmediateKill");
+
+        await AddProcessActionAuditEventAsync(
+            target,
+            "ban_requested",
+            duration.Label,
+            terminatedCount: 0,
+            FormatText("Ui_AuditRequestedFromScope", origin, scopeText),
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(target.NormalizedPath))
+        {
+            var reason = GetText("Ui_BanBlockedNoStablePath");
+            await AddProcessActionAuditEventAsync(
+                target,
+                "ban_blocked",
+                duration.Label,
+                terminatedCount: 0,
+                reason,
+                cancellationToken);
+            ProcessBanStatusText = reason;
+            return;
+        }
+
+        var safety = activeRow is null
+            ? ProcessActionSafety.Assess(processId: null, target.ExeName, target.NormalizedPath)
+            : AssessGlobalWatchRowForAction(activeRow, requiresPath: true);
+        if (!safety.IsAllowed)
+        {
+            await AddProcessActionAuditEventAsync(
+                target,
+                "ban_blocked",
+                duration.Label,
+                terminatedCount: 0,
+                safety.Reason,
+                cancellationToken);
+            ProcessBanStatusText = FormatText("Ui_ActionBlockedReason", actionText, safety.Reason);
+            return;
+        }
+
+        if (!RequestDestructiveProcessActionConfirmation(
+            GetText("Ui_ConfirmProcessBanTitle"),
+            actionText,
+            target.TargetText,
+            target.DisplayPath,
+            duration.Label,
+            scopeText,
+            impactText))
+        {
+            await AddProcessActionAuditEventAsync(
+                target,
+                "ban_cancelled",
+                duration.Label,
+                terminatedCount: 0,
+                GetText("Ui_AuditUserCancelledConfirmation"),
+                cancellationToken);
+            ProcessBanStatusText = FormatText("Ui_ActionCancelledFor", actionText, target.ExeName);
+            return;
+        }
+
+        await AddProcessActionAuditEventAsync(
+            target,
+            "ban_confirmed",
+            duration.Label,
+            terminatedCount: 0,
+            FormatText("Ui_AuditUserConfirmedAction", actionText),
+            cancellationToken);
+
         var now = DateTimeOffset.UtcNow;
         var settings = _thresholdSettingsStore.Current;
         var processBans = settings.ProcessBans;
         var active = processBans.Active
-            .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
+            .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedPath, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var rule = new ProcessBanRule
         {
             Id = $"ban_{Guid.NewGuid():N}",
-            NormalizedPath = target.NormalizedFullPath,
+            NormalizedPath = target.NormalizedPath,
             ExeName = NormalizeExeNameForAssignment(target.ExeName),
             ProductName = target.ProductName,
             CompanyName = target.CompanyName,
@@ -909,7 +1000,7 @@ public sealed partial class MainWindowViewModel
             CreatedAt = now,
             ExpiresAt = duration.Duration is null ? null : now + duration.Duration.Value,
             DurationLabel = duration.Label,
-            Reason = $"Manual ban from Process Inspector ({target.SourceText})."
+            Reason = FormatText("Ui_ManualBanFrom", origin)
         };
         active.Insert(0, rule);
 
@@ -917,11 +1008,11 @@ public sealed partial class MainWindowViewModel
         history.Insert(0, CreateProcessBanEvent(
             rule,
             "ban_created",
-            target.ActiveRow,
+            activeRow,
             terminatedCount: 0,
             details: killAfterBan
-                ? "Created from Process Inspector; running target will be killed when available."
-                : "Created from Process Inspector."));
+                ? FormatText("Ui_AuditConfirmedFromKillWhenAvailable", origin)
+                : FormatText("Ui_AuditConfirmedFrom", origin)));
 
         await _thresholdSettingsStore.SaveAsync(
             settings with
@@ -938,23 +1029,24 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         RefreshProcessBanCollections();
-        NotifyInspectorTargetProperties();
-        ProcessBanStatusText = $"{rule.ExeName} banned for {rule.DurationLabel}. Enforcement happens on Global Watch scans while this utility is running.";
+        ProcessBanStatusText = FormatText("Ui_ProcessBannedForDuration", rule.ExeName, rule.DurationLabel);
 
         if (!killAfterBan)
         {
             return;
         }
 
-        if (target.ActiveRow is null)
+        if (activeRow is null)
         {
-            ProcessBanStatusText = $"{rule.ExeName} banned for {rule.DurationLabel}. It is not running now, so nothing was killed immediately.";
+            ProcessBanStatusText = FormatText("Ui_ProcessBannedNotRunning", rule.ExeName, rule.DurationLabel);
             return;
         }
 
         var result = await KillGlobalWatchRowTreeOrGroupAsync(
-            target.ActiveRow,
-            "manual Process Inspector ban plus hard kill",
+            activeRow,
+            origin.Contains("Process Inspector", StringComparison.OrdinalIgnoreCase)
+                ? GetText("Ui_ReasonManualInspectorBanPlusKill")
+                : GetText("Ui_ReasonManualBanPlusKill"),
             cancellationToken);
         var latestSettings = _thresholdSettingsStore.Current;
         var latestProcessBans = latestSettings.ProcessBans;
@@ -962,10 +1054,10 @@ public sealed partial class MainWindowViewModel
         latestHistory.Insert(0, CreateProcessBanEvent(
             rule,
             "ban_kill",
-            target.ActiveRow,
+            activeRow,
             result.TerminatedCount,
             result.Messages.Count == 0
-                ? "Ban + kill executed immediately from Process Inspector."
+                ? GetText("Ui_BanKillExecutedImmediately")
                 : string.Join(" ", result.Messages.Take(3))));
         await _thresholdSettingsStore.SaveAsync(
             latestSettings with
@@ -980,8 +1072,8 @@ public sealed partial class MainWindowViewModel
             },
             cancellationToken);
         RefreshProcessBanCollections();
-        ProcessBanStatusText = $"{rule.ExeName} banned for {rule.DurationLabel}; {result.TerminatedCount:N0} running process{(result.TerminatedCount == 1 ? string.Empty : "es")} killed now.";
-        GlobalWatchStatusText = FormatProcessControlResult("Inspector ban + hard kill", result);
+        ProcessBanStatusText = FormatText("Ui_ProcessBannedKilledNow", rule.ExeName, rule.DurationLabel, result.TerminatedCount);
+        GlobalWatchStatusText = FormatProcessControlResult(GetText("Ui_BanHardKillAction"), result);
         await RefreshGlobalWatchAsync(cancellationToken);
     }
 
@@ -1000,6 +1092,215 @@ public sealed partial class MainWindowViewModel
                 reason,
                 cancellationToken);
     }
+
+    private bool RequestDestructiveProcessActionConfirmation(
+        string title,
+        string actionText,
+        string targetText,
+        string executablePath,
+        string durationText,
+        string scopeText,
+        string immediateImpactText)
+    {
+        var handler = DestructiveProcessActionConfirmationRequested;
+        if (handler is null)
+        {
+            return false;
+        }
+
+        var args = new DestructiveProcessActionConfirmationEventArgs(
+            title,
+            FormatText(
+                "Ui_ConfirmDestructiveActionMessage",
+                actionText,
+                targetText,
+                executablePath,
+                durationText,
+                scopeText,
+                immediateImpactText));
+        handler.Invoke(this, args);
+        return args.IsConfirmed;
+    }
+
+    private bool IsGlobalWatchRowActionAllowed(GlobalProcessRowViewModel? row, bool requiresPath) =>
+        AssessGlobalWatchRowForAction(row, requiresPath).IsAllowed;
+
+    private ProcessActionSafetyAssessment AssessGlobalWatchRowForAction(GlobalProcessRowViewModel? row, bool requiresPath)
+    {
+        if (row is null)
+        {
+            return ProcessActionSafetyAssessment.Block(GetText("Ui_NoProcessTargetSelected"));
+        }
+
+        if (requiresPath && string.IsNullOrWhiteSpace(row.NormalizedFullPath))
+        {
+            return ProcessActionSafetyAssessment.Block(GetText("Ui_FullExecutablePathUnavailable"));
+        }
+
+        foreach (var process in row.IncludedProcesses)
+        {
+            var assessment = ProcessActionSafety.Assess(process.ProcessId, process.Name, process.FullPath);
+            if (!assessment.IsAllowed)
+            {
+                return ProcessActionSafetyAssessment.Block(FormatText("Ui_ProcessSafetyReason", process.Name, process.ProcessId, assessment.Reason));
+            }
+        }
+
+        return ProcessActionSafetyAssessment.Allow();
+    }
+
+    private bool IsInspectorActionAllowed(bool requiresRunningTarget, bool requiresPath) =>
+        AssessInspectorAction(requiresRunningTarget, requiresPath).IsAllowed;
+
+    private ProcessActionSafetyAssessment AssessInspectorAction(bool requiresRunningTarget, bool requiresPath)
+    {
+        var target = _processInspectorTarget;
+        if (target is null)
+        {
+            return ProcessActionSafetyAssessment.Block(GetText("Ui_NoInspectorTarget"));
+        }
+
+        if (requiresRunningTarget && target.ActiveRow is null)
+        {
+            return ProcessActionSafetyAssessment.Block(GetText("Ui_InspectorTargetNotRunning"));
+        }
+
+        if (target.ActiveRow is not null)
+        {
+            return AssessGlobalWatchRowForAction(target.ActiveRow, requiresPath);
+        }
+
+        if (requiresPath && string.IsNullOrWhiteSpace(target.NormalizedFullPath))
+        {
+            return ProcessActionSafetyAssessment.Block(GetText("Ui_FullExecutablePathUnavailable"));
+        }
+
+        return ProcessActionSafety.Assess(processId: null, target.ExeName, target.NormalizedFullPath);
+    }
+
+    private async Task AddProcessActionAuditEventAsync(
+        ProcessActionAuditTarget target,
+        string action,
+        string durationLabel,
+        int terminatedCount,
+        string details,
+        CancellationToken cancellationToken)
+    {
+        var settings = _thresholdSettingsStore.Current;
+        var processBans = settings.ProcessBans;
+        var history = processBans.History.ToList();
+        history.Insert(0, new ProcessBanEvent
+        {
+            Id = $"ban_event_{Guid.NewGuid():N}",
+            Timestamp = DateTimeOffset.UtcNow,
+            NormalizedPath = CreateAuditPath(target.NormalizedPath, target.ExeName),
+            ExeName = NormalizeExeNameForAssignment(target.ExeName),
+            ProductName = target.ProductName,
+            CompanyName = target.CompanyName,
+            SignerStatus = target.SignerStatus,
+            Action = action,
+            DurationLabel = durationLabel,
+            ProcessId = target.IsGroup ? null : target.ProcessId,
+            ProcessName = target.TargetText,
+            TerminatedCount = terminatedCount,
+            Details = details
+        });
+
+        await _thresholdSettingsStore.SaveAsync(
+            settings with
+            {
+                ProcessBans = processBans with
+                {
+                    History = history
+                        .OrderByDescending(entry => entry.Timestamp)
+                        .Take(processBans.MaxHistory)
+                        .ToList()
+                }
+            },
+            cancellationToken);
+        RefreshProcessBanCollections();
+    }
+
+    private static ProcessActionAuditTarget CreateAuditTarget(GlobalProcessRowViewModel row) =>
+        new(
+            ExeName: row.ExeName,
+            TargetText: row.DisplayName,
+            NormalizedPath: row.NormalizedFullPath,
+            DisplayPath: FormatDisplayPath(row.FullPath, row.NormalizedFullPath),
+            ProductName: row.ProductName,
+            CompanyName: row.CompanyName,
+            SignerStatus: row.SignerStatus,
+            ProcessId: row.IsGroup ? null : row.ProcessId,
+            IsGroup: row.IsGroup);
+
+    private static ProcessActionAuditTarget CreateAuditTarget(ProcessInspectorTargetViewModel target)
+    {
+        if (target.ActiveRow is not null)
+        {
+            return CreateAuditTarget(target.ActiveRow);
+        }
+
+        return new ProcessActionAuditTarget(
+            ExeName: target.ExeName,
+            TargetText: target.DisplayName,
+            NormalizedPath: target.NormalizedFullPath,
+            DisplayPath: FormatDisplayPath(target.FullPath, target.NormalizedFullPath),
+            ProductName: target.ProductName,
+            CompanyName: target.CompanyName,
+            SignerStatus: target.SignerStatus,
+            ProcessId: null,
+            IsGroup: target.IsGroup);
+    }
+
+    private static string FormatTreeOrGroupScope(GlobalProcessRowViewModel row) =>
+        row.IsGroup
+            ? string.Format(CultureInfo.CurrentCulture, Application.Current?.TryFindResource("Ui_ScopeApplicationGroup") as string ?? "Application group: {0:N0} running instance(s), {1:N0} PID(s).", row.InstanceCount, row.IncludedProcesses.Count)
+            : string.Format(CultureInfo.CurrentCulture, Application.Current?.TryFindResource("Ui_ScopeProcessTree") as string ?? "Process tree rooted at PID {0}; latest scan shows {1:N0} descendant(s).", row.ProcessId, row.Process.DescendantProcessCount);
+
+    private static string FormatTreeOrGroupImpact(GlobalProcessRowViewModel row) =>
+        row.IsGroup
+            ? string.Format(CultureInfo.CurrentCulture, Application.Current?.TryFindResource("Ui_ImpactAppGroupKill") as string ?? "Yes: all {0:N0} running PID(s) in this app group will be terminated immediately.", row.IncludedProcesses.Count)
+            : string.Format(CultureInfo.CurrentCulture, Application.Current?.TryFindResource("Ui_ImpactProcessTreeKill") as string ?? "Yes: PID {0} and its process tree will be terminated immediately.", row.ProcessId);
+
+    private static string FormatProcessControlMessages(ProcessControlResult result) =>
+        result.Messages.Count == 0
+            ? Application.Current?.TryFindResource("Ui_NoProcessControlDetails") as string ?? "No process control details were returned."
+            : string.Join(" ", result.Messages.Take(4));
+
+    private static string FormatDisplayPath(string? fullPath, string? normalizedPath)
+    {
+        if (!string.IsNullOrWhiteSpace(fullPath)
+            && !string.Equals(fullPath, "Unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+            return fullPath;
+        }
+
+        return string.IsNullOrWhiteSpace(normalizedPath)
+            ? Application.Current?.TryFindResource("Ui_Unavailable") as string ?? "Unavailable"
+            : normalizedPath;
+    }
+
+    private static string CreateAuditPath(string? normalizedPath, string exeName)
+    {
+        if (!string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return normalizedPath;
+        }
+
+        var normalizedExe = NormalizeExeNameForAssignment(exeName);
+        return $"unavailable://{normalizedExe}";
+    }
+
+    private sealed record ProcessActionAuditTarget(
+        string ExeName,
+        string TargetText,
+        string NormalizedPath,
+        string DisplayPath,
+        string ProductName,
+        string CompanyName,
+        string SignerStatus,
+        int? ProcessId,
+        bool IsGroup);
 
     private Task SetRecommendationStatusAsync(string status)
     {
@@ -1262,7 +1563,9 @@ public sealed partial class MainWindowViewModel
         var detail = result.Messages.Count == 0
             ? string.Empty
             : $" {string.Join(" ", result.Messages.Take(2))}";
-        return $"{action}: {result.TerminatedCount:N0}/{result.RequestedCount:N0} process{(result.RequestedCount == 1 ? string.Empty : "es")} terminated.{detail}";
+        var format = Application.Current?.TryFindResource("Ui_ProcessControlResult") as string
+            ?? "{0}: {1:N0}/{2:N0} processes terminated.{3}";
+        return string.Format(CultureInfo.CurrentCulture, format, action, result.TerminatedCount, result.RequestedCount, detail);
     }
 
     private async Task RemoveSuspiciousPathAsync(string normalizedPath, CancellationToken cancellationToken)
@@ -2027,9 +2330,11 @@ public sealed partial class MainWindowViewModel
                 var representative = matchingRows
                     .OrderByDescending(row => row.CpuPercent ?? 0)
                     .First();
+                var enforcementWasBlocked = result.TerminatedCount == 0
+                    && result.Messages.Any(message => message.StartsWith("Skipped ", StringComparison.OrdinalIgnoreCase));
                 history.Insert(0, CreateProcessBanEvent(
                     rule,
-                    "ban_enforced",
+                    enforcementWasBlocked ? "ban_blocked" : "ban_enforced",
                     representative,
                     result.TerminatedCount,
                     result.Messages.Count == 0

@@ -30,6 +30,21 @@ public sealed class UpdateAvailablePromptEventArgs : EventArgs
     public UpdatePromptChoice Choice { get; set; } = UpdatePromptChoice.Later;
 }
 
+public sealed class DestructiveProcessActionConfirmationEventArgs : EventArgs
+{
+    public DestructiveProcessActionConfirmationEventArgs(
+        string title,
+        string message)
+    {
+        Title = title;
+        Message = message;
+    }
+
+    public string Title { get; }
+    public string Message { get; }
+    public bool IsConfirmed { get; set; }
+}
+
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private const double AvgCpuBudgetPercent = 2;
@@ -83,6 +98,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IExportService _exportService;
     private readonly IUpdateService _updateService;
     private string GetText(string key) => Application.Current.TryFindResource(key) as string ?? key;
+    private string FormatText(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, GetText(key), args);
     private readonly string _defaultExportDirectory;
     private readonly string _updateDownloadDirectory;
     private readonly List<SelfMonitoringSample> _selfMonitoringSamples = [];
@@ -158,18 +174,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selfPeakRamText = "n/a";
     private string _selfDiskWriteText = "n/a";
     private string _selfSampleCountText = "0";
-    private string _selfCpuBudgetStatusText = "неизвестно";
-    private string _selfRamBudgetStatusText = "неизвестно";
-    private string _selfWritesBudgetStatusText = "настроено";
-    private string _selfSnapshotsBudgetStatusText = "только по событию";
+    private string _selfCpuBudgetStatusText = string.Empty;
+    private string _selfRamBudgetStatusText = string.Empty;
+    private string _selfWritesBudgetStatusText = string.Empty;
+    private string _selfSnapshotsBudgetStatusText = string.Empty;
     private string _globalWatchFilterText = string.Empty;
-    private string _globalWatchStatusText = "Глобальный обзор показывает лёгкий срез процессов.";
-    private string _globalWatchLastScanText = "Ожидание первого скана";
-    private string _globalWatchJournalStatusText = "Журнал наблюдения пишет состояния процессов относительно профилей.";
-    private string _profileRecommendationStatusText = "Рекомендации появляются после повторных превышений лимитов профиля.";
-    private string _suspiciousWatchStatusText = "Пометь процесс или приложение подозрительным, чтобы отслеживать будущие запуски.";
-    private string _processBanStatusText = "Запреты процессов применяются Global Watch, пока утилита запущена.";
-    private string _languageSettingsStatusText = "Настройки языка загружены.";
+    private string _globalWatchStatusText = string.Empty;
+    private string _globalWatchLastScanText = string.Empty;
+    private string _globalWatchJournalStatusText = string.Empty;
+    private string _profileRecommendationStatusText = string.Empty;
+    private string _suspiciousWatchStatusText = string.Empty;
+    private string _processBanStatusText = string.Empty;
+    private string _languageSettingsStatusText = string.Empty;
     private string _selectedGlobalWatchSortMode = string.Empty;
     private string _selectedGlobalWatchMode = string.Empty;
     private string? _selectedGlobalProcessKey;
@@ -206,7 +222,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _autoStopInProgress;
     private bool _manualStopInProgress;
     private LiveSessionUiState _liveSessionState = LiveSessionUiState.ReadyToStart;
-    private string _autoStopStatusText = "Мониторинг остановлен. Нажми Старт, чтобы применить изменения.";
+    private string _autoStopStatusText = string.Empty;
     private IRunningSessionHandle? _activeHandle;
     private CancellationTokenSource? _selfMonitoringCts;
     private CancellationTokenSource? _globalWatchCts;
@@ -221,6 +237,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private UpdateManifest? _availableUpdateManifest;
 
     public event EventHandler<UpdateAvailablePromptEventArgs>? UpdateAvailablePromptRequested;
+    public event EventHandler<DestructiveProcessActionConfirmationEventArgs>? DestructiveProcessActionConfirmationRequested;
     public event EventHandler? UpdateInstallerLaunched;
     public event EventHandler? LanguageRestartRequested;
 
@@ -280,8 +297,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _selectedProcessBanDurationOption = ProcessBanDurationOptions[1];
         LanguageOptions =
         [
-            new LanguageOptionViewModel(LocalizationManager.Russian, "Русский"),
-            new LanguageOptionViewModel(LocalizationManager.English, "English")
+            new LanguageOptionViewModel(LocalizationManager.Russian, GetText("Ui_LanguageRussian")),
+            new LanguageOptionViewModel(LocalizationManager.English, GetText("Ui_LanguageEnglish"))
         ];
         _selectedLanguageOption = LanguageOptions[0];
     }
@@ -311,7 +328,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _globalWatchLastScanText = GetText("Ui_WaitingFirstScan");
         _globalWatchJournalStatusText = GetText("Ui_JournalWritingStatus");
         _profileRecommendationStatusText = GetText("Ui_RecommendationsHintStatus");
+        _suspiciousWatchStatusText = GetText("Ui_SuspiciousWatchStatusDefault");
+        _processBanStatusText = GetText("Ui_ProcessBanStatusDefault");
         _languageSettingsStatusText = GetText("Ui_LanguageSettingsLoaded");
+        _selfCpuBudgetStatusText = GetText("Ui_StatusUnknown");
+        _selfRamBudgetStatusText = GetText("Ui_StatusUnknown");
+        _selfWritesBudgetStatusText = GetText("Ui_StatusConfigured");
+        _selfSnapshotsBudgetStatusText = GetText("Ui_OnlyOnEvent");
     }
 
     public ObservableCollection<SessionListItemViewModel> Sessions { get; } = [];
@@ -1399,17 +1422,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool CanOpenSelectedGlobalProcessFileLocation => TryGetSelectedGlobalProcessUsablePath(out var path)
         && File.Exists(path);
     public bool CanCopySelectedGlobalProcessPath => TryGetSelectedGlobalProcessUsablePath(out _);
-    public bool CanKillSelectedGlobalProcess => SelectedGlobalProcess is not null;
+    public bool CanKillSelectedGlobalProcess => IsGlobalWatchRowActionAllowed(SelectedGlobalProcess, requiresPath: false);
     public bool CanBanSelectedGlobalProcess => SelectedGlobalProcess is not null
-        && TryGetSelectedGlobalProcessUsablePath(out _);
+        && TryGetSelectedGlobalProcessUsablePath(out _)
+        && IsGlobalWatchRowActionAllowed(SelectedGlobalProcess, requiresPath: true);
     public string SelectedGlobalProcessKillTreeLabel => SelectedGlobalProcess?.IsGroup == true
-        ? "Kill app group"
-        : "Kill process tree";
+        ? GetText("Ui_KillAppGroup")
+        : GetText("Ui_KillProcessTree");
     public string SelectedGlobalProcessBanText => SelectedGlobalProcess is null
-        ? "Select a row to create an app-level ban."
-        : !CanBanSelectedGlobalProcess
-            ? "Full path unavailable; cannot create a ban."
-            : $"Ban target: {SelectedGlobalProcess.ExeName} by full path.";
+        ? GetText("Ui_SelectRowCreateBan")
+        : !TryGetSelectedGlobalProcessUsablePath(out _)
+            ? GetText("Ui_FullPathUnavailableCannotBan")
+            : !AssessGlobalWatchRowForAction(SelectedGlobalProcess, requiresPath: true).IsAllowed
+                ? FormatText("Ui_ProtectedTargetReason", AssessGlobalWatchRowForAction(SelectedGlobalProcess, requiresPath: true).Reason)
+            : FormatText("Ui_BanTargetByFullPath", SelectedGlobalProcess.ExeName);
     public bool CanAssignSelectedGlobalProcessProfile => SelectedGlobalProcess is { IsUnassigned: true };
     public bool CanMarkSelectedGlobalProcessSuspicious => SelectedGlobalProcess is not null
         && TryGetSelectedGlobalProcessUsablePath(out _)
@@ -1513,8 +1539,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool CanMonitorInspectorTarget => _processInspectorTarget?.ActiveRow is not null;
     public bool CanOpenInspectorFileLocation => TryGetInspectorUsablePath(out var inspectorPath) && File.Exists(inspectorPath);
     public bool CanCopyInspectorPath => TryGetInspectorUsablePath(out _);
-    public bool CanKillInspectorTarget => _processInspectorTarget?.ActiveRow is not null;
-    public bool CanBanInspectorTarget => TryGetInspectorUsablePath(out _);
+    public bool CanKillInspectorTarget => IsInspectorActionAllowed(requiresRunningTarget: true, requiresPath: false);
+    public bool CanBanInspectorTarget => TryGetInspectorUsablePath(out _)
+        && IsInspectorActionAllowed(requiresRunningTarget: false, requiresPath: true);
     public bool CanMarkInspectorSuspicious => TryGetInspectorUsablePath(out _)
         && !IsInspectorTargetSuspicious;
     public bool CanRemoveInspectorSuspicious => IsInspectorTargetSuspicious;
@@ -1523,25 +1550,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         && _thresholdSettingsStore.Current.SuspiciousWatchlist.Items.Any(item =>
             string.Equals(item.NormalizedPath, _processInspectorTarget.NormalizedFullPath, StringComparison.OrdinalIgnoreCase));
     public string InspectorKillTreeLabel => _processInspectorTarget?.IsGroup == true
-        ? "Kill app group"
-        : "Kill process tree";
+        ? GetText("Ui_KillAppGroup")
+        : GetText("Ui_KillProcessTree");
     public string InspectorSuspiciousText => _processInspectorTarget is null
-        ? "No inspector target loaded."
+        ? GetText("Ui_NoInspectorTarget")
         : !TryGetInspectorUsablePath(out _)
-            ? "Full path unavailable; cannot add to suspicious watchlist."
+            ? GetText("Ui_FullPathUnavailableCannotWatch")
             : IsInspectorTargetSuspicious
-                ? "Marked suspicious. Launch transitions will be logged."
-                : "Not marked suspicious.";
+                ? GetText("Ui_MarkedSuspiciousLaunchesLogged")
+                : GetText("Ui_NotMarkedSuspicious");
     public string InspectorBanText => _processInspectorTarget is null
-        ? "No inspector target loaded."
+        ? GetText("Ui_NoInspectorTarget")
         : !TryGetInspectorUsablePath(out _)
-            ? "Full path unavailable; cannot create a ban."
-            : $"Ban target: {_processInspectorTarget.ExeName} by full path.";
+            ? GetText("Ui_FullPathUnavailableCannotBan")
+            : !AssessInspectorAction(requiresRunningTarget: false, requiresPath: true).IsAllowed
+                ? FormatText("Ui_ProtectedTargetReason", AssessInspectorAction(requiresRunningTarget: false, requiresPath: true).Reason)
+            : FormatText("Ui_BanTargetByFullPath", _processInspectorTarget.ExeName);
     public bool InspectorHasRecommendation => _processInspectorTarget is not null
         && ProfileRecommendations.Any(recommendation => string.Equals(recommendation.ExeName, _processInspectorTarget.ExeName, StringComparison.OrdinalIgnoreCase));
     public string InspectorRecommendationText => InspectorHasRecommendation
-        ? "A profile recommendation is ready for this exe."
-        : "No active recommendation for this exe.";
+        ? GetText("Ui_ProfileRecommendationReady")
+        : GetText("Ui_NoActiveRecommendationForExe");
     public bool HasSessionDetails => SelectedSession is not null;
     public bool HasSessionDetailEvents => SessionDetailEvents.Count > 0;
     public bool HasSessionDetailMetrics => SessionDetailMetricSummaries.Count > 0;

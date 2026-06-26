@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        shell: pwsh
+        run: dotnet restore .\SessionPerfTracker.slnx
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build .\SessionPerfTracker.slnx -c Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: dotnet test .\SessionPerfTracker.slnx -c Release --no-build --no-restore
+
+      - name: Package self-contained app
+        shell: pwsh
+        run: |
+          .\scripts\package-windows.ps1 `
+            -Configuration Release `
+            -Version 0.0.0
+
+      - name: Smoke test packaged app
+        shell: pwsh
+        run: |
+          .\scripts\test-packaged-app.ps1 `
+            -ExecutablePath .\artifacts\release\win-x64\publish\SessionPerfTracker.App.exe
+
+      - name: Upload self-contained zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: SessionPerfTracker-win-x64-self-contained
+          path: artifacts/release/dist/SessionPerfTracker-0.0.0-win-x64-self-contained.zip
+          if-no-files-found: error

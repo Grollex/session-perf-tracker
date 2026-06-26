@@ -1,6 +1,7 @@
 using System.Windows;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using SessionPerfTracker.App.ViewModels;
 using SessionPerfTracker.Domain.Services;
@@ -28,6 +29,11 @@ public partial class MainWindow : Window
     private WinForms.NotifyIcon? _notifyIcon;
     private bool _isExitRequested;
     private bool _trayNotificationShown;
+
+    private string GetText(string key) => TryFindResource(key) as string ?? key;
+
+    private string FormatText(string key, params object?[] args) =>
+        string.Format(CultureInfo.CurrentCulture, GetText(key), args);
 
     public MainWindow()
     {
@@ -84,6 +90,7 @@ public partial class MainWindow : Window
             exportsPath,
             updatesPath);
         _viewModel.UpdateAvailablePromptRequested += OnUpdateAvailablePromptRequested;
+        _viewModel.DestructiveProcessActionConfirmationRequested += OnDestructiveProcessActionConfirmationRequested;
         _viewModel.UpdateInstallerLaunched += OnUpdateInstallerLaunched;
         _viewModel.LanguageRestartRequested += OnLanguageRestartRequested;
         DataContext = _viewModel;
@@ -102,6 +109,7 @@ public partial class MainWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.UpdateAvailablePromptRequested -= OnUpdateAvailablePromptRequested;
+        _viewModel.DestructiveProcessActionConfirmationRequested -= OnDestructiveProcessActionConfirmationRequested;
         _viewModel.UpdateInstallerLaunched -= OnUpdateInstallerLaunched;
         _viewModel.LanguageRestartRequested -= OnLanguageRestartRequested;
         _notifyIcon?.Dispose();
@@ -125,8 +133,8 @@ public partial class MainWindow : Window
             {
                 _notifyIcon.ShowBalloonTip(
                     2500,
-                    $"{_viewModel.AppWindowTitle} is still running",
-                    "Use the tray icon to reopen it or choose Exit to quit.",
+                    FormatText("Ui_TrayRunningTitle", _viewModel.AppWindowTitle),
+                    GetText("Ui_TrayRunningMessage"),
                     WinForms.ToolTipIcon.Info);
                 _trayNotificationShown = true;
             }
@@ -136,8 +144,8 @@ public partial class MainWindow : Window
     private void InitializeTrayIcon()
     {
         var menu = new WinForms.ContextMenuStrip();
-        menu.Items.Add($"Open {_viewModel.AppWindowTitle}", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
-        menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitFromTray));
+        menu.Items.Add(FormatText("Ui_TrayOpenApp", _viewModel.AppWindowTitle), null, (_, _) => Dispatcher.Invoke(ShowFromTray));
+        menu.Items.Add(GetText("Ui_TrayExit"), null, (_, _) => Dispatcher.Invoke(ExitFromTray));
 
         _notifyIcon = new WinForms.NotifyIcon
         {
@@ -238,15 +246,15 @@ public partial class MainWindow : Window
 
     private void OnUpdateAvailablePromptRequested(object? sender, UpdateAvailablePromptEventArgs e)
     {
-        var latestVersion = e.Result.LatestVersion ?? e.Result.Manifest?.Version ?? "new";
+        var latestVersion = e.Result.LatestVersion ?? e.Result.Manifest?.Version ?? GetText("Ui_NewVersionFallback");
         var notes = string.IsNullOrWhiteSpace(e.Result.Manifest?.ReleaseNotes)
-            ? "No release notes were provided."
+            ? GetText("Ui_NoReleaseNotesProvided")
             : e.Result.Manifest.ReleaseNotes;
 
         var updateNow = MessageBox.Show(
             this,
-            $"Session Perf Tracker {latestVersion} is available.\n\nCurrent version: {_viewModel.CurrentVersionText}\n\n{notes}\n\nInstall now?\n\nYes = update now\nNo = later\nCancel = skip this version",
-            "Update available",
+            FormatText("Ui_UpdateAvailableMessage", latestVersion, _viewModel.CurrentVersionText, notes),
+            GetText("Ui_UpdateAvailableTitle"),
             MessageBoxButton.YesNoCancel,
             MessageBoxImage.Information);
 
@@ -256,6 +264,20 @@ public partial class MainWindow : Window
             MessageBoxResult.Cancel => UpdatePromptChoice.SkipVersion,
             _ => UpdatePromptChoice.Later
         };
+    }
+
+    private void OnDestructiveProcessActionConfirmationRequested(
+        object? sender,
+        DestructiveProcessActionConfirmationEventArgs e)
+    {
+        var result = MessageBox.Show(
+            this,
+            e.Message,
+            e.Title,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        e.IsConfirmed = result == MessageBoxResult.Yes;
     }
 
     private void OnUpdateInstallerLaunched(object? sender, EventArgs e)

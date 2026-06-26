@@ -1,10 +1,18 @@
 using System.Diagnostics;
 using SessionPerfTracker.Domain.Abstractions;
+using SessionPerfTracker.Domain.Services;
 
 namespace SessionPerfTracker.Infrastructure.GlobalWatch;
 
 public sealed class WindowsProcessControlService : IProcessControlService
 {
+    private readonly ProcessActionSafetyPolicy _safetyPolicy;
+
+    public WindowsProcessControlService(ProcessActionSafetyPolicy? safetyPolicy = null)
+    {
+        _safetyPolicy = safetyPolicy ?? ProcessActionSafetyPolicy.Default;
+    }
+
     public Task<ProcessControlResult> KillProcessAsync(
         int processId,
         string reason,
@@ -23,14 +31,13 @@ public sealed class WindowsProcessControlService : IProcessControlService
         CancellationToken cancellationToken = default) =>
         KillCoreAsync(processIds, entireTree: false, reason, cancellationToken);
 
-    private static Task<ProcessControlResult> KillCoreAsync(
+    private Task<ProcessControlResult> KillCoreAsync(
         IReadOnlyList<int> processIds,
         bool entireTree,
         string reason,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var currentProcessId = Environment.ProcessId;
         var messages = new List<string>();
         var terminated = 0;
 
@@ -39,12 +46,6 @@ public sealed class WindowsProcessControlService : IProcessControlService
             cancellationToken.ThrowIfCancellationRequested();
             if (processId <= 0)
             {
-                continue;
-            }
-
-            if (processId == currentProcessId)
-            {
-                messages.Add($"Skipped self PID {processId}.");
                 continue;
             }
 
@@ -58,6 +59,14 @@ public sealed class WindowsProcessControlService : IProcessControlService
                 }
 
                 var name = SafeGetProcessName(process);
+                var fullPath = SafeGetProcessPath(process);
+                var safety = _safetyPolicy.Assess(processId, name, fullPath);
+                if (!safety.IsAllowed)
+                {
+                    messages.Add($"Skipped {name} ({processId}): {safety.Reason}");
+                    continue;
+                }
+
                 process.Kill(entireProcessTree: entireTree);
                 terminated++;
                 messages.Add(entireTree
@@ -99,6 +108,18 @@ public sealed class WindowsProcessControlService : IProcessControlService
         catch
         {
             return "process";
+        }
+    }
+
+    private static string? SafeGetProcessPath(Process process)
+    {
+        try
+        {
+            return process.MainModule?.FileName;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

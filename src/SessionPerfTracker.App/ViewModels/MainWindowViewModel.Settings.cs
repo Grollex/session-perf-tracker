@@ -93,15 +93,11 @@ public sealed partial class MainWindowViewModel
         ApplyLanguageSettingsToUi(_thresholdSettingsStore.Current.Language);
         if (languageCode.Equals(previousLanguageCode, StringComparison.OrdinalIgnoreCase))
         {
-            LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
-                ? "Язык уже выбран. Перезапуск не нужен."
-                : "Language already selected. Restart is not needed.";
+            LanguageSettingsStatusText = GetText("Ui_LanguageAlreadySelected");
             return;
         }
 
-        LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
-            ? "Язык сохранён. Приложение перезапускается..."
-            : "Language saved. Restarting the app...";
+        LanguageSettingsStatusText = GetText("Ui_LanguageSavedRestarting");
         LanguageRestartRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -602,9 +598,9 @@ public sealed partial class MainWindowViewModel
         SelectedLanguageOption = LanguageOptions.FirstOrDefault(option =>
             option.LanguageCode.Equals(languageCode, StringComparison.OrdinalIgnoreCase))
             ?? LanguageOptions.FirstOrDefault();
-        LanguageSettingsStatusText = languageCode == LocalizationManager.Russian
-            ? "Язык приложения: русский."
-            : "Application language: English.";
+        LanguageSettingsStatusText = FormatText(
+            "Ui_ApplicationLanguageStatus",
+            SelectedLanguageOption?.DisplayName ?? languageCode);
     }
 
     private void ApplyExportSettingsToUi(ExportSettings exportSettings)
