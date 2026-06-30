@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using SessionPerfTracker.App.ViewModels;
 
 namespace SessionPerfTracker.App.Views;
@@ -230,6 +232,82 @@ public partial class SettingsView : System.Windows.Controls.UserControl
         if (ViewModel is not null)
         {
             await ViewModel.SkipAvailableUpdateAsync();
+        }
+    }
+
+    private async void SaveBugReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.SaveBugReportAsync(CaptureFeedbackScreenshot("bug-report"));
+        }
+    }
+
+    private async void SaveFeatureFeedback_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.SaveFeatureFeedbackAsync(CaptureFeedbackScreenshot("feature-idea"));
+        }
+    }
+
+    private async void OpenFeedbackDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.OpenFeedbackDirectoryAsync();
+        }
+    }
+
+    private async void OpenLatestFeedbackReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.OpenLatestFeedbackReportAsync();
+        }
+    }
+
+    private async void CopyLatestFeedbackReport_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.CopyLatestFeedbackReportAsync();
+        }
+    }
+
+    private string? CaptureFeedbackScreenshot(string kind)
+    {
+        if (ViewModel?.IncludeScreenshotInFeedback != true)
+        {
+            return null;
+        }
+
+        var window = Window.GetWindow(this);
+        if (window is null || window.ActualWidth <= 0 || window.ActualHeight <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(ViewModel.FeedbackDirectoryText);
+            var width = Math.Max(1, (int)Math.Ceiling(window.ActualWidth));
+            var height = Math.Max(1, (int)Math.Ceiling(window.ActualHeight));
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(window);
+
+            var path = Path.Combine(
+                ViewModel.FeedbackDirectoryText,
+                $"{DateTimeOffset.Now:yyyyMMdd_HHmmss}_{kind}_screenshot.png");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = File.Create(path);
+            encoder.Save(stream);
+            return path;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

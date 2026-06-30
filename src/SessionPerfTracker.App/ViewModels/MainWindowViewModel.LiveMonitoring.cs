@@ -65,6 +65,7 @@ public sealed partial class MainWindowViewModel
             _liveEventCount = 0;
             _liveSpikeCount = 0;
             _liveBreachCount = 0;
+            _liveHangCount = 0;
             _liveTrackedProcessCount = 0;
             _liveRootProcessId = _activeHandle.Target.ProcessId;
             _lastLiveUiRefresh = DateTimeOffset.MinValue;
@@ -235,6 +236,7 @@ public sealed partial class MainWindowViewModel
             _liveEventCount += events.Count;
             _liveSpikeCount += events.Count(item => HasEventKind(item, EventKind.Spike));
             _liveBreachCount += events.Count(item => HasEventKind(item, EventKind.ThresholdBreach));
+            _liveHangCount += events.Count(item => HasEventKind(item, EventKind.HangSuspected));
             NotifyLivePanelProperties();
             NotifySummaryProperties();
         });
@@ -357,6 +359,7 @@ public sealed partial class MainWindowViewModel
                 _liveEventCount = 0;
                 _liveSpikeCount = 0;
                 _liveBreachCount = 0;
+                _liveHangCount = 0;
                 _liveTrackedProcessCount = 0;
                 _liveRootProcessId = null;
                 SetLiveSessionState(LiveSessionUiState.EndedUnexpectedly);

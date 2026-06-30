@@ -227,6 +227,33 @@ public sealed class ExportFileItemViewModel
     }
 }
 
+public sealed class FeedbackDeliveryHistoryItemViewModel
+{
+    public FeedbackDeliveryHistoryItemViewModel(
+        DateTimeOffset timestamp,
+        string kind,
+        bool sent,
+        string localPath,
+        string? error)
+    {
+        TimestampText = timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        Kind = kind;
+        Status = sent ? UiText.Get("Ui_FeedbackDeliverySent") : UiText.Get("Ui_FeedbackDeliverySavedOnly");
+        LocalPath = localPath;
+        Error = string.IsNullOrWhiteSpace(error) ? string.Empty : error;
+        Details = string.IsNullOrWhiteSpace(Error)
+            ? localPath
+            : $"{localPath} - {Error}";
+    }
+
+    public string TimestampText { get; }
+    public string Kind { get; }
+    public string Status { get; }
+    public string LocalPath { get; }
+    public string Error { get; }
+    public string Details { get; }
+}
+
 public sealed class ThresholdProfileOptionViewModel
 {
     public ThresholdProfileOptionViewModel(ThresholdProfile profile)

@@ -48,6 +48,12 @@ public sealed partial class MainWindowViewModel
         SelectedTabIndex = LiveTabIndex;
     }
 
+    public void OpenFeedback()
+    {
+        SelectedSettingsTabIndex = SettingsFeedbackTabIndex;
+        SelectedTabIndex = SettingsTabIndex;
+    }
+
     private async Task ExportSelectedSessionAsync(string format, CancellationToken cancellationToken)
     {
         if (SelectedSession is null)

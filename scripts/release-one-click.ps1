@@ -1,6 +1,7 @@
 param(
     [string]$Version = "",
     [string]$ReleaseNotes = "",
+    [switch]$AutoVersion,
     [switch]$SkipUpload,
     [switch]$NoOpen
 )
@@ -10,6 +11,34 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $repository = "Grollex/session-perf-tracker"
 $versionFile = Join-Path $repoRoot "VERSION"
+$localConfigPath = Join-Path $repoRoot "release.local.ps1"
+$packageSigningArgs = @()
+
+if (Test-Path -LiteralPath $localConfigPath) {
+    Write-Host "Loading local release config: $localConfigPath" -ForegroundColor DarkGray
+    . $localConfigPath
+
+    if (Get-Variable -Name SigningPfxPath -Scope Local -ErrorAction SilentlyContinue) {
+        $packageSigningArgs += "-SigningPfxPath"
+        $packageSigningArgs += $SigningPfxPath
+    }
+
+    if (Get-Variable -Name SigningPfxPassword -Scope Local -ErrorAction SilentlyContinue) {
+        $packageSigningArgs += "-SigningPfxPassword"
+        $packageSigningArgs += $SigningPfxPassword
+    }
+
+    if (Get-Variable -Name TimestampUrl -Scope Local -ErrorAction SilentlyContinue) {
+        $packageSigningArgs += "-TimestampUrl"
+        $packageSigningArgs += $TimestampUrl
+    }
+
+    if (Get-Variable -Name SkipSigning -Scope Local -ErrorAction SilentlyContinue) {
+        if ($SkipSigning) {
+            $packageSigningArgs += "-SkipSigning"
+        }
+    }
+}
 
 function Add-LocalToolPaths {
     $paths = @(
@@ -86,6 +115,7 @@ function Publish-GitHubRelease {
         [Parameter(Mandatory = $true)][string]$Version,
         [Parameter(Mandatory = $true)][string]$InstallerPath,
         [Parameter(Mandatory = $true)][string]$ManifestPath,
+        [Parameter(Mandatory = $true)][string]$Sha256SumsPath,
         [Parameter(Mandatory = $true)][string]$ReleaseNotes,
         [Parameter(Mandatory = $true)][string]$Repository
     )
@@ -125,14 +155,14 @@ function Publish-GitHubRelease {
 
         if ($releaseExists) {
             Write-Host "GitHub Release $Tag already exists. Uploading assets with --clobber..." -ForegroundColor Cyan
-            & gh release upload $Tag $InstallerPath $ManifestPath --repo $Repository --clobber
+            & gh release upload $Tag $InstallerPath $ManifestPath $Sha256SumsPath --repo $Repository --clobber
             if ($LASTEXITCODE -ne 0) {
                 throw "GitHub Release asset upload failed."
             }
         }
         else {
             Write-Host "Creating GitHub Release $Tag and uploading assets..." -ForegroundColor Cyan
-            & gh release create $Tag $InstallerPath $ManifestPath `
+            & gh release create $Tag $InstallerPath $ManifestPath $Sha256SumsPath `
                 --repo $Repository `
                 --title "Session Perf Tracker $Version" `
                 --notes $ReleaseNotes `
@@ -201,6 +231,13 @@ $normalizedVersion = Normalize-ReleaseVersion $Version
 $storedVersion = Get-StoredReleaseVersion
 $suggestedVersion = Get-NextPatchVersion $storedVersion
 
+if ($AutoVersion -and -not $normalizedVersion) {
+    Write-Host "Last release version from VERSION: $storedVersion" -ForegroundColor DarkGray
+    Write-Host "Auto-selected next version: $suggestedVersion" -ForegroundColor Cyan
+    $Version = $suggestedVersion
+    $normalizedVersion = $suggestedVersion
+}
+
 while (-not $normalizedVersion) {
     if (-not [string]::IsNullOrWhiteSpace($Version)) {
         Write-Host ""
@@ -236,7 +273,8 @@ Write-Host "Building Session Perf Tracker $Version..." -ForegroundColor Cyan
     -Version $Version `
     -BuildInstaller `
     -InstallerBaseUrl $installerBaseUrl `
-    -ReleaseNotes $ReleaseNotes
+    -ReleaseNotes $ReleaseNotes `
+    @packageSigningArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "Release packaging failed with exit code $LASTEXITCODE"
@@ -244,6 +282,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $installerPath = Join-Path $repoRoot "artifacts\release\installer\SessionPerfTracker-$Version-win-x64-setup.exe"
 $manifestPath = Join-Path $repoRoot "artifacts\release\update\version.json"
+$sha256SumsPath = Join-Path $repoRoot "artifacts\release\dist\SHA256SUMS.txt"
+$releaseSmokeTestScript = Join-Path $repoRoot "scripts\test-release-artifacts.ps1"
 
 if (-not (Test-Path -LiteralPath $installerPath)) {
     throw "Expected installer was not created: $installerPath"
@@ -251,6 +291,18 @@ if (-not (Test-Path -LiteralPath $installerPath)) {
 
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Expected update manifest was not created: $manifestPath"
+}
+
+if (-not (Test-Path -LiteralPath $sha256SumsPath)) {
+    throw "Expected SHA256 sums file was not created: $sha256SumsPath"
+}
+
+if (Test-Path -LiteralPath $releaseSmokeTestScript) {
+    Write-Host "Running release artifact smoke test..." -ForegroundColor Cyan
+    & $releaseSmokeTestScript -Version $Version
+    if ($LASTEXITCODE -ne 0) {
+        throw "Release artifact smoke test failed with exit code $LASTEXITCODE"
+    }
 }
 
 $releaseUrl = "https://github.com/$repository/releases/new?tag=$tag&title=Session%20Perf%20Tracker%20$Version"
@@ -263,6 +315,7 @@ if (-not $SkipUpload) {
         -Version $Version `
         -InstallerPath $installerPath `
         -ManifestPath $manifestPath `
+        -Sha256SumsPath $sha256SumsPath `
         -ReleaseNotes $ReleaseNotes `
         -Repository $repository
 }
@@ -273,9 +326,10 @@ Write-Host ""
 Write-Host "Release files are ready:" -ForegroundColor Green
 Write-Host "  Installer: $installerPath"
 Write-Host "  Manifest:  $manifestPath"
+Write-Host "  SHA256:    $sha256SumsPath"
 Write-Host ""
 if ($SkipUpload) {
-    Write-Host "Upload was skipped. Create a GitHub Release with tag $tag and upload both files as assets." -ForegroundColor Yellow
+    Write-Host "Upload was skipped. Create a GitHub Release with tag $tag and upload installer, manifest, and SHA256SUMS.txt as assets." -ForegroundColor Yellow
 }
 else {
     Write-Host "GitHub Release was created/updated:" -ForegroundColor Green

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Text.Json;
 using System.IO;
 using Microsoft.Data.Sqlite;
+using Microsoft.Win32;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Models;
 
@@ -12,6 +13,9 @@ public partial class App : System.Windows.Application
 {
     private const string SingleInstanceMutexName = "Local\\SessionPerfTracker.SingleInstance";
     private const string ShowWindowEventName = "Local\\SessionPerfTracker.ShowMainWindow";
+    private const string StartupRegistryValueName = "Session Perf Tracker";
+
+    internal static bool StartMinimizedToTray { get; private set; }
 
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showWindowEvent;
@@ -20,18 +24,41 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (HasArg(e.Args, "--register-startup-and-exit"))
+        {
+            SetStartupRegistration(enabled: true);
+            Shutdown();
+            return;
+        }
+
+        if (HasArg(e.Args, "--unregister-startup-and-exit"))
+        {
+            SetStartupRegistration(enabled: false);
+            Shutdown();
+            return;
+        }
+
+        StartMinimizedToTray =
+            HasArg(e.Args, "--background")
+            || HasArg(e.Args, "--minimized")
+            || HasArg(e.Args, "/background")
+            || HasArg(e.Args, "/minimized");
+
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
         _ownsSingleInstanceMutex = isFirstInstance;
 
         if (!isFirstInstance)
         {
-            try
+            if (!StartMinimizedToTray)
             {
-                _showWindowEvent.Set();
-            }
-            catch
-            {
+                try
+                {
+                    _showWindowEvent.Set();
+                }
+                catch
+                {
+                }
             }
 
             Shutdown();
@@ -60,6 +87,40 @@ public partial class App : System.Windows.Application
         }
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
+    }
+
+    private static bool HasArg(string[] args, string expected) =>
+        args.Any(argument => argument.Equals(expected, StringComparison.OrdinalIgnoreCase));
+
+    private static void SetStartupRegistration(bool enabled)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Run",
+                writable: true);
+            if (key is null)
+            {
+                return;
+            }
+
+            if (!enabled)
+            {
+                key.DeleteValue(StartupRegistryValueName, throwOnMissingValue: false);
+                return;
+            }
+
+            var executablePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+            {
+                return;
+            }
+
+            key.SetValue(StartupRegistryValueName, $"\"{executablePath}\" --background", RegistryValueKind.String);
+        }
+        catch
+        {
+        }
     }
 
     private static string ResolveStartupLanguage()

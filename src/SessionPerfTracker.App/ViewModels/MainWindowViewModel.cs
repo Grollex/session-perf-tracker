@@ -56,6 +56,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const int GlobalWatchTabIndex = 1;
     private const int SessionsTabIndex = 2;
     private const int SessionDetailsTabIndex = 3;
+    private const int SettingsTabIndex = 5;
+    private const int SettingsFeedbackTabIndex = 3;
     private const int GlobalWatchOverviewSectionIndex = 0;
     private const int GlobalWatchJournalSectionIndex = 1;
     private const int GlobalWatchRecommendationsSectionIndex = 2;
@@ -163,6 +165,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _updateLatestVersionText = "not checked";
     private string _updateReleaseNotesText = "no updates checked yet";
     private string _downloadedUpdateInstallerPath = string.Empty;
+    private string _bugReportText = string.Empty;
+    private string _featureFeedbackText = string.Empty;
+    private string _feedbackStatusText = "No feedback saved yet.";
+    private bool _includeLatestSessionInFeedback = true;
+    private bool _includeScreenshotInFeedback;
     private string _liveAssignmentStatusText = "select target";
     private string _liveWarningText = string.Empty;
     private string _selfMonitoringStatusText = "warmup";
@@ -195,12 +202,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _lastCompletedSessionText = string.Empty;
     private string _lastCompletedSessionHint = string.Empty;
     private int _selectedTabIndex;
+    private int _selectedSettingsTabIndex;
     private int _selectedGlobalWatchSectionIndex;
     private DateTimeOffset? _activeStartedAt;
     private int _liveSampleCount;
     private int _liveEventCount;
     private int _liveSpikeCount;
     private int _liveBreachCount;
+    private int _liveHangCount;
     private int _liveTrackedProcessCount;
     private int? _liveRootProcessId;
     private bool _isRecording;
@@ -211,10 +220,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _captureDiskRead = true;
     private bool _captureDiskWrite = true;
     private bool _automaticallyCheckForUpdates;
+    private bool _automaticallyInstallUpdatesOnStartup = true;
     private bool _isCheckingForUpdates;
     private bool _isUpdateAvailable;
     private bool _isUpdateRestartRequested;
     private bool _minimizeToTrayOnClose = true;
+    private bool _startWithWindows = true;
+    private bool _startMinimizedToTray = true;
+    private bool _trustExplainerDismissed;
     private bool _globalWatchOnlyOverLimit;
     private bool _globalWatchOnlyCritical;
     private bool _globalWatchOnlyUnassigned;
@@ -354,6 +367,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SessionProfileOptionViewModel> SessionProfileOptions { get; } = [];
     public ObservableCollection<AppProfileAssignmentViewModel> AppProfileAssignments { get; } = [];
     public ObservableCollection<ExportFileItemViewModel> ExportFiles { get; } = [];
+    public ObservableCollection<FeedbackDeliveryHistoryItemViewModel> FeedbackDeliveryHistory { get; } = [];
     public ObservableCollection<AssignedTargetOptionViewModel> AssignedTargets { get; } = [];
     public ObservableCollection<GlobalProcessRowViewModel> GlobalWatchProcesses { get; } = [];
     public ObservableCollection<GlobalProcessRowViewModel> TopCpuOffenders { get; } = [];
@@ -736,6 +750,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref _minimizeToTrayOnClose, value);
     }
 
+    public bool StartWithWindows
+    {
+        get => _startWithWindows;
+        set => SetProperty(ref _startWithWindows, value);
+    }
+
+    public bool StartMinimizedToTray
+    {
+        get => _startMinimizedToTray;
+        set => SetProperty(ref _startMinimizedToTray, value);
+    }
+
+    public bool TrustExplainerDismissed
+    {
+        get => _trustExplainerDismissed;
+        private set
+        {
+            if (SetProperty(ref _trustExplainerDismissed, value))
+            {
+                OnPropertyChanged(nameof(ShowTrustExplainer));
+            }
+        }
+    }
+
+    public bool ShowTrustExplainer => !TrustExplainerDismissed;
+
     public string LanguageSettingsStatusText
     {
         get => _languageSettingsStatusText;
@@ -904,6 +944,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref _automaticallyCheckForUpdates, value);
     }
 
+    public bool AutomaticallyInstallUpdatesOnStartup
+    {
+        get => _automaticallyInstallUpdatesOnStartup;
+        set => SetProperty(ref _automaticallyInstallUpdatesOnStartup, value);
+    }
+
     public string UpdateStatusText
     {
         get => _updateStatusText;
@@ -927,6 +973,40 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get => _downloadedUpdateInstallerPath;
         private set => SetProperty(ref _downloadedUpdateInstallerPath, value);
     }
+
+    public string BugReportText
+    {
+        get => _bugReportText;
+        set => SetProperty(ref _bugReportText, value);
+    }
+
+    public string FeatureFeedbackText
+    {
+        get => _featureFeedbackText;
+        set => SetProperty(ref _featureFeedbackText, value);
+    }
+
+    public string FeedbackStatusText
+    {
+        get => _feedbackStatusText;
+        private set => SetProperty(ref _feedbackStatusText, value);
+    }
+
+    public string FeedbackDirectoryText => GetFeedbackDirectory();
+
+    public bool IncludeLatestSessionInFeedback
+    {
+        get => _includeLatestSessionInFeedback;
+        set => SetProperty(ref _includeLatestSessionInFeedback, value);
+    }
+
+    public bool IncludeScreenshotInFeedback
+    {
+        get => _includeScreenshotInFeedback;
+        set => SetProperty(ref _includeScreenshotInFeedback, value);
+    }
+
+    public bool HasFeedbackDeliveryHistory => FeedbackDeliveryHistory.Count > 0;
 
     public bool IsCheckingForUpdates
     {
@@ -1063,7 +1143,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedTabIndex, value))
             {
-                OnPropertyChanged(nameof(ShowSessionHeader));
                 OnPropertyChanged(nameof(IsGlobalWatchTab));
                 NotifySessionStateProperties();
             }
@@ -1074,6 +1153,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         get => _selectedGlobalWatchSectionIndex;
         set => SetProperty(ref _selectedGlobalWatchSectionIndex, value);
+    }
+
+    public int SelectedSettingsTabIndex
+    {
+        get => _selectedSettingsTabIndex;
+        set => SetProperty(ref _selectedSettingsTabIndex, value);
     }
 
     public string GlobalWatchFilterText
@@ -1210,7 +1295,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasGlobalWatchJournalGroups => GlobalWatchJournalGroups.Count > 0;
     public bool HasSuspiciousWatchItems => SuspiciousWatchItems.Count > 0;
     public bool HasSuspiciousLaunchEntries => SuspiciousLaunchEntries.Count > 0;
-    public bool ShowSessionHeader => false;
     public bool HasCurrentMonitoring => IsRecording;
     public string CurrentMonitoringStripText => IsRecording
         ? $"Live monitoring: {_activeTargetName} - {SampleCountText} samples - {EventCountText} events"
@@ -1718,7 +1802,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string EventCountText => IsRecording ? _liveEventCount.ToString("N0") : "0";
     public string SpikeCountText => IsRecording ? _liveSpikeCount.ToString("N0") : "0";
     public string BreachCountText => IsRecording ? _liveBreachCount.ToString("N0") : "0";
-    public string HangCountText => "0";
+    public string HangCountText => IsRecording ? _liveHangCount.ToString("N0") : "0";
 
     public async Task InitializeAsync(string storagePath, CancellationToken cancellationToken = default)
     {
@@ -1735,12 +1819,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ?? RetentionOptions.FirstOrDefault(option => option.Days == 30);
         await ApplyRetentionPolicyAsync(thresholds.Retention, cancellationToken);
         ThresholdSettingsStatusText = "Threshold profiles loaded. Assigned apps use profile limits; others use global fallback.";
+        ApplyStartupRegistration(thresholds.Behavior);
         await RefreshRunningProcessesAsync(cancellationToken);
         await ReloadSessionsAsync(selectSessionId: null, cancellationToken);
         await RefreshExportFilesAsync(cancellationToken);
         StartSelfMonitoring();
         StartGlobalWatch();
-        _ = AutoCheckForUpdatesIfNeededAsync(thresholds.Updates, cancellationToken);
+        _ = AutoInstallUpdatesOnStartupAsync(thresholds.Updates, cancellationToken);
     }
 
     public void Shutdown()

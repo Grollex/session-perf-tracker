@@ -7,7 +7,9 @@
     <UserControl.Resources>
         <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
     </UserControl.Resources>
-<TabControl Margin="16,0,0,0">
+<TabControl x:Name="SettingsTabs"
+            Margin="16,0,0,0"
+            SelectedIndex="{Binding SelectedSettingsTabIndex, Mode=TwoWay}">
     <TabItem Header="{DynamicResource Ui_Capture}">
         <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
             <Grid>
@@ -129,6 +131,12 @@
                                 <TextBlock Text="{DynamicResource Ui_AppBehavior}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
                                 <CheckBox Content="{DynamicResource Ui_KeepRunningBackground}"
                                           IsChecked="{Binding MinimizeToTrayOnClose}" />
+                                <CheckBox Content="{DynamicResource Ui_StartWithWindows}"
+                                          IsChecked="{Binding StartWithWindows}"
+                                          Margin="0,8,0,0" />
+                                <CheckBox Content="{DynamicResource Ui_StartMinimizedToTray}"
+                                          IsChecked="{Binding StartMinimizedToTray}"
+                                          Margin="0,8,0,0" />
                                 <TextBlock Text="{DynamicResource Ui_AppBehaviorHint}"
                                            Style="{StaticResource MutedText}"
                                            Margin="0,6,0,10" />
@@ -425,6 +433,9 @@
                         <CheckBox Content="{DynamicResource Ui_AutoCheckUpdates}"
                                   IsChecked="{Binding AutomaticallyCheckForUpdates}"
                                   Margin="0,0,0,10" />
+                        <CheckBox Content="{DynamicResource Ui_AutoInstallUpdatesStartup}"
+                                  IsChecked="{Binding AutomaticallyInstallUpdatesOnStartup}"
+                                  Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_ManifestUrl}" Style="{StaticResource MutedText}" />
                         <TextBox Text="{Binding UpdateManifestUrlText, UpdateSourceTrigger=PropertyChanged}"
                                  MinHeight="32"
@@ -460,6 +471,142 @@
                                  MinHeight="72"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="{DynamicResource Ui_Feedback}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_ReportBug}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_ReportBugHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
+                        <TextBox Text="{Binding BugReportText, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="220"
+                                 VerticalScrollBarVisibility="Auto" />
+                        <CheckBox Content="{DynamicResource Ui_AttachLatestSession}"
+                                  IsChecked="{Binding IncludeLatestSessionInFeedback}"
+                                  Margin="0,10,0,0" />
+                        <CheckBox Content="{DynamicResource Ui_AttachScreenshot}"
+                                  IsChecked="{Binding IncludeScreenshotInFeedback}"
+                                  Margin="0,6,0,0" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackPrivacyCopy}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                        <Button Content="{DynamicResource Ui_SendBugReport}"
+                                Click="SaveBugReport_Click"
+                                HorizontalAlignment="Left"
+                                Margin="0,12,0,0"
+                                Style="{StaticResource PrimaryButton}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_SendIdea}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_SendIdeaHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
+                        <TextBox Text="{Binding FeatureFeedbackText, UpdateSourceTrigger=PropertyChanged}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 MinHeight="220"
+                                 VerticalScrollBarVisibility="Auto" />
+                        <CheckBox Content="{DynamicResource Ui_AttachLatestSession}"
+                                  IsChecked="{Binding IncludeLatestSessionInFeedback}"
+                                  Margin="0,10,0,0" />
+                        <CheckBox Content="{DynamicResource Ui_AttachScreenshot}"
+                                  IsChecked="{Binding IncludeScreenshotInFeedback}"
+                                  Margin="0,6,0,0" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackPrivacyCopy}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0" />
+                        <Button Content="{DynamicResource Ui_SendFeatureFeedback}"
+                                Click="SaveFeatureFeedback_Click"
+                                HorizontalAlignment="Left"
+                                Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.ColumnSpan="3"
+                        Grid.Row="2"
+                        Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_FeedbackFolder}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackFolderHint}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,0,0,8" />
+                        <TextBlock Text="{Binding FeedbackDirectoryText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding FeedbackDirectoryText}"
+                                   Margin="0,0,0,10" />
+                        <WrapPanel>
+                            <Button Content="{DynamicResource Ui_OpenFeedbackFolder}"
+                                    Click="OpenFeedbackDirectory_Click"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,8,8" />
+                            <Button Content="{DynamicResource Ui_OpenLatestFeedbackReport}"
+                                    Click="OpenLatestFeedbackReport_Click"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,8,8" />
+                            <Button Content="{DynamicResource Ui_CopyLatestFeedbackReport}"
+                                    Click="CopyLatestFeedbackReport_Click"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,8,8" />
+                        </WrapPanel>
+                        <TextBlock Text="{Binding FeedbackStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackDeliveryHistory}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Margin="0,14,0,8" />
+                        <Border Visibility="{Binding HasFeedbackDeliveryHistory, Converter={StaticResource BoolToVisibilityConverter}}"
+                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="8">
+                            <ItemsControl ItemsSource="{Binding FeedbackDeliveryHistory}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="105" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding TimestampText}" Style="{StaticResource MutedText}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Kind}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Status}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="3"
+                                                       Text="{Binding Details}"
+                                                       Style="{StaticResource MutedText}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Details}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -16,6 +16,7 @@ dist/
 *.log
 *.tmp
 *.cache
+*.pfx
 .DS_Store
 Thumbs.db
 
@@ -37,6 +38,7 @@ sandbox
 src/OpenCodeChat/
 clipboard_content.txt
 scripts/check-omniroute-models.ps1
+release.local.ps1
 
 # Agent session data
 ._agent_memory/

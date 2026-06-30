@@ -18,3 +18,16 @@
 - Preserve current MVP behavior while improving localized UI and process inspection.
 - Keep performance monitoring lightweight.
 - Keep process-control actions explicit and recoverable.
+
+## Feedback Review Backlog
+
+- [ ] Replace public hardcoded ntfy topic with a relay/tokenized endpoint. Status: Нет денег, пока не работаем.
+- [x] Add optional bug-report attachments: latest session summary and/or current screen snapshot.
+- [x] Implement real hang detection or hide the live `Hangs` counter until it is backed by real data.
+- [x] Decide what to do with the hidden session header: revive it as a compact dashboard or remove the dead XAML.
+- [ ] Implement reliable GPU/temperature collectors, or move unavailable metrics out of the main user-facing flow. Status: Future note, skipped for now.
+- [x] Add a first-run trust/release explainer for self-signed builds, SHA256 verification, and GitHub Releases.
+- [x] Add feedback delivery status/history for recently sent and failed reports.
+- [x] Add `Copy report` and `Open latest report` actions for saved feedback files.
+- [x] Add privacy copy near feedback submit explaining what is sent remotely and what stays local.
+- [x] Add a release smoke-test script for signing, `SHA256SUMS.txt`, `version.json` hash match, and installer existence.

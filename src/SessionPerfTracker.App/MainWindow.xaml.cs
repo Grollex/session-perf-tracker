@@ -104,6 +104,14 @@ public partial class MainWindow : Window
     {
         Loaded -= OnLoaded;
         await _viewModel.InitializeAsync(_storagePath);
+        if (App.StartMinimizedToTray && _viewModel.MinimizeToTrayOnClose)
+        {
+            Hide();
+            if (_notifyIcon is not null)
+            {
+                _notifyIcon.Visible = true;
+            }
+        }
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -209,6 +217,28 @@ public partial class MainWindow : Window
     private void OpenLive_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.OpenLive();
+    }
+
+    private void ReportBug_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.OpenFeedback();
+    }
+
+    private async void DismissTrustExplainer_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _viewModel.DismissTrustExplainerAsync();
+        }
+        catch (Exception error)
+        {
+            System.Windows.MessageBox.Show(
+                this,
+                error.Message,
+                _viewModel.AppWindowTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private void OnLanguageRestartRequested(object? sender, EventArgs e)

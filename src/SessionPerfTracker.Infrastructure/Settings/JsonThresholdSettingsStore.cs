@@ -88,6 +88,7 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             SuspiciousWatchlist = NormalizeSuspiciousWatchlist(settings.SuspiciousWatchlist),
             ProcessBans = NormalizeProcessBans(settings.ProcessBans),
             Updates = NormalizeUpdates(settings.Updates),
+            Behavior = NormalizeBehavior(settings.Behavior),
             Language = NormalizeLanguage(settings.Language)
         };
     }
@@ -196,9 +197,16 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
         return settings with
         {
             AutomaticallyCheckForUpdates = automaticallyCheck,
+            AutomaticallyInstallUpdatesOnStartup = settings.AutomaticallyInstallUpdatesOnStartup,
             ManifestUrl = manifestUrl,
             SkippedVersion = skippedVersion
         };
+    }
+
+    private static AppBehaviorSettings NormalizeBehavior(AppBehaviorSettings? settings)
+    {
+        settings ??= new AppBehaviorSettings();
+        return settings;
     }
 
     private static AppLanguageSettings NormalizeLanguage(AppLanguageSettings? settings)
