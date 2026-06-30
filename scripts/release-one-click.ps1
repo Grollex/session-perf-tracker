@@ -18,22 +18,22 @@ if (Test-Path -LiteralPath $localConfigPath) {
     Write-Host "Loading local release config: $localConfigPath" -ForegroundColor DarkGray
     . $localConfigPath
 
-    if (Get-Variable -Name SigningPfxPath -Scope Local -ErrorAction SilentlyContinue) {
+    if (Get-Variable -Name SigningPfxPath -ErrorAction SilentlyContinue) {
         $packageSigningArgs += "-SigningPfxPath"
         $packageSigningArgs += $SigningPfxPath
     }
 
-    if (Get-Variable -Name SigningPfxPassword -Scope Local -ErrorAction SilentlyContinue) {
+    if (Get-Variable -Name SigningPfxPassword -ErrorAction SilentlyContinue) {
         $packageSigningArgs += "-SigningPfxPassword"
         $packageSigningArgs += $SigningPfxPassword
     }
 
-    if (Get-Variable -Name TimestampUrl -Scope Local -ErrorAction SilentlyContinue) {
+    if (Get-Variable -Name TimestampUrl -ErrorAction SilentlyContinue) {
         $packageSigningArgs += "-TimestampUrl"
         $packageSigningArgs += $TimestampUrl
     }
 
-    if (Get-Variable -Name SkipSigning -Scope Local -ErrorAction SilentlyContinue) {
+    if (Get-Variable -Name SkipSigning -ErrorAction SilentlyContinue) {
         if ($SkipSigning) {
             $packageSigningArgs += "-SkipSigning"
         }
