@@ -269,12 +269,14 @@ $installerBaseUrl = "https://github.com/$repository/releases/download/$tag"
 $packageScript = Join-Path $repoRoot "scripts\package-windows.ps1"
 
 Write-Host "Building Session Perf Tracker $Version..." -ForegroundColor Cyan
-& $packageScript `
-    -Version $Version `
-    -BuildInstaller `
-    -InstallerBaseUrl $installerBaseUrl `
-    -ReleaseNotes $ReleaseNotes `
-    @packageSigningArgs
+$packageArgs = @(
+    "-Version", $Version,
+    "-BuildInstaller",
+    "-InstallerBaseUrl", $installerBaseUrl,
+    "-ReleaseNotes", $ReleaseNotes
+) + $packageSigningArgs
+
+& $packageScript @packageArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "Release packaging failed with exit code $LASTEXITCODE"
