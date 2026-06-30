@@ -12,30 +12,27 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $repository = "Grollex/session-perf-tracker"
 $versionFile = Join-Path $repoRoot "VERSION"
 $localConfigPath = Join-Path $repoRoot "release.local.ps1"
-$packageSigningArgs = @()
+$packageSigningParams = @{}
 
 if (Test-Path -LiteralPath $localConfigPath) {
     Write-Host "Loading local release config: $localConfigPath" -ForegroundColor DarkGray
     . $localConfigPath
 
     if (Get-Variable -Name SigningPfxPath -ErrorAction SilentlyContinue) {
-        $packageSigningArgs += "-SigningPfxPath"
-        $packageSigningArgs += $SigningPfxPath
+        $packageSigningParams["SigningPfxPath"] = $SigningPfxPath
     }
 
     if (Get-Variable -Name SigningPfxPassword -ErrorAction SilentlyContinue) {
-        $packageSigningArgs += "-SigningPfxPassword"
-        $packageSigningArgs += $SigningPfxPassword
+        $packageSigningParams["SigningPfxPassword"] = $SigningPfxPassword
     }
 
     if (Get-Variable -Name TimestampUrl -ErrorAction SilentlyContinue) {
-        $packageSigningArgs += "-TimestampUrl"
-        $packageSigningArgs += $TimestampUrl
+        $packageSigningParams["TimestampUrl"] = $TimestampUrl
     }
 
     if (Get-Variable -Name SkipSigning -ErrorAction SilentlyContinue) {
         if ($SkipSigning) {
-            $packageSigningArgs += "-SkipSigning"
+            $packageSigningParams["SkipSigning"] = $true
         }
     }
 }
@@ -269,12 +266,15 @@ $installerBaseUrl = "https://github.com/$repository/releases/download/$tag"
 $packageScript = Join-Path $repoRoot "scripts\package-windows.ps1"
 
 Write-Host "Building Session Perf Tracker $Version..." -ForegroundColor Cyan
-$packageArgs = @(
-    "-Version", $Version,
-    "-BuildInstaller",
-    "-InstallerBaseUrl", $installerBaseUrl,
-    "-ReleaseNotes", $ReleaseNotes
-) + $packageSigningArgs
+$packageArgs = @{
+    Version = $Version
+    BuildInstaller = $true
+    InstallerBaseUrl = $installerBaseUrl
+    ReleaseNotes = $ReleaseNotes
+}
+foreach ($key in $packageSigningParams.Keys) {
+    $packageArgs[$key] = $packageSigningParams[$key]
+}
 
 & $packageScript @packageArgs
 
