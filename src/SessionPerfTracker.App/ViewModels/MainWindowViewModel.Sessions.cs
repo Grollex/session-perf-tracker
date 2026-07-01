@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using SessionPerfTracker.Domain.Metrics;
+using SessionPerfTracker.Domain.Services;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
@@ -14,6 +15,8 @@ namespace SessionPerfTracker.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly SessionRecommendationService SessionRecommendations = new();
+
     public Task ExportSelectedSessionHtmlAsync(CancellationToken cancellationToken = default) =>
         ExportSelectedSessionAsync("html", cancellationToken);
 
@@ -199,6 +202,7 @@ public sealed partial class MainWindowViewModel
         if (session is null)
         {
             SessionDetailFacts.Clear();
+            SessionDetailRecommendations.Clear();
             SessionDetailMetricSummaries.Clear();
             SessionDetailEvents.Clear();
             SessionDetailUnsupportedMetricNotices.Clear();
@@ -207,6 +211,9 @@ public sealed partial class MainWindowViewModel
         }
 
         SessionDetailFacts.ReplaceWith(CreateSessionDetailFacts(session));
+        SessionDetailRecommendations.ReplaceWith(SessionRecommendations
+            .Recommend(session)
+            .Select(recommendation => new SessionRecommendationViewModel(recommendation)));
         SessionDetailMetricSummaries.ReplaceWith(session.Summary.Metrics
             .Select(metric => new MetricSummaryRowViewModel(metric)));
         SessionDetailEvents.ReplaceWith(session.Events

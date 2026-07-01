@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Infrastructure.Collectors;
 using SessionPerfTracker.Infrastructure.Targeting;
@@ -9,6 +10,7 @@ namespace SessionPerfTracker.Infrastructure.GlobalWatch;
 
 public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
 {
+    private const int ProcessQueryLimitedInformation = 0x1000;
     private static readonly TimeSpan RecentProcessWindow = TimeSpan.FromSeconds(60);
     private static readonly Dictionary<string, string> SignerStatusByPath = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object SignerCacheSync = new();
@@ -201,17 +203,52 @@ public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
         try
         {
             var path = process.MainModule?.FileName;
-            return string.IsNullOrWhiteSpace(path) ? null : path;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
         }
         catch (InvalidOperationException)
         {
-            return null;
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            return null;
         }
         catch (UnauthorizedAccessException)
+        {
+        }
+
+        return TryQueryFullProcessImageName(process.Id);
+    }
+
+    private static string? TryQueryFullProcessImageName(int processId)
+    {
+        try
+        {
+            var handle = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+            if (handle == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            try
+            {
+                var builder = new StringBuilder(1024);
+                var size = builder.Capacity;
+                if (!QueryFullProcessImageName(handle, 0, builder, ref size))
+                {
+                    return null;
+                }
+
+                var path = builder.ToString();
+                return string.IsNullOrWhiteSpace(path) ? null : path;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+        catch
         {
             return null;
         }
@@ -406,6 +443,19 @@ public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
         string? SignerStatus,
         string? Version,
         string? OriginalFileName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(int desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageName(
+        IntPtr processHandle,
+        int flags,
+        StringBuilder exeName,
+        ref int size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
 
     private static class WindowsProcessIoCounters
     {

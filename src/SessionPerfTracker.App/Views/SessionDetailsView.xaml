@@ -7,7 +7,7 @@
     <UserControl.Resources>
         <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
     </UserControl.Resources>
-<ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+<ScrollViewer Style="{StaticResource PageScrollViewer}">
     <StackPanel Margin="16,0,0,0">
         <Border Style="{StaticResource Panel}" Margin="0,0,0,14">
             <StackPanel>
@@ -48,18 +48,69 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12"
-                                    Margin="0,0,10,10"
-                                    CornerRadius="8"
-                                    Background="#141A1F"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
+                            <Border Style="{StaticResource KpiTile}" Margin="0,0,10,10">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Label}" Style="{StaticResource MutedText}" />
                                     <TextBlock Text="{Binding Value}"
                                                FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource Panel}"
+                Margin="0,0,0,14"
+                Visibility="{Binding HasSessionDetailRecommendations, Converter={StaticResource BoolToVisibilityConverter}}">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,14">
+                    <TextBlock Text="{DynamicResource Ui_SessionRecommendations}"
+                               FontSize="16"
+                               FontWeight="SemiBold" />
+                    <TextBlock DockPanel.Dock="Right"
+                               Text="{DynamicResource Ui_ActionableNextSteps}"
+                               Style="{StaticResource MutedText}" />
+                </DockPanel>
+
+                <ItemsControl ItemsSource="{Binding SessionDetailRecommendations}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="112" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Severity}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Metric}"
+                                                   Style="{StaticResource MutedText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Recommendation}"
+                                                   Style="{StaticResource MutedText}"
+                                                   Margin="0,5,0,0"
+                                                   TextWrapping="Wrap" />
+                                        <Border Margin="0,8,0,0"
+                                                Padding="8"
+                                                CornerRadius="6"
+                                                Background="#171D22"
+                                                BorderBrush="{StaticResource BorderBrushSoft}"
+                                                BorderThickness="1"
+                                                Visibility="{Binding HasEvidence, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding Evidence}"
+                                                       Style="{StaticResource MutedText}"
+                                                       TextWrapping="Wrap" />
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -79,12 +130,7 @@
                 <ItemsControl ItemsSource="{Binding SessionDetailMetricSummaries}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12"
-                                    Margin="0,0,0,8"
-                                    CornerRadius="8"
-                                    Background="#141A1F"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
+                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.3*" />
@@ -123,12 +169,7 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <Border Padding="12"
-                        Margin="0,10,0,0"
-                        CornerRadius="8"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
+                <Border Style="{StaticResource EmptyState}" Margin="0,10,0,0">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_NotShownRecorded}" Style="{StaticResource MutedText}" />
                         <ItemsControl ItemsSource="{Binding SessionDetailUnsupportedMetricNotices}">
@@ -155,12 +196,25 @@
                 <ItemsControl ItemsSource="{Binding SessionDetailEvents}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12"
-                                    Margin="0,0,0,10"
-                                    CornerRadius="8"
-                                    Background="#141A1F"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="18" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Rectangle Width="2"
+                                               Fill="{StaticResource BorderBrushSoft}"
+                                               HorizontalAlignment="Center" />
+                                    <Ellipse Width="9"
+                                             Height="9"
+                                             Fill="{StaticResource ItemSelectedBorderBrush}"
+                                             Stroke="#101317"
+                                             StrokeThickness="2"
+                                             VerticalAlignment="Top"
+                                             Margin="0,17,0,0" />
+                                </Grid>
+                                <Border Grid.Column="1"
+                                        Style="{StaticResource KpiTile}">
                                 <StackPanel>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -205,14 +259,9 @@
 
                                     <Expander Header="{DynamicResource Ui_ContextAroundEvent}"
                                               Foreground="{StaticResource TextBrush}"
-                                              Background="#11171C"
                                               Margin="0,10,0,0"
                                               Visibility="{Binding HasContext, Converter={StaticResource BoolToVisibilityConverter}}">
-                                        <Border Padding="10"
-                                                CornerRadius="8"
-                                                Background="#11171C"
-                                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                                BorderThickness="1">
+                                        <Border Style="{StaticResource EmptyState}" Margin="0,8,0,0">
                                             <StackPanel>
                                                 <TextBlock Text="{Binding ContextCapturedText}" Style="{StaticResource MutedText}" />
                                                 <TextBlock Text="{Binding ContextNoteText}" Style="{StaticResource MutedText}" Margin="0,2,0,10" />
@@ -265,7 +314,8 @@
                                         </Border>
                                     </Expander>
                                 </StackPanel>
-                            </Border>
+                                </Border>
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

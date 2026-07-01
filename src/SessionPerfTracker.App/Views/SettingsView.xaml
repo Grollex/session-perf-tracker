@@ -11,7 +11,7 @@
             Margin="16,0,0,0"
             SelectedIndex="{Binding SelectedSettingsTabIndex, Mode=TwoWay}">
     <TabItem Header="{DynamicResource Ui_Capture}">
-        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -20,7 +20,7 @@
                 </Grid.ColumnDefinitions>
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_CollectorsCapture}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_CollectorsCapture}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <TextBlock Text="{DynamicResource Ui_SamplingSettingsHint}" Style="{StaticResource MutedText}" />
                         <TextBlock Text="{DynamicResource Ui_SamplingHint}" Style="{StaticResource MutedText}" Margin="0,4,0,12" />
                         <UniformGrid Columns="2" Margin="0,0,0,12">
@@ -32,10 +32,11 @@
                         <TextBlock Text="{DynamicResource Ui_UnsupportedCollectorsHint}" Style="{StaticResource MutedText}" Margin="0,0,0,12" />
                         <Button Content="{DynamicResource Ui_SaveCaptureScope}"
                                 Click="SaveCaptureSettings_Click"
+                                Style="{StaticResource ToolbarButton}"
                                 HorizontalAlignment="Left" />
                         <TextBlock Text="{Binding ThresholdSettingsStatusText}" Style="{StaticResource MutedText}" Margin="0,8,0,0" />
 
-                        <TextBlock Text="{DynamicResource Ui_AntiNoise}" FontSize="16" FontWeight="SemiBold" Margin="0,22,0,12" />
+                        <TextBlock Text="{DynamicResource Ui_AntiNoise}" Style="{StaticResource SectionTitle}" Margin="0,22,0,12" />
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -60,14 +61,14 @@
                             <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding GroupingWindowSecondsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" />
                             <TextBlock Grid.Row="2" Grid.Column="3" Text="{DynamicResource Ui_SnapshotSuppress}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                             <TextBox Grid.Row="2" Grid.Column="4" Text="{Binding SnapshotSuppressionSecondsText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" />
-                            <Button Grid.Row="4" Grid.ColumnSpan="6" Content="{DynamicResource Ui_SaveAntiNoise}" Click="SaveAntiNoiseSettings_Click" HorizontalAlignment="Left" />
+                            <Button Grid.Row="4" Grid.ColumnSpan="6" Content="{DynamicResource Ui_SaveAntiNoise}" Click="SaveAntiNoiseSettings_Click" HorizontalAlignment="Left" Style="{StaticResource ToolbarButton}" />
                         </Grid>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="2" Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_SelfMonitoring}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_SelfMonitoring}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <DockPanel Margin="0,0,0,10">
                             <TextBlock Text="{DynamicResource Ui_SelfProcess}" />
                             <TextBlock DockPanel.Dock="Right" Text="{Binding SelfMonitoringStatusText}" Style="{StaticResource MutedText}" />
@@ -102,7 +103,7 @@
                                 <TextBlock Text="{Binding SelfSampleCountText}" />
                             </StackPanel>
                         </UniformGrid>
-                        <TextBlock Text="{DynamicResource Ui_OverheadBudget}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_OverheadBudget}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <UniformGrid Columns="2">
                             <StackPanel Margin="0,0,10,10">
                                 <TextBlock Text="{DynamicResource Ui_AvgCpuBudget}" Style="{StaticResource MutedText}" />
@@ -128,7 +129,7 @@
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="{DynamicResource Ui_AppBehavior}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                <TextBlock Text="{DynamicResource Ui_AppBehavior}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                                 <CheckBox Content="{DynamicResource Ui_KeepRunningBackground}"
                                           IsChecked="{Binding MinimizeToTrayOnClose}" />
                                 <CheckBox Content="{DynamicResource Ui_StartWithWindows}"
@@ -143,7 +144,7 @@
                                 <Button Content="{DynamicResource Ui_SaveAppBehavior}"
                                         Click="SaveAppBehaviorSettings_Click"
                                         HorizontalAlignment="Left"
-                                        Style="{StaticResource CompactButton}" />
+                                        Style="{StaticResource ToolbarButton}" />
                             </StackPanel>
                         </Border>
                         <Border Margin="0,12,0,0"
@@ -153,7 +154,7 @@
                                 BorderBrush="{StaticResource BorderBrushSoft}"
                                 BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="{DynamicResource Ui_Language}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                <TextBlock Text="{DynamicResource Ui_Language}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                                 <ComboBox ItemsSource="{Binding LanguageOptions}"
                                           SelectedItem="{Binding SelectedLanguageOption}"
                                           DisplayMemberPath="DisplayName"
@@ -162,7 +163,7 @@
                                 <Button Content="{DynamicResource Ui_SaveLanguage}"
                                         Click="SaveLanguageSettings_Click"
                                         HorizontalAlignment="Left"
-                                        Style="{StaticResource CompactButton}"
+                                        Style="{StaticResource ToolbarButton}"
                                         Margin="0,10,0,0" />
                                 <TextBlock Text="{Binding LanguageSettingsStatusText}"
                                            Style="{StaticResource MutedText}"
@@ -176,10 +177,10 @@
     </TabItem>
 
     <TabItem Header="{DynamicResource Ui_Profiles}">
-        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Border Style="{StaticResource Panel}">
                 <StackPanel>
-                <TextBlock Text="{DynamicResource Ui_ThresholdProfiles}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                <TextBlock Text="{DynamicResource Ui_ThresholdProfiles}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                 <TextBlock Text="{DynamicResource Ui_GlobalFallback}" Style="{StaticResource MutedText}" Margin="0,0,0,8" />
                 <Grid Margin="0,0,0,18">
                     <Grid.RowDefinitions>
@@ -217,6 +218,7 @@
                             Grid.RowSpan="3"
                             Content="{DynamicResource Ui_SaveFallback}"
                             Click="SaveThresholdSettings_Click"
+                            Style="{StaticResource ToolbarButton}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Center"
                             Margin="14,0,0,0" />
@@ -248,11 +250,13 @@
                     <Button Grid.Column="3"
                             Content="{DynamicResource Ui_ResetSelected}"
                             Click="ResetSelectedProfile_Click"
+                            Style="{StaticResource ToolbarButton}"
                             HorizontalAlignment="Left" />
                     <Button Grid.Column="4"
                             Grid.ColumnSpan="2"
                             Content="{DynamicResource Ui_ResetAllThresholds}"
                             Click="ResetAllThresholdSettings_Click"
+                            Style="{StaticResource DangerButton}"
                             HorizontalAlignment="Left" />
 
                     <TextBlock Grid.Row="2" Text="{DynamicResource Ui_CpuPercent}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
@@ -280,6 +284,7 @@
                             Grid.Column="5"
                             Content="{DynamicResource Ui_SaveProfile}"
                             Click="SaveSelectedProfile_Click"
+                            Style="{StaticResource ToolbarButton}"
                             HorizontalAlignment="Left"
                             Margin="14,0,0,0" />
                 </Grid>
@@ -304,6 +309,7 @@
                     <Button Grid.Column="4"
                             Content="{DynamicResource Ui_Assign}"
                             Click="SaveAppProfileAssignment_Click"
+                            Style="{StaticResource ToolbarButton}"
                             HorizontalAlignment="Left"
                             Margin="14,0,0,0" />
                 </Grid>
@@ -324,6 +330,7 @@
                     <Button Grid.Column="1"
                             Content="{DynamicResource Ui_RemoveAssignment}"
                             Click="RemoveAppProfileAssignment_Click"
+                            Style="{StaticResource TertiaryButton}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top"
                             Margin="14,0,0,0" />
@@ -336,7 +343,7 @@
     </TabItem>
 
     <TabItem Header="{DynamicResource Ui_Storage}">
-        <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -346,27 +353,28 @@
 
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_StorageRetention}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_StorageRetention}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <DockPanel Margin="0,0,0,10">
                             <TextBlock Text="{DynamicResource Ui_Retention}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                             <Button DockPanel.Dock="Right"
                                     Content="{DynamicResource Ui_Save}"
                                     Click="SaveRetentionSettings_Click"
-                                    MinHeight="30"
-                                    Padding="10,0"
+                                    Style="{StaticResource ToolbarButton}"
                                     Margin="8,0,0,0" />
                             <ComboBox ItemsSource="{Binding RetentionOptions}"
                                       SelectedItem="{Binding SelectedRetentionOption}"
                                       DisplayMemberPath="Label"
                                       Margin="12,0,0,0" />
                         </DockPanel>
-                        <UniformGrid Columns="2" Margin="0,0,0,8">
-                            <Button Content="{DynamicResource Ui_DeleteAllSessions}" Click="DeleteAllSessions_Click" Margin="0,0,8,8" />
-                            <Button Content="{DynamicResource Ui_DeleteFilteredSessions}" Click="DeleteFilteredSessions_Click" Margin="0,0,0,8" />
-                            <Button Content="{DynamicResource Ui_DeleteOlder1}" Click="DeleteSessionsOlderThan1Day_Click" Margin="0,0,8,8" />
-                            <Button Content="{DynamicResource Ui_DeleteOlder7}" Click="DeleteSessionsOlderThan7Days_Click" Margin="0,0,0,8" />
-                            <Button Content="{DynamicResource Ui_DeleteOlder30}" Click="DeleteSessionsOlderThan30Days_Click" Margin="0,0,8,0" />
-                        </UniformGrid>
+                        <Border Style="{StaticResource DangerPanel}" Margin="0,0,0,8">
+                            <UniformGrid Columns="2">
+                                <Button Content="{DynamicResource Ui_DeleteAllSessions}" Click="DeleteAllSessions_Click" Style="{StaticResource DangerButton}" Margin="0,0,8,8" />
+                                <Button Content="{DynamicResource Ui_DeleteFilteredSessions}" Click="DeleteFilteredSessions_Click" Style="{StaticResource DangerButton}" Margin="0,0,0,8" />
+                                <Button Content="{DynamicResource Ui_DeleteOlder1}" Click="DeleteSessionsOlderThan1Day_Click" Style="{StaticResource DangerButton}" Margin="0,0,8,8" />
+                                <Button Content="{DynamicResource Ui_DeleteOlder7}" Click="DeleteSessionsOlderThan7Days_Click" Style="{StaticResource DangerButton}" Margin="0,0,0,8" />
+                                <Button Content="{DynamicResource Ui_DeleteOlder30}" Click="DeleteSessionsOlderThan30Days_Click" Style="{StaticResource DangerButton}" Margin="0,0,8,0" />
+                            </UniformGrid>
+                        </Border>
                         <TextBlock Text="{Binding StorageStatusText}" Style="{StaticResource MutedText}" />
                         <TextBlock Text="{Binding StoragePath}" Style="{StaticResource MutedText}" Margin="0,14,0,0" />
                     </StackPanel>
@@ -374,21 +382,20 @@
 
                 <Border Grid.Column="2" Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_Exports}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_Exports}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <TextBlock Text="{DynamicResource Ui_Folder}" Style="{StaticResource MutedText}" />
                         <DockPanel Margin="0,6,0,8">
                             <Button DockPanel.Dock="Right"
                                     Content="{DynamicResource Ui_Browse}"
                                     Click="BrowseExportDirectory_Click"
-                                    MinHeight="30"
-                                    Padding="10,0"
+                                    Style="{StaticResource ToolbarButton}"
                                     Margin="8,0,0,0" />
                             <TextBox Text="{Binding ExportDirectoryText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" />
                         </DockPanel>
                         <UniformGrid Columns="3" Margin="0,0,0,8">
-                            <Button Content="{DynamicResource Ui_SaveFolder}" Click="SaveExportDirectory_Click" Margin="0,0,8,8" />
-                            <Button Content="{DynamicResource Ui_DefaultFolder}" Click="ResetExportDirectory_Click" Margin="0,0,8,8" />
-                            <Button Content="{DynamicResource Ui_OpenFolder}" Click="OpenExportDirectory_Click" Margin="0,0,0,8" />
+                            <Button Content="{DynamicResource Ui_SaveFolder}" Click="SaveExportDirectory_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,8" />
+                            <Button Content="{DynamicResource Ui_DefaultFolder}" Click="ResetExportDirectory_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,8" />
+                            <Button Content="{DynamicResource Ui_OpenFolder}" Click="OpenExportDirectory_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,0,8" />
                         </UniformGrid>
                         <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,8">
                             <Run Text="{DynamicResource Ui_DefaultPrefix}" />
@@ -397,8 +404,8 @@
                         <DockPanel Margin="0,0,0,8">
                             <TextBlock Text="{DynamicResource Ui_ExportFiles}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                                <Button Content="{DynamicResource Ui_Refresh}" Click="RefreshExports_Click" MinHeight="28" Padding="10,0" Margin="0,0,8,0" />
-                                <Button Content="{DynamicResource Ui_OpenSelected}" Click="OpenSelectedExport_Click" MinHeight="28" Padding="10,0" />
+                                <Button Content="{DynamicResource Ui_Refresh}" Click="RefreshExports_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" />
+                                <Button Content="{DynamicResource Ui_OpenSelected}" Click="OpenSelectedExport_Click" Style="{StaticResource ToolbarButton}" />
                             </StackPanel>
                         </DockPanel>
                         <ListBox ItemsSource="{Binding ExportFiles}"
@@ -416,7 +423,7 @@
 
                 <Border Grid.Row="2" Grid.ColumnSpan="3" Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_Updates}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14" />
+                        <TextBlock Text="{DynamicResource Ui_Updates}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="150" />
@@ -478,7 +485,7 @@
     </TabItem>
 
     <TabItem Header="{DynamicResource Ui_Feedback}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -493,7 +500,7 @@
 
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_ReportBug}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_ReportBug}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_ReportBugHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
                         <TextBox Text="{Binding BugReportText, UpdateSourceTrigger=PropertyChanged}"
                                  AcceptsReturn="True"
@@ -520,7 +527,7 @@
 
                 <Border Grid.Column="2" Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_SendIdea}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_SendIdea}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_SendIdeaHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
                         <TextBox Text="{Binding FeatureFeedbackText, UpdateSourceTrigger=PropertyChanged}"
                                  AcceptsReturn="True"
@@ -540,7 +547,8 @@
                         <Button Content="{DynamicResource Ui_SendFeatureFeedback}"
                                 Click="SaveFeatureFeedback_Click"
                                 HorizontalAlignment="Left"
-                                Margin="0,12,0,0" />
+                                Margin="0,12,0,0"
+                                Style="{StaticResource PrimaryButton}" />
                     </StackPanel>
                 </Border>
 
@@ -548,7 +556,7 @@
                         Grid.Row="2"
                         Style="{StaticResource Panel}">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_FeedbackFolder}" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackFolder}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_FeedbackFolderHint}"
                                    Style="{StaticResource MutedText}"
                                    Margin="0,0,0,8" />
@@ -561,14 +569,17 @@
                             <Button Content="{DynamicResource Ui_OpenFeedbackFolder}"
                                     Click="OpenFeedbackDirectory_Click"
                                     HorizontalAlignment="Left"
+                                    Style="{StaticResource ToolbarButton}"
                                     Margin="0,0,8,8" />
                             <Button Content="{DynamicResource Ui_OpenLatestFeedbackReport}"
                                     Click="OpenLatestFeedbackReport_Click"
                                     HorizontalAlignment="Left"
+                                    Style="{StaticResource ToolbarButton}"
                                     Margin="0,0,8,8" />
                             <Button Content="{DynamicResource Ui_CopyLatestFeedbackReport}"
                                     Click="CopyLatestFeedbackReport_Click"
                                     HorizontalAlignment="Left"
+                                    Style="{StaticResource ToolbarButton}"
                                     Margin="0,0,8,8" />
                         </WrapPanel>
                         <TextBlock Text="{Binding FeedbackStatusText}"
@@ -580,10 +591,7 @@
                                    FontWeight="SemiBold"
                                    Margin="0,14,0,8" />
                         <Border Visibility="{Binding HasFeedbackDeliveryHistory, Converter={StaticResource BoolToVisibilityConverter}}"
-                                BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1"
-                                CornerRadius="8"
-                                Padding="8">
+                                Style="{StaticResource EmptyState}">
                             <ItemsControl ItemsSource="{Binding FeedbackDeliveryHistory}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>

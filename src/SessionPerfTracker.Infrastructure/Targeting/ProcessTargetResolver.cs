@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
 
@@ -6,6 +8,8 @@ namespace SessionPerfTracker.Infrastructure.Targeting;
 
 public sealed class ProcessTargetResolver : IProcessTargetResolver
 {
+    private const int ProcessQueryLimitedInformation = 0x1000;
+
     public Task<IReadOnlyList<TargetDescriptor>> ListRunningTargetsAsync(CancellationToken cancellationToken = default)
     {
         var targets = Process.GetProcesses()
@@ -118,19 +122,68 @@ public sealed class ProcessTargetResolver : IProcessTargetResolver
     {
         try
         {
-            return process.MainModule?.FileName;
+            var path = process.MainModule?.FileName;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
         }
         catch (InvalidOperationException)
         {
-            return null;
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            return null;
         }
         catch (UnauthorizedAccessException)
+        {
+        }
+
+        return TryQueryFullProcessImageName(process.Id);
+    }
+
+    private static string? TryQueryFullProcessImageName(int processId)
+    {
+        try
+        {
+            var handle = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+            if (handle == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            try
+            {
+                var builder = new StringBuilder(1024);
+                var size = builder.Capacity;
+                if (!QueryFullProcessImageName(handle, 0, builder, ref size))
+                {
+                    return null;
+                }
+
+                var path = builder.ToString();
+                return string.IsNullOrWhiteSpace(path) ? null : path;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+        }
+        catch
         {
             return null;
         }
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(int desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageName(
+        IntPtr processHandle,
+        int flags,
+        StringBuilder exeName,
+        ref int size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
 }

@@ -3,6 +3,7 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="Ui_Live">Запись</system:String>
     <system:String x:Key="Ui_GlobalWatch">Глобальный обзор</system:String>
+    <system:String x:Key="Ui_AppSubtitle">Запись и анализ производительности</system:String>
     <system:String x:Key="Ui_Overview">Обзор</system:String>
     <system:String x:Key="Ui_Journal">Журнал</system:String>
     <system:String x:Key="Ui_Recommendations">Рекомендации</system:String>
@@ -472,4 +473,6 @@
     <system:String x:Key="Ui_UpdateAvailableTitle">Доступно обновление</system:String>
     <system:String x:Key="Ui_UpdateAvailableMessage">Доступна версия Session Perf Tracker {0}.&#x0a;&#x0a;Текущая версия: {1}&#x0a;&#x0a;{2}&#x0a;&#x0a;Установить сейчас?&#x0a;&#x0a;Да = обновить сейчас&#x0a;Нет = позже&#x0a;Отмена = пропустить эту версию</system:String>
     <system:String x:Key="Ui_NewVersionFallback">новая</system:String>
+    <system:String x:Key="Ui_SessionRecommendations">Рекомендации</system:String>
+    <system:String x:Key="Ui_ActionableNextSteps">Что сделать дальше</system:String>
 </ResourceDictionary>

@@ -139,6 +139,23 @@ public sealed record SelfOverheadSummary
     public int SampleCount { get; init; }
 }
 
+public enum SessionRecommendationSeverity
+{
+    Info,
+    Warning,
+    Critical
+}
+
+public sealed record SessionRecommendation
+{
+    public required string Id { get; init; }
+    public SessionRecommendationSeverity Severity { get; init; }
+    public required string Title { get; init; }
+    public required string Recommendation { get; init; }
+    public string? Evidence { get; init; }
+    public MetricKey? MetricKey { get; init; }
+}
+
 public sealed record SessionSummary
 {
     public required string SessionId { get; init; }

@@ -356,6 +356,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<MetricSummaryRowViewModel> SelectedMetricSummaries { get; } = [];
     public ObservableCollection<EventRowViewModel> SelectedEvents { get; } = [];
     public ObservableCollection<SessionDetailFactViewModel> SessionDetailFacts { get; } = [];
+    public ObservableCollection<SessionRecommendationViewModel> SessionDetailRecommendations { get; } = [];
     public ObservableCollection<MetricSummaryRowViewModel> SessionDetailMetricSummaries { get; } = [];
     public ObservableCollection<EventRowViewModel> SessionDetailEvents { get; } = [];
     public ObservableCollection<string> SessionDetailUnsupportedMetricNotices { get; } = [];
@@ -1658,6 +1659,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSessionDetails => SelectedSession is not null;
     public bool HasSessionDetailEvents => SessionDetailEvents.Count > 0;
     public bool HasSessionDetailMetrics => SessionDetailMetricSummaries.Count > 0;
+    public bool HasSessionDetailRecommendations => SessionDetailRecommendations.Count > 0;
     public string SessionDetailTitle => SelectedSession is null
         ? "No session selected"
         : $"{SelectedSession.AppName} review";
@@ -1843,6 +1845,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasSessionDetails));
         OnPropertyChanged(nameof(HasSessionDetailEvents));
         OnPropertyChanged(nameof(HasSessionDetailMetrics));
+        OnPropertyChanged(nameof(HasSessionDetailRecommendations));
         OnPropertyChanged(nameof(SessionDetailTitle));
         OnPropertyChanged(nameof(SessionDetailSubtitle));
     }

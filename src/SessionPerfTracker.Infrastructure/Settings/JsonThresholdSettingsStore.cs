@@ -243,6 +243,7 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
                 .Select(item => item with
                 {
                     ExeName = NormalizeExeName(item.ExeName),
+                    FullPath = string.IsNullOrWhiteSpace(item.FullPath) ? null : NormalizeFullPath(item.FullPath),
                     WarningCount = Math.Max(0, item.WarningCount)
                 })
                 .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
@@ -260,7 +261,11 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             History = settings.History
                 .Where(item => !string.IsNullOrWhiteSpace(item.ExeName)
                     && !string.IsNullOrWhiteSpace(item.Kind))
-                .Select(item => item with { ExeName = NormalizeExeName(item.ExeName) })
+                .Select(item => item with
+                {
+                    ExeName = NormalizeExeName(item.ExeName),
+                    FullPath = string.IsNullOrWhiteSpace(item.FullPath) ? null : NormalizeFullPath(item.FullPath)
+                })
                 .OrderByDescending(item => item.Timestamp)
                 .Take(500)
                 .ToList()
@@ -277,7 +282,11 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             Entries = settings.Entries
                 .Where(item => !string.IsNullOrWhiteSpace(item.ExeName)
                     && !string.IsNullOrWhiteSpace(item.HealthState))
-                .Select(item => item with { ExeName = NormalizeExeName(item.ExeName) })
+                .Select(item => item with
+                {
+                    ExeName = NormalizeExeName(item.ExeName),
+                    FullPath = string.IsNullOrWhiteSpace(item.FullPath) ? null : NormalizeFullPath(item.FullPath)
+                })
                 .OrderByDescending(item => item.Timestamp)
                 .Take(maxEntries)
                 .ToList()

@@ -138,6 +138,7 @@ public sealed record GlobalWatchJournalEntry
     public required string ExeName { get; init; }
     public string? DisplayName { get; init; }
     public int? ProcessId { get; init; }
+    public string? FullPath { get; init; }
     public required string WatchMode { get; init; }
     public required string ProfileSource { get; init; }
     public required string HealthState { get; init; }
@@ -223,6 +224,7 @@ public sealed record ProfileRecommendationRecord
 {
     public required string Id { get; init; }
     public required string ExeName { get; init; }
+    public string? FullPath { get; init; }
     public required string CurrentProfileId { get; init; }
     public required string CurrentProfileName { get; init; }
     public required string CurrentProfileSource { get; init; }
@@ -247,6 +249,7 @@ public sealed record ProfileRecommendationHistoryEntry
 {
     public required string Kind { get; init; }
     public required string ExeName { get; init; }
+    public string? FullPath { get; init; }
     public required string SuggestedProfileId { get; init; }
     public required string SuggestedProfileName { get; init; }
     public DateTimeOffset Timestamp { get; init; }

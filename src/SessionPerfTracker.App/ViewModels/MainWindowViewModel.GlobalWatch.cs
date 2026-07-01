@@ -452,7 +452,7 @@ public sealed partial class MainWindowViewModel
         var activeRow = FindActiveGlobalWatchRowForInspector(
             recommendation.ExeName,
             processId: null,
-            normalizedPath: null,
+            recommendation.NormalizedPath,
             preferApplications: true);
         SetProcessInspectorTarget(ProcessInspectorTargetViewModel.FromRecommendation(
             recommendation.Recommendation,
@@ -502,7 +502,7 @@ public sealed partial class MainWindowViewModel
         var activeRow = FindActiveGlobalWatchRowForInspector(
             group.ExeName,
             group.ProcessId,
-            normalizedPath: null,
+            group.NormalizedPath,
             preferApplications);
         SetProcessInspectorTarget(ProcessInspectorTargetViewModel.FromJournalGroup(
             group,
@@ -1341,7 +1341,8 @@ public sealed partial class MainWindowViewModel
                 recommendation.ExeName,
                 recommendation.SuggestedProfileId,
                 recommendation.SuggestedProfileName,
-                $"{recommendation.ExeName} promoted to {recommendation.SuggestedProfileName}.");
+                $"{recommendation.ExeName} promoted to {recommendation.SuggestedProfileName}.",
+                recommendation.FullPath);
         }
 
         await _thresholdSettingsStore.SaveAsync(
@@ -1407,7 +1408,8 @@ public sealed partial class MainWindowViewModel
                 recommendation.ExeName,
                 recommendation.SuggestedProfileId,
                 recommendation.SuggestedProfileName,
-                $"{recommendation.ExeName} recommendation ignored: {recommendation.Reason}");
+                $"{recommendation.ExeName} recommendation ignored: {recommendation.Reason}",
+                recommendation.FullPath);
         }
 
         await _thresholdSettingsStore.SaveAsync(
@@ -1607,6 +1609,7 @@ public sealed partial class MainWindowViewModel
             ExeName = NormalizeExeNameForAssignment(row.ExeName),
             DisplayName = row.DisplayName,
             ProcessId = row.IsGroup ? null : row.ProcessId,
+            FullPath = IsUnavailablePath(row.FullPath) ? null : row.FullPath,
             WatchMode = row.IsGroup ? GlobalModeApplications : GlobalModeProcesses,
             ProfileSource = row.ProfileSourceText,
             HealthState = healthState,
@@ -1618,6 +1621,11 @@ public sealed partial class MainWindowViewModel
             RecommendationId = recommendationId
         };
     }
+
+    private static bool IsUnavailablePath(string? path) =>
+        string.IsNullOrWhiteSpace(path)
+        || string.Equals(path, "Unavailable", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(path, "n/a", StringComparison.OrdinalIgnoreCase);
 
     private static List<GlobalWatchJournalEntry> TrimGlobalWatchJournalEntries(
         IEnumerable<GlobalWatchJournalEntry> entries,
@@ -1635,7 +1643,8 @@ public sealed partial class MainWindowViewModel
         string exeName,
         string suggestedProfileId,
         string suggestedProfileName,
-        string reason)
+        string reason,
+        string? fullPath = null)
     {
         return new[]
             {
@@ -1643,6 +1652,7 @@ public sealed partial class MainWindowViewModel
                 {
                     Kind = kind,
                     ExeName = NormalizeExeNameForAssignment(exeName),
+                    FullPath = IsUnavailablePath(fullPath) ? null : fullPath,
                     SuggestedProfileId = suggestedProfileId,
                     SuggestedProfileName = suggestedProfileName,
                     Timestamp = DateTimeOffset.UtcNow,
@@ -2429,7 +2439,8 @@ public sealed partial class MainWindowViewModel
                     {
                         WarningCount = Math.Max(existing.WarningCount, warnings.Count),
                         LastSeen = capturedAt,
-                        Reason = row.RecommendationReason
+                        Reason = row.RecommendationReason,
+                        FullPath = IsUnavailablePath(row.FullPath) ? existing.FullPath : row.FullPath
                     };
                     changed = true;
                 }
@@ -2441,6 +2452,7 @@ public sealed partial class MainWindowViewModel
             {
                 Id = recommendationId,
                 ExeName = row.ExeName,
+                FullPath = IsUnavailablePath(row.FullPath) ? null : row.FullPath,
                 CurrentProfileId = row.ProfileId,
                 CurrentProfileName = row.ProfileName,
                 CurrentProfileSource = row.IsAssignedProfile ? "Assigned profile" : "Global fallback",
@@ -2463,7 +2475,8 @@ public sealed partial class MainWindowViewModel
                 row.ExeName,
                 suggestedProfile.Id,
                 suggestedProfile.Name,
-                $"{row.ExeName} repeatedly exceeded {row.ProfileSourceText}; suggested {suggestedProfile.Name}.");
+                $"{row.ExeName} repeatedly exceeded {row.ProfileSourceText}; suggested {suggestedProfile.Name}.",
+                row.FullPath);
             changed = true;
         }
 

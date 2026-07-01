@@ -3,6 +3,7 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="Ui_Live">Live</system:String>
     <system:String x:Key="Ui_GlobalWatch">Global Watch</system:String>
+    <system:String x:Key="Ui_AppSubtitle">Performance session recorder</system:String>
     <system:String x:Key="Ui_Overview">Overview</system:String>
     <system:String x:Key="Ui_Journal">Journal</system:String>
     <system:String x:Key="Ui_Recommendations">Recommendations</system:String>
@@ -472,4 +473,6 @@
     <system:String x:Key="Ui_UpdateAvailableTitle">Update available</system:String>
     <system:String x:Key="Ui_UpdateAvailableMessage">Session Perf Tracker {0} is available.&#x0a;&#x0a;Current version: {1}&#x0a;&#x0a;{2}&#x0a;&#x0a;Install now?&#x0a;&#x0a;Yes = update now&#x0a;No = later&#x0a;Cancel = skip this version</system:String>
     <system:String x:Key="Ui_NewVersionFallback">new</system:String>
+    <system:String x:Key="Ui_SessionRecommendations">Recommendations</system:String>
+    <system:String x:Key="Ui_ActionableNextSteps">Actionable next steps</system:String>
 </ResourceDictionary>

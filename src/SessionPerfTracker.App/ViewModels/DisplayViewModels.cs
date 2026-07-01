@@ -453,23 +453,25 @@ public sealed class GlobalProcessRowViewModel
             .ThenByDescending(row => row.CpuPercent ?? 0)
             .FirstOrDefault()
             ?? orderedRows.First();
+        var identitySource = orderedRows.FirstOrDefault(row => !string.IsNullOrWhiteSpace(row.Process.FullPath))
+            ?? primary;
         Process = primary.Process;
         ExeName = exeName;
-        AppName = Prefer(primary.Process.ProductName, primary.Process.FileDescription, exeName);
+        AppName = Prefer(identitySource.Process.ProductName, primary.Process.ProductName, primary.Process.FileDescription, exeName);
         IsGroup = true;
         InstanceCount = orderedRows.Length;
         SelectionKey = $"group:{exeName}";
         IncludedProcesses = orderedRows.SelectMany(row => row.IncludedProcesses).ToArray();
         ProcessId = primary.ProcessId;
         Name = exeName;
-        FullPath = string.IsNullOrWhiteSpace(primary.Process.FullPath) ? "Unavailable" : primary.Process.FullPath;
-        NormalizedFullPath = NormalizeFullPath(primary.Process.FullPath);
-        FileDescription = Prefer(primary.Process.FileDescription, "Unavailable");
-        ProductName = Prefer(primary.Process.ProductName, AppName);
-        CompanyName = Prefer(primary.Process.CompanyName, "Unavailable");
-        SignerStatus = Prefer(primary.Process.SignerStatus, "Unknown");
-        Version = Prefer(primary.Process.Version, "Unavailable");
-        OriginalFileName = Prefer(primary.Process.OriginalFileName, "Unavailable");
+        FullPath = string.IsNullOrWhiteSpace(identitySource.Process.FullPath) ? "Unavailable" : identitySource.Process.FullPath;
+        NormalizedFullPath = NormalizeFullPath(identitySource.Process.FullPath);
+        FileDescription = Prefer(identitySource.Process.FileDescription, primary.Process.FileDescription, "Unavailable");
+        ProductName = Prefer(identitySource.Process.ProductName, primary.Process.ProductName, AppName);
+        CompanyName = Prefer(identitySource.Process.CompanyName, primary.Process.CompanyName, "Unavailable");
+        SignerStatus = Prefer(identitySource.Process.SignerStatus, primary.Process.SignerStatus, "Unknown");
+        Version = Prefer(identitySource.Process.Version, primary.Process.Version, "Unavailable");
+        OriginalFileName = Prefer(identitySource.Process.OriginalFileName, primary.Process.OriginalFileName, "Unavailable");
         ParentProcessText = "Application group";
         DescendantCountText = orderedRows.Sum(row => row.Process.DescendantProcessCount).ToString("N0");
         DisplayName = AppName;
@@ -1010,8 +1012,8 @@ public sealed class ProcessInspectorTargetViewModel
             "Offline details: process is not running in the latest scan",
             recommendation.ExeName,
             recommendation.ExeName,
-            "Unavailable",
-            string.Empty,
+            string.IsNullOrWhiteSpace(recommendation.FullPath) ? "Unavailable" : recommendation.FullPath,
+            NormalizePath(string.Empty, recommendation.FullPath ?? string.Empty),
             recommendation.ExeName,
             "Unavailable while process is not running",
             "Unknown company",
@@ -1051,8 +1053,8 @@ public sealed class ProcessInspectorTargetViewModel
             $"Offline details: {group.ModeText}",
             group.ExeName,
             group.IdentityText,
-            "Unavailable",
-            string.Empty,
+            group.PathText,
+            group.NormalizedPath,
             group.IdentityText,
             "Unavailable while process is not running",
             "Unknown company",
@@ -1153,6 +1155,8 @@ public sealed class ProfileRecommendationViewModel
         SuggestedProfileText = recommendation.SuggestedProfileName;
         WarningCountText = recommendation.WarningCount.ToString("N0");
         Reason = recommendation.Reason;
+        PathText = string.IsNullOrWhiteSpace(recommendation.FullPath) ? "Path unavailable" : recommendation.FullPath;
+        NormalizedPath = NormalizeRecommendationPath(recommendation.FullPath);
         FirstSeenText = recommendation.FirstSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         LastSeenText = recommendation.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         DisplayText = $"{ExeName} -> {SuggestedProfileText} ({WarningCountText} warnings)";
@@ -1165,11 +1169,34 @@ public sealed class ProfileRecommendationViewModel
     public string SuggestedProfileText { get; }
     public string WarningCountText { get; }
     public string Reason { get; }
+    public string PathText { get; }
+    public string NormalizedPath { get; }
     public string FirstSeenText { get; }
     public string LastSeenText { get; }
     public string DisplayText { get; }
 
     public override string ToString() => DisplayText;
+
+    private static string NormalizeRecommendationPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || string.Equals(path, "Path unavailable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, "Unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path.Trim())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .ToLowerInvariant();
+        }
+        catch
+        {
+            return path.Trim().ToLowerInvariant();
+        }
+    }
 }
 
 public sealed class DeniedProfileRecommendationViewModel
@@ -1207,6 +1234,7 @@ public sealed class GlobalWatchJournalEntryViewModel
         HealthText = entry.HealthState;
         ProfileText = entry.ProfileSource;
         Reason = entry.Reason;
+        PathText = string.IsNullOrWhiteSpace(entry.FullPath) ? "Path unavailable" : entry.FullPath;
         MetricsText = $"CPU {FormatPercent(entry.CpuPercent)} | RAM {FormatMb(entry.MemoryMb)} | Disk R {FormatMbPerSec(entry.DiskReadMbPerSec)} / W {FormatMbPerSec(entry.DiskWriteMbPerSec)}";
         RecommendationText = string.IsNullOrWhiteSpace(entry.RecommendationId)
             ? string.Empty
@@ -1220,6 +1248,7 @@ public sealed class GlobalWatchJournalEntryViewModel
     public string HealthText { get; }
     public string ProfileText { get; }
     public string Reason { get; }
+    public string PathText { get; }
     public string MetricsText { get; }
     public string RecommendationText { get; }
 
@@ -1255,6 +1284,8 @@ public sealed class GlobalWatchJournalGroupViewModel
         HealthText = Entry.HealthState;
         ProfileText = Entry.ProfileSource;
         Reason = Entry.Reason;
+        PathText = string.IsNullOrWhiteSpace(Entry.FullPath) ? "Path unavailable" : Entry.FullPath;
+        NormalizedPath = NormalizeJournalPath(Entry.FullPath);
         MetricsText = Entries[0].MetricsText;
         HasMultipleEntries = Entries.Count > 1;
         ExpandHint = HasMultipleEntries
@@ -1277,6 +1308,8 @@ public sealed class GlobalWatchJournalGroupViewModel
     public string HealthText { get; }
     public string ProfileText { get; }
     public string Reason { get; }
+    public string PathText { get; }
+    public string NormalizedPath { get; }
     public string MetricsText { get; }
     public bool HasMultipleEntries { get; }
     public string ExpandHint { get; }
@@ -1284,6 +1317,27 @@ public sealed class GlobalWatchJournalGroupViewModel
     public string HeaderText { get; }
 
     public override string ToString() => HeaderText;
+
+    private static string NormalizeJournalPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || string.Equals(path, "Path unavailable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, "Unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path.Trim())
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .ToLowerInvariant();
+        }
+        catch
+        {
+            return path.Trim().ToLowerInvariant();
+        }
+    }
 }
 
 public sealed class SuspiciousWatchItemViewModel
@@ -1698,6 +1752,37 @@ public sealed class SessionDetailFactViewModel
 
     public string Label { get; }
     public string Value { get; }
+}
+
+public sealed class SessionRecommendationViewModel
+{
+    public SessionRecommendationViewModel(SessionRecommendation recommendation)
+    {
+        Title = recommendation.Title;
+        Recommendation = recommendation.Recommendation;
+        Evidence = string.IsNullOrWhiteSpace(recommendation.Evidence) ? string.Empty : recommendation.Evidence;
+        Severity = recommendation.Severity.ToString();
+        Metric = recommendation.MetricKey is null ? "Session" : FormatMetricKey(recommendation.MetricKey.Value);
+        HasEvidence = !string.IsNullOrWhiteSpace(Evidence);
+    }
+
+    public string Title { get; }
+    public string Recommendation { get; }
+    public string Evidence { get; }
+    public string Severity { get; }
+    public string Metric { get; }
+    public bool HasEvidence { get; }
+
+    private static string FormatMetricKey(MetricKey key) => key switch
+    {
+        MetricKey.CpuPercent => "CPU",
+        MetricKey.MemoryMb => "RAM",
+        MetricKey.GpuPercent => "GPU",
+        MetricKey.DiskReadMbPerSec => "Disk read",
+        MetricKey.DiskWriteMbPerSec => "Disk write",
+        MetricKey.TemperatureC => "Temperature",
+        _ => key.ToString()
+    };
 }
 
 public sealed class ComparisonMetricRowViewModel

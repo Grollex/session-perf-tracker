@@ -7,10 +7,7 @@
     <UserControl.Resources>
         <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
     </UserControl.Resources>
-<ScrollViewer VerticalScrollBarVisibility="Hidden"
-              HorizontalScrollBarVisibility="Disabled"
-              CanContentScroll="False"
-              PanningMode="VerticalOnly">
+<ScrollViewer Style="{StaticResource PageScrollViewer}">
     <Grid Margin="16,0,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -87,22 +84,30 @@
                              Columns="4"
                              Margin="18,0,0,0"
                              VerticalAlignment="Center">
-                    <StackPanel Margin="0,0,14,0">
-                        <TextBlock Text="{DynamicResource Ui_Version}" Style="{StaticResource MutedText}" />
-                        <TextBlock Text="{Binding AppVersionBadgeText}" FontSize="16" FontWeight="SemiBold" />
-                    </StackPanel>
-                    <StackPanel Margin="0,0,14,0">
-                        <TextBlock Text="{DynamicResource Ui_Duration}" Style="{StaticResource MutedText}" />
-                        <TextBlock Text="{Binding DurationText}" FontSize="16" FontWeight="SemiBold" />
-                    </StackPanel>
-                    <StackPanel Margin="0,0,14,0">
-                        <TextBlock Text="{DynamicResource Ui_Samples}" Style="{StaticResource MutedText}" />
-                        <TextBlock Text="{Binding SampleCountText}" FontSize="16" FontWeight="SemiBold" />
-                    </StackPanel>
-                    <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_Events}" Style="{StaticResource MutedText}" />
-                        <TextBlock Text="{Binding EventCountText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}" />
-                    </StackPanel>
+                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_Version}" Style="{StaticResource MutedText}" />
+                            <TextBlock Text="{Binding AppVersionBadgeText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_Duration}" Style="{StaticResource MutedText}" />
+                            <TextBlock Text="{Binding DurationText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_Samples}" Style="{StaticResource MutedText}" />
+                            <TextBlock Text="{Binding SampleCountText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource KpiTile}">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_Events}" Style="{StaticResource MutedText}" />
+                            <TextBlock Text="{Binding EventCountText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}" TextWrapping="NoWrap" />
+                        </StackPanel>
+                    </Border>
                 </UniformGrid>
             </Grid>
         </Border>
@@ -194,20 +199,29 @@
                           DisplayMemberPath="Label" />
                 <CheckBox Content="{DynamicResource Ui_IncludeChildProcesses}" IsChecked="{Binding IncludeChildProcesses}" />
                 <CheckBox Content="{DynamicResource Ui_LiveMonitor}" IsChecked="{Binding IsLiveMonitorEnabled}" />
-                <TextBlock Text="{Binding RecordingStatusText}"
-                           Style="{StaticResource MutedText}"
-                           Margin="0,10,0,0" />
-                <UniformGrid Columns="2" Margin="0,12,0,0">
-                    <Button Content="{DynamicResource Ui_Start}"
-                            Click="StartRecording_Click"
-                            IsEnabled="{Binding CanStart}"
-                            Style="{StaticResource PrimaryButton}"
-                            Margin="0,0,8,0" />
-                    <Button Content="{DynamicResource Ui_Stop}"
-                            Click="StopRecording_Click"
-                            Style="{StaticResource DangerButton}"
-                            IsEnabled="{Binding CanStop}" />
-                </UniformGrid>
+                <Border Margin="0,14,0,0"
+                        Padding="12"
+                        CornerRadius="7"
+                        Background="#11171C"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="{Binding RecordingStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,0,0,10" />
+                        <UniformGrid Columns="2">
+                            <Button Content="{DynamicResource Ui_Start}"
+                                    Click="StartRecording_Click"
+                                    IsEnabled="{Binding CanStart}"
+                                    Style="{StaticResource HeroPrimaryButton}"
+                                    Margin="0,0,8,0" />
+                            <Button Content="{DynamicResource Ui_Stop}"
+                                    Click="StopRecording_Click"
+                                    Style="{StaticResource HeroDangerButton}"
+                                    IsEnabled="{Binding CanStop}" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
 
                 <Expander Header="{DynamicResource Ui_Assignments}"
                           Foreground="{StaticResource TextBrush}"
@@ -239,9 +253,10 @@
                 <Expander Header="{DynamicResource Ui_Diagnostics}"
                           Foreground="{StaticResource TextBrush}"
                           Margin="0,16,0,0">
-                    <StackPanel Margin="0,8,0,0">
+                    <StackPanel Margin="0,8,0,0" Opacity="0.92">
                         <Button Content="{DynamicResource Ui_RamDiagnosticSnapshot}"
-                                Click="CaptureRamDiagnostic_Click" />
+                                Click="CaptureRamDiagnostic_Click"
+                                Style="{StaticResource TertiaryButton}" />
                         <TextBox Text="{Binding RamDiagnosticText, Mode=OneWay}"
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
@@ -253,6 +268,7 @@
                                  Margin="0,8,0,0" />
                         <Button Content="{DynamicResource Ui_SystemContextSnapshot}"
                                 Click="CaptureSystemContext_Click"
+                                Style="{StaticResource TertiaryButton}"
                                 Margin="0,12,0,0" />
                         <TextBox Text="{Binding SystemContextText, Mode=OneWay}"
                                  IsReadOnly="True"
@@ -284,12 +300,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,0,10,10"
-                                    Padding="14"
-                                    CornerRadius="8"
-                                    Background="{StaticResource PanelStrongBrush}"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
+                            <Border Style="{StaticResource KpiTile}" Margin="0,0,10,10">
                                 <StackPanel>
                                     <TextBlock Text="{Binding Label}" Style="{StaticResource MutedText}" />
                                     <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
@@ -305,11 +316,7 @@
                            Margin="0,2,0,10"
                            Visibility="{Binding HasActiveLiveMetrics, Converter={StaticResource BoolToVisibilityConverter}}" />
                 <Border Visibility="{Binding ShowLiveSnapshotEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Padding="12"
-                        CornerRadius="8"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
+                        Style="{StaticResource EmptyState}">
                     <StackPanel>
                         <TextBlock Text="{Binding LiveSnapshotEmptyText}"
                                    Style="{StaticResource MutedText}" />
@@ -382,7 +389,7 @@
                         <DataTemplate>
                             <Border Padding="12"
                                     Margin="0,0,0,8"
-                                    CornerRadius="8"
+                                    CornerRadius="7"
                                     Background="#141A1F"
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="1">
@@ -413,11 +420,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Border Visibility="{Binding ShowLiveEventEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Padding="16"
-                        CornerRadius="8"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
+                        Style="{StaticResource EmptyState}">
                     <TextBlock Text="{Binding LiveEventEmptyText}"
                                Style="{StaticResource MutedText}" />
                 </Border>

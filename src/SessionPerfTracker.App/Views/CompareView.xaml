@@ -7,13 +7,11 @@
     <UserControl.Resources>
         <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
     </UserControl.Resources>
-<ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+<ScrollViewer Style="{StaticResource PageScrollViewer}">
     <StackPanel Margin="16,0,0,0">
         <Border Style="{StaticResource Panel}" Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="14" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -21,43 +19,46 @@
                     <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource KpiTile}">
                 <StackPanel>
-                    <TextBlock Text="{DynamicResource Ui_Left}" Style="{StaticResource MutedText}" />
+                    <TextBlock Text="{DynamicResource Ui_Left}" Style="{StaticResource SectionTitle}" />
                     <ComboBox ItemsSource="{Binding Sessions}"
                               SelectedItem="{Binding CompareLeft}"
                               DisplayMemberPath="CompareLabel" />
                     <TextBlock Text="{Binding CompareLeft.StabilityText}" Style="{StaticResource MutedText}" Margin="0,6,0,0" />
                 </StackPanel>
-                <StackPanel Grid.Column="2">
-                    <TextBlock Text="{DynamicResource Ui_Right}" Style="{StaticResource MutedText}" />
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource KpiTile}">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource Ui_Right}" Style="{StaticResource SectionTitle}" />
                     <ComboBox ItemsSource="{Binding Sessions}"
                               SelectedItem="{Binding CompareRight}"
                               DisplayMemberPath="CompareLabel" />
                     <TextBlock Text="{Binding CompareRight.StabilityText}" Style="{StaticResource MutedText}" Margin="0,6,0,0" />
                 </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
         <Border Style="{StaticResource Panel}">
             <StackPanel>
                 <DockPanel Margin="0,0,0,14">
-                    <TextBlock Text="{DynamicResource Ui_MetricDelta}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource Ui_MetricDelta}" Style="{StaticResource SectionTitle}" />
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Button Content="{DynamicResource Ui_ExportHtml}"
                                 Click="ExportCurrentCompareHtml_Click"
-                                MinHeight="28"
-                                Padding="10,0"
+                                Style="{StaticResource ToolbarButton}"
                                 Margin="0,0,8,0" />
                         <Button Content="{DynamicResource Ui_ExportCsv}"
                                 Click="ExportCurrentCompareCsv_Click"
-                                MinHeight="28"
-                                Padding="10,0" />
+                                Style="{StaticResource ToolbarButton}" />
                     </StackPanel>
                 </DockPanel>
                 <TextBlock Text="{Binding ExportStatusText}"
                            Style="{StaticResource MutedText}"
                            Margin="0,0,0,12" />
-                <Grid Margin="0,0,0,8">
+                <Border Style="{StaticResource ToolbarPanel}" Margin="0,0,0,8">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.2*" />
                         <ColumnDefinition Width="*" />
@@ -73,15 +74,11 @@
                     <TextBlock Grid.Column="4" Text="{DynamicResource Ui_MaxDelta}" Style="{StaticResource MutedText}" />
                     <TextBlock Grid.Column="5" Text="{DynamicResource Ui_Better}" Style="{StaticResource MutedText}" />
                 </Grid>
+                </Border>
                 <ItemsControl ItemsSource="{Binding ComparisonRows}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="12"
-                                    Margin="0,0,0,8"
-                                    CornerRadius="8"
-                                    Background="#141A1F"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
+                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.2*" />
@@ -102,12 +99,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Border Padding="12"
-                        Margin="0,8,0,0"
-                        CornerRadius="8"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
+                <Border Style="{StaticResource EmptyState}" Margin="0,8,0,0">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_UnavailableMetrics}" Style="{StaticResource MutedText}" />
                         <ItemsControl ItemsSource="{Binding UnavailableComparisonMetrics}">

@@ -30,7 +30,7 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Padding="12,8"
+                Padding="14,9"
                 Background="#12191F"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,0,1">
@@ -38,33 +38,57 @@
                 <Button DockPanel.Dock="Right"
                         Content="{DynamicResource Ui_ReportBugQuick}"
                         Click="ReportBug_Click"
-                        Style="{StaticResource CompactButton}" />
-                <TextBlock Text="{Binding AppWindowTitle}"
-                           Style="{StaticResource MutedText}"
-                           VerticalAlignment="Center" />
+                        Style="{StaticResource InfoButton}"
+                        MinWidth="92" />
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Image Source="Assets/app.ico"
+                           Width="22"
+                           Height="22"
+                           Margin="0,0,10,0" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding AppWindowTitle}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="NoWrap" />
+                        <TextBlock Text="{DynamicResource Ui_AppSubtitle}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="NoWrap" />
+                    </StackPanel>
+                </StackPanel>
             </DockPanel>
         </Border>
 
         <Border Grid.Row="1"
-                Padding="14,10"
-                Background="#1B2118"
-                BorderBrush="#3E6B3A"
+                Padding="14,9"
+                Background="#12202A"
+                BorderBrush="#315C7A"
                 BorderThickness="0,0,0,1"
                 Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
             <DockPanel>
                 <Button DockPanel.Dock="Right"
                         Content="{DynamicResource Ui_TrustExplainerDismiss}"
                         Click="DismissTrustExplainer_Click"
-                        Style="{StaticResource CompactButton}"
+                        Style="{StaticResource TertiaryButton}"
                         Margin="12,0,0,0" />
-                <StackPanel>
-                    <TextBlock Text="{DynamicResource Ui_TrustExplainerTitle}"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,3" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="4"
+                            CornerRadius="2"
+                            Background="{StaticResource ItemSelectedBorderBrush}" />
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{DynamicResource Ui_TrustExplainerTitle}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,2" />
                     <TextBlock Text="{DynamicResource Ui_TrustExplainerBody}"
                                Style="{StaticResource MutedText}"
                                TextWrapping="Wrap" />
-                </StackPanel>
+                    </StackPanel>
+                </Grid>
             </DockPanel>
         </Border>
 
