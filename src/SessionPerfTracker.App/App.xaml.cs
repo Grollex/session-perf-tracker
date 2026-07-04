@@ -16,6 +16,7 @@ public partial class App : System.Windows.Application
     private const string StartupRegistryValueName = "Session Perf Tracker";
 
     internal static bool StartMinimizedToTray { get; private set; }
+    internal static string? VisualQaDirectory { get; private set; }
 
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showWindowEvent;
@@ -43,6 +44,7 @@ public partial class App : System.Windows.Application
             || HasArg(e.Args, "--minimized")
             || HasArg(e.Args, "/background")
             || HasArg(e.Args, "/minimized");
+        VisualQaDirectory = GetArgValue(e.Args, "--visual-qa-dir");
 
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
@@ -91,6 +93,25 @@ public partial class App : System.Windows.Application
 
     private static bool HasArg(string[] args, string expected) =>
         args.Any(argument => argument.Equals(expected, StringComparison.OrdinalIgnoreCase));
+
+    private static string? GetArgValue(string[] args, string expected)
+    {
+        for (var index = 0; index < args.Length; index++)
+        {
+            var argument = args[index];
+            if (argument.StartsWith(expected + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                return argument[(expected.Length + 1)..].Trim('"');
+            }
+
+            if (argument.Equals(expected, StringComparison.OrdinalIgnoreCase) && index + 1 < args.Length)
+            {
+                return args[index + 1].Trim('"');
+            }
+        }
+
+        return null;
+    }
 
     private static void SetStartupRegistration(bool enabled)
     {

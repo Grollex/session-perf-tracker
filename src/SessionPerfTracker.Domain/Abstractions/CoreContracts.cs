@@ -117,6 +117,10 @@ public interface IExportService
         SessionComparisonResult comparison,
         string format,
         CancellationToken cancellationToken = default);
+    Task<string> ExportProcessActionAuditAsync(
+        IReadOnlyList<ProcessBanEvent> events,
+        string format,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IUpdateService

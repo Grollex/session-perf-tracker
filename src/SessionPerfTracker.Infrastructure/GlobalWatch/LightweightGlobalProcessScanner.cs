@@ -15,6 +15,7 @@ public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
     private static readonly Dictionary<string, string> SignerStatusByPath = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object SignerCacheSync = new();
     private readonly object _sync = new();
+    private readonly GlobalProcessPathCache _pathCache = new();
     private Dictionary<int, ProcessProbe> _previousByProcessId = [];
     private DateTimeOffset? _previousCapturedAt;
 
@@ -47,7 +48,7 @@ public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
             snapshots));
     }
 
-    private static IReadOnlyList<ProcessProbe> CaptureProbe(CancellationToken cancellationToken)
+    private IReadOnlyList<ProcessProbe> CaptureProbe(CancellationToken cancellationToken)
     {
         var capturedAt = DateTimeOffset.UtcNow;
         var probes = new List<ProcessProbe>();
@@ -69,13 +70,19 @@ public sealed class LightweightGlobalProcessScanner : IGlobalProcessScanner
                     var parentProcessId = parentByProcess.TryGetValue(process.Id, out var parentId)
                         ? parentId
                         : (int?)null;
+                    var startedAt = SafeGetStartTime(process);
+                    var fullPath = _pathCache.Resolve(
+                        process.Id,
+                        startedAt,
+                        SafeGetMainModulePath(process),
+                        capturedAt);
                     probes.Add(new ProcessProbe(
                         process.Id,
                         parentProcessId,
                         SafeGetProcessName(process),
                         SafeGetWindowTitle(process),
-                        SafeGetMainModulePath(process),
-                        SafeGetStartTime(process),
+                        fullPath,
+                        startedAt,
                         capturedAt,
                         SafeGetTotalProcessorTime(process),
                         SafeGetMemoryMb(process),

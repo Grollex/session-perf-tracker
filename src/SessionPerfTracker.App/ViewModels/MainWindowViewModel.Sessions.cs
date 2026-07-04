@@ -231,6 +231,7 @@ public sealed partial class MainWindowViewModel
 
         if (CompareLeft is null || CompareRight is null || CompareLeft.Id == CompareRight.Id)
         {
+            NotifyComparisonStateProperties();
             return;
         }
 
@@ -244,6 +245,13 @@ public sealed partial class MainWindowViewModel
 
         ComparisonRows.ReplaceWith(availableMetrics.Select(item => new ComparisonMetricRowViewModel(item)));
         UnavailableComparisonMetrics.ReplaceWith(unavailableMetrics.Select(item => new UnavailableComparisonMetricViewModel(item)));
+        NotifyComparisonStateProperties();
+    }
+
+    private void NotifyComparisonStateProperties()
+    {
+        OnPropertyChanged(nameof(HasComparisonRows));
+        OnPropertyChanged(nameof(ShowComparisonEmptyState));
     }
 
     private static IEnumerable<string> CreateUnsupportedMetricNotices(SessionRecord? session)
@@ -261,91 +269,91 @@ public sealed partial class MainWindowViewModel
             .Where(metric => metric.Key is not MetricKey.CpuPercent and not MetricKey.MemoryMb)
             .Where(metric => !recorded.Contains(metric.Key))
             .Select(metric => metric.Key is MetricKey.DiskReadMbPerSec or MetricKey.DiskWriteMbPerSec
-                ? $"{metric.Label}: not recorded in this session"
-                : $"{metric.Label}: not collected in this build");
+                ? UiText.Format("Ui_MetricNotRecordedInSession", metric.Label)
+                : UiText.Format("Ui_MetricNotCollectedInBuild", metric.Label));
     }
 
     private IEnumerable<SessionDetailFactViewModel> CreateSessionDetailFacts(SessionRecord session)
     {
         var facts = new List<SessionDetailFactViewModel>
         {
-            new("App", session.Target.DisplayName),
-            new("Started", session.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")),
-            new("Duration", FormatDuration(session.Summary.Duration)),
-            new("Sampling", $"{session.Sampling.IntervalMs} ms"),
-            new("Child processes", session.Target.IncludeChildProcesses ? "On" : "Off"),
-            new("Capture", FormatCaptureScope(session.Sampling)),
-            new("Status", FormatSessionStatus(session.Status)),
-            new("Stability", FormatStability(session.Summary)),
-            new("Exit", FormatExit(session.Summary))
+            new(GetText("Ui_FactApp"), session.Target.DisplayName),
+            new(GetText("Ui_FactStarted"), session.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")),
+            new(GetText("Ui_FactDuration"), FormatDuration(session.Summary.Duration)),
+            new(GetText("Ui_FactSampling"), $"{session.Sampling.IntervalMs} ms"),
+            new(GetText("Ui_FactChildProcesses"), session.Target.IncludeChildProcesses ? GetText("Ui_On") : GetText("Ui_Off")),
+            new(GetText("Ui_FactCapture"), FormatCaptureScope(session.Sampling)),
+            new(GetText("Ui_FactStatus"), FormatSessionStatus(session.Status)),
+            new(GetText("Ui_FactStability"), FormatStability(session.Summary)),
+            new(GetText("Ui_FactExit"), FormatExit(session.Summary))
         };
 
         if (!string.IsNullOrWhiteSpace(session.Target.ExecutablePath))
         {
-            facts.Insert(1, new SessionDetailFactViewModel("Exe", Path.GetFileName(session.Target.ExecutablePath)));
+            facts.Insert(1, new SessionDetailFactViewModel(GetText("Ui_FactExe"), Path.GetFileName(session.Target.ExecutablePath)));
         }
 
         if (session.EndedAt is not null)
         {
             facts.Insert(3, new SessionDetailFactViewModel(
-                "Ended",
+                GetText("Ui_FactEnded"),
                 session.EndedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
         }
 
         if (!string.IsNullOrWhiteSpace(session.Sampling.SessionProfileName))
         {
-            facts.Add(new SessionDetailFactViewModel("Session profile", session.Sampling.SessionProfileName));
+            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactSessionProfile"), session.Sampling.SessionProfileName));
         }
 
         if (!string.IsNullOrWhiteSpace(session.Sampling.ThresholdSourceLabel))
         {
-            facts.Add(new SessionDetailFactViewModel("Threshold source", session.Sampling.ThresholdSourceLabel));
+            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactThresholdSource"), session.Sampling.ThresholdSourceLabel));
         }
 
         if (session.Summary.LongStartupMs is not null)
         {
             facts.Add(new SessionDetailFactViewModel(
-                "Startup",
-                $"{TimeSpan.FromMilliseconds(session.Summary.LongStartupMs.Value).TotalSeconds:N1}s long startup event"));
+                GetText("Ui_FactStartup"),
+                UiText.Format("Ui_LongStartupSeconds", TimeSpan.FromMilliseconds(session.Summary.LongStartupMs.Value).TotalSeconds)));
         }
 
         if (session.Summary.Overhead is { SampleCount: > 0 } overhead)
         {
             facts.Add(new SessionDetailFactViewModel(
-                "Self CPU avg / peak",
+                GetText("Ui_FactSelfCpuAvgPeak"),
                 $"{FormatPercent(overhead.AvgCpuPercent)} / {FormatPercent(overhead.MaxCpuPercent)}"));
             facts.Add(new SessionDetailFactViewModel(
-                "Self RAM avg / peak",
+                GetText("Ui_FactSelfRamAvgPeak"),
                 $"{FormatMb(overhead.AvgMemoryMb)} / {FormatMb(overhead.MaxMemoryMb)}"));
         }
 
         return facts;
     }
 
-    private static string FormatCaptureScope(SamplingSettings sampling)
+    private string FormatCaptureScope(SamplingSettings sampling)
     {
         var enabled = new List<string>();
         if (sampling.CaptureCpu)
         {
-            enabled.Add("CPU");
+            enabled.Add(GetText("Ui_CPU"));
         }
 
         if (sampling.CaptureRam)
         {
-            enabled.Add("RAM");
+            enabled.Add(GetText("Ui_RAM"));
         }
 
         if (sampling.CaptureDiskRead)
         {
-            enabled.Add("Disk Read");
+            enabled.Add(GetText("Ui_DiskRead"));
         }
 
         if (sampling.CaptureDiskWrite)
         {
-            enabled.Add("Disk Write");
+            enabled.Add(GetText("Ui_DiskWrite"));
         }
 
-        return enabled.Count == 0 ? "No metrics enabled" : string.Join(", ", enabled);
+        return enabled.Count == 0 ? GetText("Ui_NoMetricsEnabled") : string.Join(", ", enabled);
     }
 
     private string FormatSessionStatus(SessionStatus status) => status switch
@@ -360,27 +368,69 @@ public sealed partial class MainWindowViewModel
         _ => status.ToString()
     };
 
-    private static string FormatStability(SessionSummary summary) =>
-        string.IsNullOrWhiteSpace(summary.StabilityReason)
-            ? summary.StabilityStatus.ToString()
-            : $"{summary.StabilityStatus}: {summary.StabilityReason}";
+    private string FormatStability(SessionSummary summary)
+    {
+        var status = FormatStabilityStatus(summary.StabilityStatus);
+        var reason = FormatStabilityReason(summary.StabilityReason);
+        return string.IsNullOrWhiteSpace(reason) ? status : $"{status}: {reason}";
+    }
+
+    private string FormatStabilityStatus(StabilityStatus status) => status switch
+    {
+        StabilityStatus.Stable => GetText("Ui_StabilityHealthy"),
+        StabilityStatus.Degraded => GetText("Ui_StabilityDegraded"),
+        StabilityStatus.Hung => GetText("Ui_StabilityHung"),
+        StabilityStatus.Crashed => GetText("Ui_StabilityCrashed"),
+        _ => status.ToString()
+    };
+
+    private string FormatStabilityReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return string.Empty;
+        }
+
+        return reason switch
+        {
+            "Best-effort crash-like exit signal was recorded." => GetText("Ui_StabilityReasonCrashLike"),
+            "Target exited unexpectedly, but no crash-like signal was recorded." => GetText("Ui_StabilityReasonUnexpectedExit"),
+            "No stability issues detected." => GetText("Ui_StabilityReasonHealthy"),
+            _ => reason
+        };
+    }
 
     private string FormatExit(SessionSummary summary)
     {
         if (!string.IsNullOrWhiteSpace(summary.ExitReason))
         {
-            return summary.ExitReason;
+            return FormatExitReason(summary.ExitReason);
         }
 
         return summary.ExitKind switch
         {
             SessionExitKind.NormalStop => GetText("Ui_ExitNormalStop"),
-            SessionExitKind.ExternalClose => "External close / graceful exit",
-            SessionExitKind.UnexpectedExit => "Unexpected exit",
-            SessionExitKind.CrashLikeExit => "Crash-like exit",
-            SessionExitKind.Running => "Still running",
-            SessionExitKind.Completed => "Completed",
-            _ => "Unknown"
+            SessionExitKind.ExternalClose => GetText("Ui_ExitExternalClose"),
+            SessionExitKind.UnexpectedExit => GetText("Ui_StatusUnexpectedExit"),
+            SessionExitKind.CrashLikeExit => GetText("Ui_StatusCrashLikeExit"),
+            SessionExitKind.Running => GetText("Ui_Running"),
+            SessionExitKind.Completed => GetText("Ui_StatusCompleted"),
+            _ => GetText("Ui_StatusUnknown")
+        };
+    }
+
+    private string FormatExitReason(string reason)
+    {
+        if (reason.StartsWith("The target process exited with non-zero exit code", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetText("Ui_ExitReasonNonZero");
+        }
+
+        return reason switch
+        {
+            "Target process was closed externally." => GetText("Ui_ExitReasonExternalClose"),
+            "Target process stopped normally." => GetText("Ui_ExitReasonNormalStop"),
+            _ => reason
         };
     }
 

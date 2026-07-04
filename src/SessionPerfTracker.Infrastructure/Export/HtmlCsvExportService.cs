@@ -119,6 +119,24 @@ public sealed class HtmlCsvExportService : IExportService
         };
     }
 
+    public async Task<string> ExportProcessActionAuditAsync(
+        IReadOnlyList<ProcessBanEvent> events,
+        string format,
+        CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(_exportDirectory);
+        var orderedEvents = events
+            .OrderByDescending(item => item.Timestamp)
+            .ToArray();
+
+        return NormalizeFormat(format) switch
+        {
+            "html" => await WriteTextAsync(CreateProcessActionAuditFilePath("html"), BuildProcessActionAuditHtml(orderedEvents), cancellationToken),
+            "csv" => await WriteTextAsync(CreateProcessActionAuditFilePath("csv"), BuildProcessActionAuditCsv(orderedEvents), cancellationToken, CsvEncoding),
+            _ => throw new ArgumentException($"Unsupported export format: {format}", nameof(format))
+        };
+    }
+
     private async Task<string> ExportSessionCsvAsync(SessionRecord session, CancellationToken cancellationToken)
     {
         var samplesPath = CreateFilePath(session, "session_samples", "csv");
@@ -153,6 +171,12 @@ public sealed class HtmlCsvExportService : IExportService
         var rightName = SanitizeFilePart(GetAppName(right));
         var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         return Path.Combine(_exportDirectory, $"{leftName}_vs_{rightName}_{timestamp}_compare.{extension}");
+    }
+
+    private string CreateProcessActionAuditFilePath(string extension)
+    {
+        var timestamp = DateTimeOffset.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        return Path.Combine(_exportDirectory, $"process_action_audit_{timestamp}.{extension}");
     }
 
     private static string BuildSessionHtml(SessionRecord session)
@@ -231,6 +255,61 @@ public sealed class HtmlCsvExportService : IExportService
 
         builder.AppendLine("</section>");
         return CloseHtml(builder);
+    }
+
+    private static string BuildProcessActionAuditHtml(IReadOnlyList<ProcessBanEvent> events)
+    {
+        var builder = CreateHtmlShell(
+            "Process action audit",
+            "Process action audit");
+        builder.AppendLine("<section class=\"panel\"><h2>Summary</h2><div class=\"grid\">");
+        AddKeyValue(builder, "Generated", FormatDate(DateTimeOffset.Now));
+        AddKeyValue(builder, "Events", events.Count.ToString("N0", CultureInfo.InvariantCulture));
+        AddKeyValue(builder, "Terminated processes", events.Sum(item => item.TerminatedCount).ToString("N0", CultureInfo.InvariantCulture));
+        builder.AppendLine("</div></section>");
+
+        builder.AppendLine("<section class=\"panel\"><h2>Actions</h2>");
+        builder.AppendLine("<table><thead><tr><th>Timestamp</th><th>Action</th><th>Target</th><th>Path</th><th>Reason / details</th><th>Result</th><th>Confirmation context</th></tr></thead><tbody>");
+        foreach (var item in events)
+        {
+            builder.AppendLine("<tr>");
+            AppendCell(builder, FormatDate(item.Timestamp));
+            AppendCell(builder, item.Action);
+            AppendCell(builder, FormatAuditTarget(item));
+            AppendCell(builder, item.NormalizedPath);
+            AppendCell(builder, string.IsNullOrWhiteSpace(item.Details) ? "n/a" : item.Details);
+            AppendCell(builder, FormatAuditResult(item));
+            AppendCell(builder, FormatAuditConfirmationContext(item));
+            builder.AppendLine("</tr>");
+        }
+
+        builder.AppendLine("</tbody></table></section>");
+        return CloseHtml(builder);
+    }
+
+    private static string BuildProcessActionAuditCsv(IReadOnlyList<ProcessBanEvent> events)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine(Csv("timestamp", "action", "target", "path", "reason_details", "result", "confirmation_context", "duration", "pid", "exe", "product", "company", "signer"));
+        foreach (var item in events)
+        {
+            builder.AppendLine(Csv(
+                FormatDate(item.Timestamp),
+                item.Action,
+                FormatAuditTarget(item),
+                item.NormalizedPath,
+                item.Details,
+                FormatAuditResult(item),
+                FormatAuditConfirmationContext(item),
+                item.DurationLabel,
+                item.ProcessId,
+                item.ExeName,
+                item.ProductName,
+                item.CompanyName,
+                item.SignerStatus));
+        }
+
+        return builder.ToString();
     }
 
     private static string BuildSessionSamplesCsv(SessionRecord session)
@@ -643,6 +722,77 @@ public sealed class HtmlCsvExportService : IExportService
         return session.Sampling.SessionProfileMode == "Auto"
             ? "Auto / global fallback"
             : session.Sampling.SessionProfileMode;
+    }
+
+    private static string FormatAuditTarget(ProcessBanEvent item)
+    {
+        var process = string.IsNullOrWhiteSpace(item.ProcessName)
+            ? item.ExeName
+            : item.ProcessName;
+        return item.ProcessId is null ? process : $"{process} ({item.ProcessId})";
+    }
+
+    private static string FormatAuditResult(ProcessBanEvent item)
+    {
+        if (item.Action.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Blocked";
+        }
+
+        if (item.Action.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Cancelled";
+        }
+
+        if (item.Action.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Confirmed";
+        }
+
+        if (item.TerminatedCount > 0)
+        {
+            return $"{item.TerminatedCount:N0} terminated";
+        }
+
+        if (item.Action.Contains("kill", StringComparison.OrdinalIgnoreCase)
+            || item.Action.Contains("enforced", StringComparison.OrdinalIgnoreCase))
+        {
+            return "No process terminated";
+        }
+
+        return "Recorded";
+    }
+
+    private static string FormatAuditConfirmationContext(ProcessBanEvent item)
+    {
+        if (item.Action.Contains("requested", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Confirmation requested";
+        }
+
+        if (item.Action.Contains("confirmed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "User confirmed";
+        }
+
+        if (item.Action.Contains("cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "User cancelled";
+        }
+
+        if (item.Action.Contains("blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Blocked before execution";
+        }
+
+        if (item.Action.Contains("enforced", StringComparison.OrdinalIgnoreCase)
+            || item.Action.Contains("ban_kill", StringComparison.OrdinalIgnoreCase)
+            || item.Action.Contains("kill_executed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Executed after existing confirmation or active ban";
+        }
+
+        return "n/a";
     }
 
     private static string SessionLabel(SessionRecord session) =>

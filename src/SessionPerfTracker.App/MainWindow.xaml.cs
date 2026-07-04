@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using SessionPerfTracker.App.ViewModels;
 using SessionPerfTracker.Domain.Services;
 using SessionPerfTracker.Infrastructure.Context;
@@ -112,6 +114,13 @@ public partial class MainWindow : Window
                 _notifyIcon.Visible = true;
             }
         }
+
+        if (!string.IsNullOrWhiteSpace(App.VisualQaDirectory))
+        {
+            await CaptureVisualQaAsync(App.VisualQaDirectory);
+            _isExitRequested = true;
+            Close();
+        }
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -212,6 +221,64 @@ public partial class MainWindow : Window
         _notifyIcon?.Dispose();
         _notifyIcon = null;
         Close();
+    }
+
+    private async Task CaptureVisualQaAsync(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        WindowState = WindowState.Normal;
+        Width = 1420;
+        Height = 860;
+        Show();
+        Activate();
+
+        var captures = new (string FileName, int MainTab, int? GlobalTab, int? SettingsTab)[]
+        {
+            ("01-live.png", 0, null, null),
+            ("02-global-overview.png", 1, 0, null),
+            ("03-global-journal.png", 1, 1, null),
+            ("04-global-recommendations.png", 1, 2, null),
+            ("05-global-suspicious.png", 1, 3, null),
+            ("06-global-bans.png", 1, 4, null),
+            ("07-sessions.png", 2, null, null),
+            ("08-details.png", 3, null, null),
+            ("09-compare.png", 4, null, null),
+            ("10-settings-capture.png", 5, null, 0),
+            ("11-settings-profiles.png", 5, null, 1),
+            ("12-settings-storage.png", 5, null, 2),
+            ("13-settings-health.png", 5, null, 3),
+            ("14-settings-feedback.png", 5, null, 4)
+        };
+
+        foreach (var capture in captures)
+        {
+            _viewModel.SelectedTabIndex = capture.MainTab;
+            if (capture.GlobalTab is { } globalTab)
+            {
+                _viewModel.SelectedGlobalWatchSectionIndex = globalTab;
+            }
+
+            if (capture.SettingsTab is { } settingsTab)
+            {
+                _viewModel.SelectedSettingsTabIndex = settingsTab;
+            }
+
+            await Dispatcher.InvokeAsync(UpdateLayout);
+            await Task.Delay(250);
+            SaveWindowPng(Path.Combine(directory, capture.FileName));
+        }
+    }
+
+    private void SaveWindowPng(string path)
+    {
+        var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+        var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(this);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
     }
 
     private void OpenLive_Click(object sender, RoutedEventArgs e)

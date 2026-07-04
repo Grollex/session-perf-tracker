@@ -10,6 +10,13 @@
 <TabControl x:Name="SettingsTabs"
             Margin="16,0,0,0"
             SelectedIndex="{Binding SelectedSettingsTabIndex, Mode=TwoWay}">
+    <TabControl.ItemContainerStyle>
+        <Style TargetType="TabItem" BasedOn="{StaticResource SubTabItem}">
+            <Setter Property="Width" Value="150" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="0,0,8,14" />
+        </Style>
+    </TabControl.ItemContainerStyle>
     <TabItem Header="{DynamicResource Ui_Capture}">
         <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Grid>
@@ -123,11 +130,10 @@
                             </StackPanel>
                         </UniformGrid>
                         <Border Margin="0,18,0,0"
-                                Padding="12"
-                                CornerRadius="8"
-                                Background="#11171C"
+                                Padding="0,14,0,0"
+                                Background="Transparent"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1">
+                                BorderThickness="0,1,0,0">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource Ui_AppBehavior}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                                 <CheckBox Content="{DynamicResource Ui_KeepRunningBackground}"
@@ -147,12 +153,11 @@
                                         Style="{StaticResource ToolbarButton}" />
                             </StackPanel>
                         </Border>
-                        <Border Margin="0,12,0,0"
-                                Padding="12"
-                                CornerRadius="8"
-                                Background="#11171C"
+                        <Border Margin="0,16,0,0"
+                                Padding="0,14,0,0"
+                                Background="Transparent"
                                 BorderBrush="{StaticResource BorderBrushSoft}"
-                                BorderThickness="1">
+                                BorderThickness="0,1,0,0">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource Ui_Language}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                                 <ComboBox ItemsSource="{Binding LanguageOptions}"
@@ -354,18 +359,25 @@
                 <Border Style="{StaticResource Panel}">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_StorageRetention}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
-                        <DockPanel Margin="0,0,0,10">
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <TextBlock Text="{DynamicResource Ui_Retention}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-                            <Button DockPanel.Dock="Right"
-                                    Content="{DynamicResource Ui_Save}"
-                                    Click="SaveRetentionSettings_Click"
-                                    Style="{StaticResource ToolbarButton}"
-                                    Margin="8,0,0,0" />
                             <ComboBox ItemsSource="{Binding RetentionOptions}"
+                                      Grid.Column="2"
                                       SelectedItem="{Binding SelectedRetentionOption}"
                                       DisplayMemberPath="Label"
-                                      Margin="12,0,0,0" />
-                        </DockPanel>
+                                      Margin="0" />
+                            <Button Grid.Column="4"
+                                    Content="{DynamicResource Ui_Save}"
+                                    Click="SaveRetentionSettings_Click"
+                                    Style="{StaticResource ToolbarButton}" />
+                        </Grid>
                         <Border Style="{StaticResource DangerPanel}" Margin="0,0,0,8">
                             <UniformGrid Columns="2">
                                 <Button Content="{DynamicResource Ui_DeleteAllSessions}" Click="DeleteAllSessions_Click" Style="{StaticResource DangerButton}" Margin="0,0,8,8" />
@@ -384,14 +396,18 @@
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_Exports}" Style="{StaticResource SectionTitle}" Margin="0,0,0,14" />
                         <TextBlock Text="{DynamicResource Ui_Folder}" Style="{StaticResource MutedText}" />
-                        <DockPanel Margin="0,6,0,8">
-                            <Button DockPanel.Dock="Right"
+                        <Grid Margin="0,6,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Text="{Binding ExportDirectoryText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" />
+                            <Button Grid.Column="2"
                                     Content="{DynamicResource Ui_Browse}"
                                     Click="BrowseExportDirectory_Click"
-                                    Style="{StaticResource ToolbarButton}"
-                                    Margin="8,0,0,0" />
-                            <TextBox Text="{Binding ExportDirectoryText, UpdateSourceTrigger=PropertyChanged}" MinHeight="32" />
-                        </DockPanel>
+                                    Style="{StaticResource ToolbarButton}" />
+                        </Grid>
                         <UniformGrid Columns="3" Margin="0,0,0,8">
                             <Button Content="{DynamicResource Ui_SaveFolder}" Click="SaveExportDirectory_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,8" />
                             <Button Content="{DynamicResource Ui_DefaultFolder}" Click="ResetExportDirectory_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,8" />
@@ -401,13 +417,21 @@
                             <Run Text="{DynamicResource Ui_DefaultPrefix}" />
                             <Run Text="{Binding DefaultExportDirectoryText, Mode=OneWay}" />
                         </TextBlock>
-                        <DockPanel Margin="0,0,0,8">
-                            <TextBlock Text="{DynamicResource Ui_ExportFiles}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="{DynamicResource Ui_ExportFiles}"
+                                       Style="{StaticResource MutedText}"
+                                       VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
                                 <Button Content="{DynamicResource Ui_Refresh}" Click="RefreshExports_Click" Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" />
                                 <Button Content="{DynamicResource Ui_OpenSelected}" Click="OpenSelectedExport_Click" Style="{StaticResource ToolbarButton}" />
                             </StackPanel>
-                        </DockPanel>
+                        </Grid>
                         <ListBox ItemsSource="{Binding ExportFiles}"
                                  SelectedItem="{Binding SelectedExportFile}"
                                  DisplayMemberPath="DisplayText"
@@ -478,6 +502,75 @@
                                  MinHeight="72"
                                  TextWrapping="Wrap"
                                  VerticalScrollBarVisibility="Auto" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="{DynamicResource Ui_HealthCheck}">
+        <ScrollViewer Style="{StaticResource PageScrollViewer}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_HealthAutostart}"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="{Binding HealthAutostartStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_HealthUpdates}"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="{Binding HealthUpdateStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_HealthStorage}"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="{Binding HealthStorageStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding HealthVersionStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_HealthTelemetry}"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="{Binding HealthFeedbackStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding HealthLastGlobalWatchScanText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,12,0,0" />
                     </StackPanel>
                 </Border>
             </Grid>

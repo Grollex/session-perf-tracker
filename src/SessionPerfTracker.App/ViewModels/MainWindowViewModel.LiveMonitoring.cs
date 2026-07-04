@@ -424,8 +424,8 @@ public sealed partial class MainWindowViewModel
         SelfSampleCountText = summary.SampleCount.ToString("N0");
         SelfCpuBudgetStatusText = FormatBudget(summary.AvgCpuPercent, AvgCpuBudgetPercent);
         SelfRamBudgetStatusText = FormatBudget(summary.MaxMemoryMb, PeakRamBudgetMb);
-        SelfWritesBudgetStatusText = "configured";
-        SelfSnapshotsBudgetStatusText = "event-only";
+        SelfWritesBudgetStatusText = UiText.Get("Ui_Configured");
+        SelfSnapshotsBudgetStatusText = UiText.Get("Ui_EventOnly");
     }
 
     private void NotifySummaryProperties()

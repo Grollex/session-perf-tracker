@@ -43,3 +43,40 @@
 - [x] Compare tab: show paired session selectors and a clear metric-difference table.
 - [x] Settings tab: split into short sections, standardize save buttons, isolate dangerous storage actions, polish Feedback.
 - [x] Visual QA: build, test, verify all tabs, RU/EN text, and minimum window size `1220x720`.
+
+## Visual Polish Backlog v2
+
+- [x] Shell/chrome pass: make the trust banner compact, reduce first-screen height loss, and keep page headers/actions aligned.
+- [x] Details/Sessions header fixes: stop stretched or clipped action buttons, keep back/details/export actions in stable right-aligned groups.
+- [x] Global Watch selected panel: make long paths readable without breaking the panel; improve right-panel vertical density and clipping.
+- [x] Sessions metrics density: replace tall metric cards with a tighter repeated row style and clearer summary hierarchy.
+- [x] Recommendations readability: reduce card weight, add clearer severity badges, and localize the visible recommendation text or isolate it as technical guidance.
+- [x] Compare empty state: replace the blank comparison table with a useful empty state and disabled export affordance.
+- [x] Settings consistency: reduce nested-card feel, align section spacing, and remove mixed RU/EN status copy where user-facing.
+- [x] Visual QA v2: regenerate all tab screenshots, inspect minimum window size, verify paths and recommendation screens, then update publish.
+
+## Visual Polish Backlog v3
+
+- [x] Global Watch sub-tabs: increase tab height/width breathing room, prevent Russian labels from looking clipped, and align the selected state.
+- [x] Live tab microcopy: fix the glued `События0` header and review counter/title spacing in compact panels.
+- [x] Details recommendations: remove the `РекомендацииЧто делать дальше` header collision and reduce English-heavy recommendation rows.
+- [x] Sessions/Details localization polish: replace visible English status fragments in metric/recommendation demo data where the UI can localize safely.
+- [x] Global Watch tables: review header/cell spacing, long process names, and right-side details panel for edge clipping at 1420x860 and smaller.
+- [x] Settings/Feedback polish: verify scroll edges, button alignment, and long text wrapping after the v2 cleanup.
+- [x] Visual QA v3: rebuild, regenerate all screenshots, inspect every tab, send updated screenshots to Telegram, then refresh publish.
+
+## Serious Improvement Backlog
+
+- [x] Update security: require a valid SHA256 hash for remote installer downloads before auto-update can launch anything.
+- [x] Update UX/i18n: localize update statuses/errors and show whether the downloaded installer passed SHA256 verification.
+- [x] Data retention: cap/compact Global Watch journal, ban history, recommendation history, feedback delivery history, and old screenshots so app data cannot grow forever.
+- [x] Process path reliability: add a PID + start-time path cache and backfill watch/recommendation rows so `Недоступно` appears much less often.
+- [x] Dangerous-action audit: add a single exportable audit report for kill/ban actions with timestamp, target, path, reason, result, and confirmation context.
+- [x] Health check screen: show autostart state, update state, feedback delivery, storage availability, current version, and last successful background scan.
+- [x] Update integration tests: add local manifest/package smoke tests for update check, hash match, hash mismatch, skipped version, and startup auto-install flow.
+
+## Visual QA 2026-07-04
+
+- [x] Settings sub-tabs risk after adding Health: apply compact Settings sub-tab style and verify tab bounds with DPI-aware UIA.
+- [x] Russian UI still shows the quick `Report bug` button in English.
+- [x] External screenshot automation captures WPF content as blank/white; add an internal `--visual-qa-dir` screenshot path for visual checks.

@@ -10,6 +10,7 @@ using SessionPerfTracker.Domain.Metrics;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
+using SessionPerfTracker.Domain.Services;
 using Application = System.Windows.Application;
 using Clipboard = System.Windows.Clipboard;
 
@@ -44,6 +45,119 @@ public sealed partial class MainWindowViewModel
         await _thresholdSettingsStore.SaveAsync(settings, cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
         ThresholdSettingsStatusText = "Global fallback saved.";
+    }
+
+    public string HealthAutostartStatusText
+    {
+        get
+        {
+            if (!StartWithWindows)
+            {
+                return GetText("Ui_HealthAutostartDisabled");
+            }
+
+            var registered = TryGetStartupRegistryValue(out var value);
+            return registered
+                ? FormatText("Ui_HealthAutostartEnabled", value)
+                : GetText("Ui_HealthAutostartMismatch");
+        }
+    }
+
+    public string HealthUpdateStatusText
+    {
+        get
+        {
+            var mode = AutomaticallyCheckForUpdates
+                ? AutomaticallyInstallUpdatesOnStartup
+                    ? GetText("Ui_HealthUpdateAutoInstall")
+                    : GetText("Ui_HealthUpdateAutoCheck")
+                : GetText("Ui_HealthUpdateManual");
+            return $"{mode} {UpdateStatusText}";
+        }
+    }
+
+    public string HealthFeedbackStatusText
+    {
+        get
+        {
+            var delivery = FeedbackDeliveryHistory.FirstOrDefault();
+            return delivery is null
+                ? FeedbackStatusText
+                : FormatText("Ui_HealthFeedbackLastDelivery", delivery.TimestampText, delivery.Status);
+        }
+    }
+
+    public string HealthStorageStatusText
+    {
+        get
+        {
+            var directory = ResolveStorageDirectory();
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                return GetText("Ui_HealthStorageUnknown");
+            }
+
+            try
+            {
+                Directory.CreateDirectory(directory);
+                return FormatText("Ui_HealthStorageAvailable", directory);
+            }
+            catch (Exception error)
+            {
+                return FormatText("Ui_HealthStorageUnavailable", error.Message);
+            }
+        }
+    }
+
+    public string HealthVersionStatusText => FormatText("Ui_HealthVersionStatus", CurrentVersionText);
+
+    public string HealthLastGlobalWatchScanText => _lastSuccessfulGlobalWatchScanAt is null
+        ? GetText("Ui_HealthNoGlobalWatchScan")
+        : FormatText("Ui_HealthLastGlobalWatchScan", _lastSuccessfulGlobalWatchScanAt.Value.ToLocalTime());
+
+    private void NotifyHealthCheckProperties()
+    {
+        OnPropertyChanged(nameof(HealthAutostartStatusText));
+        OnPropertyChanged(nameof(HealthUpdateStatusText));
+        OnPropertyChanged(nameof(HealthFeedbackStatusText));
+        OnPropertyChanged(nameof(HealthStorageStatusText));
+        OnPropertyChanged(nameof(HealthVersionStatusText));
+        OnPropertyChanged(nameof(HealthLastGlobalWatchScanText));
+    }
+
+    private static bool TryGetStartupRegistryValue(out string value)
+    {
+        value = string.Empty;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+            value = key?.GetValue(StartupRegistryValueName) as string ?? string.Empty;
+            return !string.IsNullOrWhiteSpace(value);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string ResolveStorageDirectory()
+    {
+        if (string.IsNullOrWhiteSpace(StoragePath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var path = Path.GetFullPath(StoragePath);
+            return Path.HasExtension(path)
+                ? Path.GetDirectoryName(path) ?? string.Empty
+                : path;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     public async Task SaveAntiNoiseSettingsAsync(CancellationToken cancellationToken = default)
@@ -402,7 +516,7 @@ public sealed partial class MainWindowViewModel
                     ?? ExportFiles.FirstOrDefault();
             if (updateStatus)
             {
-                ExportStatusText = $"{ExportFiles.Count:N0} export files shown.";
+                ExportStatusText = FormatText("Ui_ExportFilesShown", ExportFiles.Count);
             }
         }
         catch (Exception error)
@@ -450,7 +564,7 @@ public sealed partial class MainWindowViewModel
             _thresholdSettingsStore.Current with { Updates = updates },
             cancellationToken);
         ApplyUpdateSettingsToUi(_thresholdSettingsStore.Current.Updates);
-        UpdateStatusText = "Update settings saved.";
+        UpdateStatusText = GetText("Ui_UpdateSettingsSaved");
     }
 
     public async Task SaveBugReportAsync(
@@ -561,7 +675,7 @@ public sealed partial class MainWindowViewModel
     {
         if (_availableUpdateManifest is null)
         {
-            UpdateStatusText = "No update version is available to skip.";
+            UpdateStatusText = GetText("Ui_UpdateNoVersionToSkip");
             return;
         }
 
@@ -578,39 +692,41 @@ public sealed partial class MainWindowViewModel
 
         _availableUpdateManifest = null;
         IsUpdateAvailable = false;
-        UpdateStatusText = $"Version {skippedVersion} skipped. Automatic checks will ignore it until a newer version is released.";
+        UpdateStatusText = FormatText("Ui_UpdateVersionSkipped", skippedVersion);
     }
 
     public async Task DownloadAndLaunchUpdateAsync(CancellationToken cancellationToken = default)
     {
         if (_availableUpdateManifest is null)
         {
-            UpdateStatusText = "No downloadable update is selected. Check for updates first.";
+            UpdateStatusText = GetText("Ui_UpdateNoDownloadSelected");
             return;
         }
 
         try
         {
             IsCheckingForUpdates = true;
-            UpdateStatusText = "Downloading update installer...";
+            UpdateStatusText = GetText("Ui_DownloadingUpdateInstaller");
             var installerPath = await _updateService.DownloadInstallerAsync(
                 _availableUpdateManifest,
                 _updateDownloadDirectory,
                 cancellationToken);
             DownloadedUpdateInstallerPath = installerPath;
-            UpdateStatusText = $"Installer downloaded: {installerPath}. Launching installer...";
+            UpdateStatusText = HasSha256(_availableUpdateManifest)
+                ? FormatText("Ui_UpdateInstallerDownloadedShaVerified", installerPath)
+                : FormatText("Ui_UpdateInstallerDownloadedNoShaLocal", installerPath);
             await _updateService.LaunchInstallerAsync(installerPath, cancellationToken);
             _isUpdateRestartRequested = true;
-            UpdateStatusText = "Installer launched. Session Perf Tracker will exit now so the update can replace the running files.";
+            UpdateStatusText = GetText("Ui_UpdateInstallerLaunchedExit");
             UpdateInstallerLaunched?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
         {
-            UpdateStatusText = "Update download cancelled.";
+            UpdateStatusText = GetText("Ui_UpdateDownloadCancelled");
         }
         catch (Exception error)
         {
-            UpdateStatusText = $"Update install launch failed: {error.Message}";
+            UpdateStatusText = FormatText("Ui_UpdateInstallLaunchFailed", FormatUpdateError(error));
         }
         finally
         {
@@ -764,8 +880,8 @@ public sealed partial class MainWindowViewModel
         {
             var skippedText = string.IsNullOrWhiteSpace(updateSettings.SkippedVersion)
                 ? string.Empty
-                : $" Skipped version: {updateSettings.SkippedVersion}.";
-            UpdateStatusText = $"Last update check: {lastCheckedAt.ToLocalTime():MMM dd, HH:mm}.{skippedText}";
+                : " " + FormatText("Ui_UpdateSkippedVersionSuffix", updateSettings.SkippedVersion);
+            UpdateStatusText = FormatText("Ui_UpdateLastCheck", lastCheckedAt.ToLocalTime(), skippedText);
         }
     }
 
@@ -839,7 +955,42 @@ public sealed partial class MainWindowViewModel
             screenshotPath: screenshotPath,
             includeLatestSession: IncludeLatestSessionInFeedback);
         await File.WriteAllTextAsync(path, content, cancellationToken);
+        PruneFeedbackScreenshots(directory);
         return path;
+    }
+
+    private static void PruneFeedbackScreenshots(string directory)
+    {
+        const int maxScreenshotFiles = 40;
+        var oldestAllowed = DateTimeOffset.Now.AddDays(-30);
+
+        try
+        {
+            var screenshots = Directory
+                .EnumerateFiles(directory, "*_screenshot.png", SearchOption.TopDirectoryOnly)
+                .Select(path => new FileInfo(path))
+                .Where(file => file.Exists)
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .ToArray();
+
+            foreach (var file in screenshots
+                         .Where(file => file.LastWriteTimeUtc < oldestAllowed.UtcDateTime)
+                         .Concat(screenshots.Skip(maxScreenshotFiles))
+                         .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    file.Delete();
+                }
+                catch
+                {
+                    // Feedback cleanup must never block saving or sending a report.
+                }
+            }
+        }
+        catch
+        {
+        }
     }
 
     private async Task<FeedbackDeliveryResult> TrySendFeedbackAsync(
@@ -936,6 +1087,7 @@ public sealed partial class MainWindowViewModel
         }
 
         OnPropertyChanged(nameof(HasFeedbackDeliveryHistory));
+        NotifyHealthCheckProperties();
     }
 
     private string BuildFeedbackReport(
@@ -1078,15 +1230,11 @@ public sealed partial class MainWindowViewModel
         {
             IsCheckingForUpdates = true;
             DownloadedUpdateInstallerPath = string.Empty;
-            UpdateStatusText = "Checking for startup update...";
+            UpdateStatusText = GetText("Ui_UpdateCheckingStartup");
             var result = await _updateService.CheckAsync(settings.ManifestUrl.Trim(), cancellationToken);
             _availableUpdateManifest = result.IsUpdateAvailable ? result.Manifest : null;
             IsUpdateAvailable = result.IsUpdateAvailable && result.Manifest is not null;
-            UpdateLatestVersionText = result.LatestVersion ?? "Unavailable";
-            UpdateReleaseNotesText = string.IsNullOrWhiteSpace(result.Manifest?.ReleaseNotes)
-                ? "No release notes in manifest."
-                : result.Manifest.ReleaseNotes;
-            UpdateStatusText = result.Status;
+            ApplyUpdateCheckResult(result);
 
             await _thresholdSettingsStore.SaveAsync(
                 _thresholdSettingsStore.Current with
@@ -1100,14 +1248,12 @@ public sealed partial class MainWindowViewModel
                 return;
             }
 
-            var latestVersion = result.Manifest.Version.Trim().TrimStart('v', 'V');
-            var skippedVersion = _thresholdSettingsStore.Current.Updates.SkippedVersion?.Trim().TrimStart('v', 'V');
-            if (!string.IsNullOrWhiteSpace(skippedVersion)
-                && string.Equals(latestVersion, skippedVersion, StringComparison.OrdinalIgnoreCase))
+            var startupDecision = AppUpdatePolicy.DecideStartupUpdate(_thresholdSettingsStore.Current.Updates, result);
+            if (startupDecision.Kind == StartupUpdateDecisionKind.Skipped)
             {
                 _availableUpdateManifest = null;
                 IsUpdateAvailable = false;
-                UpdateStatusText = $"Version {latestVersion} is skipped. Startup auto-install will wait for a newer version.";
+                UpdateStatusText = FormatText("Ui_UpdateStartupSkipped", startupDecision.LatestVersion ?? result.Manifest.Version);
                 return;
             }
 
@@ -1116,11 +1262,11 @@ public sealed partial class MainWindowViewModel
         }
         catch (OperationCanceledException)
         {
-            UpdateStatusText = "Startup update check cancelled.";
+            UpdateStatusText = GetText("Ui_UpdateStartupCancelled");
         }
         catch (Exception error)
         {
-            UpdateStatusText = $"Startup update failed: {error.Message}";
+            UpdateStatusText = FormatText("Ui_UpdateStartupFailed", FormatUpdateError(error));
         }
         finally
         {
@@ -1141,28 +1287,22 @@ public sealed partial class MainWindowViewModel
         try
         {
             IsCheckingForUpdates = true;
-            UpdateStatusText = automatic ? "Automatically checking for updates..." : "Checking for updates...";
+            UpdateStatusText = automatic ? GetText("Ui_UpdateCheckingAutomatic") : GetText("Ui_UpdateCheckingManual");
             DownloadedUpdateInstallerPath = string.Empty;
             var result = await _updateService.CheckAsync(UpdateManifestUrlText.Trim(), cancellationToken);
             _availableUpdateManifest = result.IsUpdateAvailable ? result.Manifest : null;
             IsUpdateAvailable = result.IsUpdateAvailable && result.Manifest is not null;
-            UpdateLatestVersionText = result.LatestVersion ?? "Unavailable";
-            UpdateReleaseNotesText = string.IsNullOrWhiteSpace(result.Manifest?.ReleaseNotes)
-                ? "No release notes in manifest."
-                : result.Manifest.ReleaseNotes;
-            UpdateStatusText = result.Status;
+            ApplyUpdateCheckResult(result);
 
             if (result.IsUpdateAvailable && result.Manifest is not null)
             {
                 var latestVersion = result.Manifest.Version.Trim().TrimStart('v', 'V');
-                var skippedVersion = _thresholdSettingsStore.Current.Updates.SkippedVersion?.Trim().TrimStart('v', 'V');
                 if (automatic
-                    && !string.IsNullOrWhiteSpace(skippedVersion)
-                    && string.Equals(latestVersion, skippedVersion, StringComparison.OrdinalIgnoreCase))
+                    && AppUpdatePolicy.IsSkippedVersion(latestVersion, _thresholdSettingsStore.Current.Updates.SkippedVersion))
                 {
                     _availableUpdateManifest = null;
                     IsUpdateAvailable = false;
-                    UpdateStatusText = $"Version {latestVersion} is skipped. Automatic checks will wait for a newer version.";
+                    UpdateStatusText = FormatText("Ui_UpdateAutomaticSkipped", latestVersion);
                 }
                 else if (automatic && UpdateAvailablePromptRequested is not null)
                 {
@@ -1178,7 +1318,7 @@ public sealed partial class MainWindowViewModel
                     }
                     else
                     {
-                        UpdateStatusText = $"Update {latestVersion} is available. You can install it later from Settings.";
+                        UpdateStatusText = FormatText("Ui_UpdateAvailableLater", latestVersion);
                     }
                 }
             }
@@ -1192,17 +1332,110 @@ public sealed partial class MainWindowViewModel
         }
         catch (OperationCanceledException)
         {
-            UpdateStatusText = "Update check cancelled.";
+            UpdateStatusText = GetText("Ui_UpdateCheckCancelled");
         }
         catch (Exception error)
         {
-            UpdateStatusText = $"Update check failed: {error.Message}";
+            UpdateStatusText = FormatText("Ui_UpdateCheckFailed", FormatUpdateError(error));
         }
         finally
         {
             IsCheckingForUpdates = false;
         }
     }
+
+    private void ApplyUpdateCheckResult(UpdateCheckResult result)
+    {
+        UpdateLatestVersionText = result.LatestVersion ?? GetText("Ui_Unavailable");
+        UpdateReleaseNotesText = string.IsNullOrWhiteSpace(result.Manifest?.ReleaseNotes)
+            ? GetText("Ui_NoReleaseNotesProvided")
+            : result.Manifest.ReleaseNotes;
+        UpdateStatusText = FormatUpdateCheckStatus(result);
+    }
+
+    private string FormatUpdateCheckStatus(UpdateCheckResult result)
+    {
+        if (result.IsUpdateAvailable && result.Manifest is not null)
+        {
+            var shaStatus = HasSha256(result.Manifest)
+                ? GetText("Ui_UpdateShaAvailable")
+                : GetText("Ui_UpdateShaMissingDownloadBlocked");
+            return FormatText(
+                "Ui_UpdateAvailableStatus",
+                result.CurrentVersion,
+                result.Manifest.Version,
+                shaStatus);
+        }
+
+        var serviceStatus = FormatUpdateServiceStatus(result.Status);
+        if (!string.Equals(serviceStatus, result.Status, StringComparison.Ordinal))
+        {
+            return serviceStatus;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.LatestVersion))
+        {
+            return FormatText("Ui_UpdateUpToDateStatus", result.CurrentVersion);
+        }
+
+        return serviceStatus;
+    }
+
+    private string FormatUpdateServiceStatus(string status)
+    {
+        if (string.Equals(status, "Update manifest URL is not configured.", StringComparison.Ordinal))
+        {
+            return GetText("Ui_UpdateManifestUrlNotConfigured");
+        }
+
+        if (string.Equals(status, "Update manifest is missing version or installerUrl.", StringComparison.Ordinal))
+        {
+            return GetText("Ui_UpdateManifestMissingFields");
+        }
+
+        if (status.StartsWith("Latest version ", StringComparison.OrdinalIgnoreCase)
+            && status.EndsWith(" found, but version comparison was not possible.", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatText("Ui_UpdateVersionComparisonFailed", status);
+        }
+
+        if (status.StartsWith("Update check failed: ", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatText("Ui_UpdateCheckFailed", FormatUpdateError(status["Update check failed: ".Length..]));
+        }
+
+        return status;
+    }
+
+    private string FormatUpdateError(Exception error) => FormatUpdateError(error.Message);
+
+    private string FormatUpdateError(string message)
+    {
+        if (message.Contains("must include a SHA256 hash", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetText("Ui_UpdateErrorMissingSha256");
+        }
+
+        if (message.Contains("invalid SHA256 hash", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetText("Ui_UpdateErrorInvalidSha256");
+        }
+
+        if (message.Contains("failed SHA256 verification", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetText("Ui_UpdateErrorSha256Mismatch");
+        }
+
+        if (message.Contains("installer URL", StringComparison.OrdinalIgnoreCase))
+        {
+            return GetText("Ui_UpdateErrorInstallerUrlMissing");
+        }
+
+        return message;
+    }
+
+    private static bool HasSha256(UpdateManifest manifest) =>
+        !string.IsNullOrWhiteSpace(manifest.Sha256);
 
     private void LoadSelectedProfileFields()
     {

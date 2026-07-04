@@ -11,8 +11,12 @@
     <StackPanel Margin="16,0,0,0">
         <Border Style="{StaticResource Panel}" Margin="0,0,0,14">
             <StackPanel>
-                <DockPanel Margin="0,0,0,14">
-                    <StackPanel>
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
                         <TextBlock Text="{Binding SessionDetailTitle}"
                                    FontSize="20"
                                    FontWeight="SemiBold" />
@@ -20,11 +24,14 @@
                                    Style="{StaticResource MutedText}"
                                    Margin="0,4,0,0" />
                     </StackPanel>
-                    <Button DockPanel.Dock="Right"
+                    <Button Grid.Column="1"
                             Content="{DynamicResource Ui_BackToSessions}"
                             Click="BackToSessions_Click"
-                            Style="{StaticResource CompactButton}" />
-                </DockPanel>
+                            Style="{StaticResource CompactButton}"
+                            MinWidth="128"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top" />
+                </Grid>
 
                 <TextBlock Text="{DynamicResource Ui_SessionDetailsHint}">
                     <TextBlock.Style>
@@ -53,7 +60,9 @@
                                     <TextBlock Text="{Binding Label}" Style="{StaticResource MutedText}" />
                                     <TextBlock Text="{Binding Value}"
                                                FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
+                                               TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Value}" />
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
@@ -66,19 +75,30 @@
                 Margin="0,0,0,14"
                 Visibility="{Binding HasSessionDetailRecommendations, Converter={StaticResource BoolToVisibilityConverter}}">
             <StackPanel>
-                <DockPanel Margin="0,0,0,14">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Text="{DynamicResource Ui_SessionRecommendations}"
                                FontSize="16"
                                FontWeight="SemiBold" />
-                    <TextBlock DockPanel.Dock="Right"
+                    <TextBlock Grid.Column="1"
                                Text="{DynamicResource Ui_ActionableNextSteps}"
-                               Style="{StaticResource MutedText}" />
-                </DockPanel>
+                               Style="{StaticResource MutedText}"
+                               Margin="16,0,0,0"
+                               VerticalAlignment="Center" />
+                </Grid>
 
                 <ItemsControl ItemsSource="{Binding SessionDetailRecommendations}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
+                            <Border Padding="12"
+                                    Margin="0,0,0,8"
+                                    CornerRadius="6"
+                                    Background="#151B20"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="1">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="112" />

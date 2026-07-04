@@ -20,9 +20,17 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <DockPanel Grid.Row="0" Margin="0,0,0,12">
-                <TextBlock Text="{DynamicResource Ui_SavedSessions}" Style="{StaticResource SectionTitle}" />
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="{DynamicResource Ui_SavedSessions}"
+                           Style="{StaticResource SectionTitle}" />
+                <StackPanel Grid.Row="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left">
                     <Button Content="{DynamicResource Ui_OpenDetails}"
                             Click="OpenSessionDetails_Click"
                             Style="{StaticResource ToolbarButton}"
@@ -31,7 +39,7 @@
                             Click="RefreshSessions_Click"
                             Style="{StaticResource ToolbarButton}" />
                 </StackPanel>
-            </DockPanel>
+            </Grid>
             <Border Grid.Row="1" Style="{StaticResource ToolbarPanel}" Margin="0,0,0,12">
             <StackPanel>
                 <Grid>
@@ -116,9 +124,17 @@
     <Border Grid.Column="1" Style="{StaticResource Panel}">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
-                <DockPanel Margin="0,0,0,14">
-                    <TextBlock Text="{DynamicResource Ui_MetricSummary}" Style="{StaticResource SectionTitle}" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="{DynamicResource Ui_MetricSummary}"
+                               Style="{StaticResource SectionTitle}"
+                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Content="{DynamicResource Ui_ExportHtml}"
                                 Click="ExportSelectedSessionHtml_Click"
                                 Style="{StaticResource ToolbarButton}"
@@ -127,11 +143,16 @@
                                 Click="ExportSelectedSessionCsv_Click"
                                 Style="{StaticResource ToolbarButton}" />
                     </StackPanel>
-                </DockPanel>
+                </Grid>
                 <TextBlock Text="{Binding ExportStatusText}"
                            Style="{StaticResource MutedText}"
                            Margin="0,0,0,12" />
-                <Border Style="{StaticResource EmptyState}" Margin="0,0,0,12">
+                <Border Padding="12"
+                        CornerRadius="6"
+                        Background="#121920"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="1"
+                        Margin="0,0,0,10">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -155,8 +176,11 @@
                 <ItemsControl ItemsSource="{Binding SelectedMetricSummaries}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
-                                <Grid>
+                            <Border Padding="12,9"
+                                    Background="#151B20"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid MinHeight="42">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.2*" />
                                         <ColumnDefinition Width="*" />
@@ -164,16 +188,32 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding Reliability}" Style="{StaticResource MutedText}" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Label}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Reliability}"
+                                                   Style="{StaticResource MutedText}"
+                                                   TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding MinLabel}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding AvgLabel}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding MaxLabel}" />
-                                    <StackPanel Grid.Column="4">
-                                        <TextBlock Text="{Binding SpikeLabel}" />
-                                        <TextBlock Text="{Binding BreachLabel}" Style="{StaticResource MutedText}" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding MinLabel}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding AvgLabel}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding MaxLabel}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Grid.Column="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SpikeLabel}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding BreachLabel}"
+                                                   Style="{StaticResource MutedText}"
+                                                   TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Grid>
                             </Border>

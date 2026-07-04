@@ -778,6 +778,35 @@ public sealed partial class MainWindowViewModel
         ProcessBanStatusText = $"{selected.ExeName} ban removed. Future launches are allowed unless another ban exists.";
     }
 
+    public Task ExportProcessActionAuditHtmlAsync(CancellationToken cancellationToken = default) =>
+        ExportProcessActionAuditAsync("html", cancellationToken);
+
+    public Task ExportProcessActionAuditCsvAsync(CancellationToken cancellationToken = default) =>
+        ExportProcessActionAuditAsync("csv", cancellationToken);
+
+    private async Task ExportProcessActionAuditAsync(string format, CancellationToken cancellationToken)
+    {
+        var events = _thresholdSettingsStore.Current.ProcessBans.History
+            .OrderByDescending(item => item.Timestamp)
+            .ToArray();
+        if (events.Length == 0)
+        {
+            ProcessBanStatusText = GetText("Ui_NoProcessActionAuditToExport");
+            return;
+        }
+
+        try
+        {
+            var path = await _exportService.ExportProcessActionAuditAsync(events, format, cancellationToken);
+            ProcessBanStatusText = FormatText("Ui_ProcessActionAuditExported", format.ToUpperInvariant(), path);
+            await RefreshExportFilesAsync(cancellationToken, updateStatus: false);
+        }
+        catch (Exception error)
+        {
+            ProcessBanStatusText = FormatText("Ui_ProcessActionAuditExportFailed", error.Message);
+        }
+    }
+
     private async Task BanSelectedGlobalProcessCoreAsync(bool killAfterBan, CancellationToken cancellationToken)
     {
         var selected = GetSelectedGlobalWatchRow();
@@ -1729,6 +1758,8 @@ public sealed partial class MainWindowViewModel
                 GlobalWatchLastScanText = scan.ComparedToPreviousScan is null
                     ? $"Last scan: {scan.CapturedAt.ToLocalTime():HH:mm:ss}; CPU/Disk deltas warm up on next scan"
                     : $"Last scan: {scan.CapturedAt.ToLocalTime():HH:mm:ss}; interval {scan.ComparedToPreviousScan.Value.TotalSeconds:N1}s";
+                _lastSuccessfulGlobalWatchScanAt = scan.CapturedAt;
+                NotifyHealthCheckProperties();
                 GlobalWatchStatusText = $"Global Watch: profile-aware scan every {GlobalWatchIntervalMs / 1000:N0}s. Unassigned apps use Light background fallback.";
             });
         }

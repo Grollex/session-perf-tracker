@@ -51,26 +51,26 @@ public sealed class SessionListItemViewModel
     public bool IsPrimarySession => !IsDemoSession && !IsShortSession;
     public string QualityTag => IsDemoSession ? "DEMO" : IsShortSession ? "SHORT" : string.Empty;
     public string QualityHint => IsDemoSession
-        ? "Sample data"
+        ? GetText("Ui_SampleData")
         : IsShortSession
-            ? "Very short"
-            : "Recorded session";
-    public string StabilityText => $"{GetText("Ui_Stability")}: {Session.Summary.StabilityStatus}";
-    public string StabilityReason => Session.Summary.StabilityReason ?? GetText("Ui_NoStabilitySummary");
+            ? GetText("Ui_VeryShortSession")
+            : GetText("Ui_RecordedSession");
+    public string StabilityText => $"{GetText("Ui_Stability")}: {FormatStabilityStatus(Session.Summary.StabilityStatus)}";
+    public string StabilityReason => FormatStabilityReason(Session.Summary.StabilityReason);
     public string StartupText => Session.Summary.LongStartupMs is null
-        ? "Startup: no long startup event"
-        : $"Startup: {TimeSpan.FromMilliseconds(Session.Summary.LongStartupMs.Value).TotalSeconds:N1}s";
+        ? GetText("Ui_StartupNoLongEvent")
+        : $"{GetText("Ui_Startup")}: {TimeSpan.FromMilliseconds(Session.Summary.LongStartupMs.Value).TotalSeconds:N1}s";
     public string ExitText => Session.Summary.CrashLikeExit
-        ? "Exit: crash-like"
+        ? $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitCrashLike")}"
         : Session.Summary.ExitKind switch
         {
             SessionExitKind.NormalStop => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitNormalStop")}",
-            SessionExitKind.ExternalClose => "Exit: external close / graceful",
-            SessionExitKind.UnexpectedExit => "Exit: unexpected",
-            SessionExitKind.CrashLikeExit => "Exit: crash-like",
-            SessionExitKind.Running => "Exit: still running",
-            SessionExitKind.Completed => "Exit: completed",
-            _ => "Exit: unknown"
+            SessionExitKind.ExternalClose => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitExternalClose")}",
+            SessionExitKind.UnexpectedExit => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitUnexpected")}",
+            SessionExitKind.CrashLikeExit => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_ExitCrashLike")}",
+            SessionExitKind.Running => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_StatusRecording")}",
+            SessionExitKind.Completed => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_StatusCompleted")}",
+            _ => $"{GetText("Ui_ExitPrefix")}: {GetText("Ui_Unavailable")}"
         };
     public string SessionLabel => $"{AppName} - {StartedFullText} - {DurationText} - {ChildTrackingText} - {SamplingText}";
     public string CompareLabel => SessionLabel;
@@ -95,6 +95,31 @@ public sealed class SessionListItemViewModel
 
     private static string FormatDuration(TimeSpan duration) =>
         $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
+
+    private static string FormatStabilityStatus(StabilityStatus status) => status switch
+    {
+        StabilityStatus.Stable => GetText("Ui_StabilityHealthy"),
+        StabilityStatus.Degraded => GetText("Ui_StabilityDegraded"),
+        StabilityStatus.Hung => GetText("Ui_StabilityHung"),
+        StabilityStatus.Crashed => GetText("Ui_StabilityCrashed"),
+        _ => status.ToString()
+    };
+
+    private static string FormatStabilityReason(string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return GetText("Ui_NoStabilitySummary");
+        }
+
+        return reason switch
+        {
+            "Best-effort crash-like exit signal was recorded." => GetText("Ui_StabilityReasonCrashLike"),
+            "Target exited unexpectedly, but no crash-like signal was recorded." => GetText("Ui_StabilityReasonUnexpectedExit"),
+            "No stability issues detected." => GetText("Ui_StabilityReasonHealthy"),
+            _ => reason
+        };
+    }
 
     private static string GetAppName(SessionRecord session)
     {
@@ -1151,15 +1176,15 @@ public sealed class ProfileRecommendationViewModel
         Recommendation = recommendation;
         Id = recommendation.Id;
         ExeName = recommendation.ExeName;
-        CurrentProfileText = $"{recommendation.CurrentProfileSource}: {recommendation.CurrentProfileName}";
-        SuggestedProfileText = recommendation.SuggestedProfileName;
+        CurrentProfileText = $"{FormatProfileSource(recommendation.CurrentProfileSource)}: {FormatProfileName(recommendation.CurrentProfileName)}";
+        SuggestedProfileText = FormatProfileName(recommendation.SuggestedProfileName);
         WarningCountText = recommendation.WarningCount.ToString("N0");
-        Reason = recommendation.Reason;
-        PathText = string.IsNullOrWhiteSpace(recommendation.FullPath) ? "Path unavailable" : recommendation.FullPath;
+        Reason = FormatRecommendationReason(recommendation.Reason);
+        PathText = string.IsNullOrWhiteSpace(recommendation.FullPath) ? UiText.Get("Ui_Unavailable") : recommendation.FullPath;
         NormalizedPath = NormalizeRecommendationPath(recommendation.FullPath);
-        FirstSeenText = recommendation.FirstSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-        LastSeenText = recommendation.LastSeen.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-        DisplayText = $"{ExeName} -> {SuggestedProfileText} ({WarningCountText} warnings)";
+        FirstSeenText = recommendation.FirstSeen.ToLocalTime().ToString("dd.MM.yy HH:mm");
+        LastSeenText = recommendation.LastSeen.ToLocalTime().ToString("dd.MM.yy HH:mm");
+        DisplayText = $"{ExeName} -> {SuggestedProfileText} ({WarningCountText} {UiText.Get("Ui_Warnings")})";
     }
 
     public ProfileRecommendationRecord Recommendation { get; }
@@ -1181,6 +1206,7 @@ public sealed class ProfileRecommendationViewModel
     {
         if (string.IsNullOrWhiteSpace(path)
             || string.Equals(path, "Path unavailable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, UiText.Get("Ui_Unavailable"), StringComparison.OrdinalIgnoreCase)
             || string.Equals(path, "Unavailable", StringComparison.OrdinalIgnoreCase))
         {
             return string.Empty;
@@ -1197,6 +1223,33 @@ public sealed class ProfileRecommendationViewModel
             return path.Trim().ToLowerInvariant();
         }
     }
+
+    private static string FormatProfileSource(string source) => source switch
+    {
+        "Assigned profile" => UiText.Get("Ui_AssignedProfileSourceShort"),
+        "Global fallback" => UiText.Get("Ui_GlobalFallbackSource"),
+        _ => source
+    };
+
+    private static string FormatProfileName(string name) => name switch
+    {
+        "Light background" => UiText.Get("Ui_ProfileLightBackground"),
+        "Browsers / chats" => UiText.Get("Ui_ProfileBrowsersChats"),
+        "Games" => UiText.Get("Ui_ProfileGames"),
+        "Hardcore" => UiText.Get("Ui_ProfileHardcore"),
+        "Custom" => UiText.Get("Ui_ProfileCustom"),
+        _ => name
+    };
+
+    private static string FormatRecommendationReason(string reason) => reason switch
+    {
+        "CPU over profile limit" => UiText.Get("Ui_ProfileReasonCpuOverLimit"),
+        "RAM over profile limit" => UiText.Get("Ui_ProfileReasonRamOverLimit"),
+        "Disk over profile limit" => UiText.Get("Ui_ProfileReasonDiskOverLimit"),
+        "Disk read over profile limit" => UiText.Get("Ui_ProfileReasonDiskReadOverLimit"),
+        "Disk write over profile limit" => UiText.Get("Ui_ProfileReasonDiskWriteOverLimit"),
+        _ => reason
+    };
 }
 
 public sealed class DeniedProfileRecommendationViewModel
@@ -1490,11 +1543,11 @@ public sealed class MetricSummaryRowViewModel
         SpikeText = summary.Spikes.ToString("N0");
         BreachText = summary.ThresholdBreaches.ToString("N0");
         SamplesText = summary.Samples.ToString("N0");
-        MinLabel = $"Min {MinText}";
-        AvgLabel = $"Avg {AvgText}";
-        MaxLabel = $"Max {MaxText}";
-        SpikeLabel = $"Spikes {SpikeText}";
-        BreachLabel = $"Breaches {BreachText}";
+        MinLabel = UiText.Format("Ui_MinValue", MinText);
+        AvgLabel = UiText.Format("Ui_AvgValue", AvgText);
+        MaxLabel = UiText.Format("Ui_MaxValue", MaxText);
+        SpikeLabel = UiText.Format("Ui_SpikesValue", SpikeText);
+        BreachLabel = UiText.Format("Ui_BreachesValue", BreachText);
         Reliability = FormatReliability(summary.Reliability);
     }
 
@@ -1516,9 +1569,9 @@ public sealed class MetricSummaryRowViewModel
 
     private static string FormatReliability(MetricReliability reliability) => reliability switch
     {
-        MetricReliability.Stable => "Recorded",
-        MetricReliability.BestEffort => "Recorded, best effort",
-        MetricReliability.Unavailable => "Not supported",
+        MetricReliability.Stable => UiText.Get("Ui_Recorded"),
+        MetricReliability.BestEffort => UiText.Get("Ui_RecordedBestEffort"),
+        MetricReliability.Unavailable => UiText.Get("Ui_NotSupported"),
         _ => reliability.ToString()
     };
 }
@@ -1758,11 +1811,11 @@ public sealed class SessionRecommendationViewModel
 {
     public SessionRecommendationViewModel(SessionRecommendation recommendation)
     {
-        Title = recommendation.Title;
-        Recommendation = recommendation.Recommendation;
-        Evidence = string.IsNullOrWhiteSpace(recommendation.Evidence) ? string.Empty : recommendation.Evidence;
-        Severity = recommendation.Severity.ToString();
-        Metric = recommendation.MetricKey is null ? "Session" : FormatMetricKey(recommendation.MetricKey.Value);
+        Title = LocalizeRecommendationTitle(recommendation);
+        Recommendation = LocalizeRecommendationBody(recommendation);
+        Evidence = LocalizeRecommendationEvidence(recommendation);
+        Severity = FormatSeverity(recommendation.Severity);
+        Metric = recommendation.MetricKey is null ? UiText.Get("Ui_Session") : FormatMetricKey(recommendation.MetricKey.Value);
         HasEvidence = !string.IsNullOrWhiteSpace(Evidence);
     }
 
@@ -1773,14 +1826,50 @@ public sealed class SessionRecommendationViewModel
     public string Metric { get; }
     public bool HasEvidence { get; }
 
+    private static string LocalizeRecommendationTitle(SessionRecommendation recommendation)
+    {
+        var key = $"Ui_SessionRec_{NormalizeRecommendationId(recommendation.Id)}_Title";
+        var value = UiText.Get(key);
+        return value == key ? recommendation.Title : value;
+    }
+
+    private static string LocalizeRecommendationBody(SessionRecommendation recommendation)
+    {
+        var key = $"Ui_SessionRec_{NormalizeRecommendationId(recommendation.Id)}_Body";
+        var value = UiText.Get(key);
+        return value == key ? recommendation.Recommendation : value;
+    }
+
+    private static string LocalizeRecommendationEvidence(SessionRecommendation recommendation)
+    {
+        if (string.IsNullOrWhiteSpace(recommendation.Evidence))
+        {
+            return string.Empty;
+        }
+
+        var key = $"Ui_SessionRec_{NormalizeRecommendationId(recommendation.Id)}_Evidence";
+        var value = UiText.Get(key);
+        return value == key ? recommendation.Evidence : value;
+    }
+
+    private static string NormalizeRecommendationId(string id) => id.Replace('-', '_');
+
+    private static string FormatSeverity(SessionRecommendationSeverity severity) => severity switch
+    {
+        SessionRecommendationSeverity.Critical => UiText.Get("Ui_Critical"),
+        SessionRecommendationSeverity.Warning => UiText.Get("Ui_Warning"),
+        SessionRecommendationSeverity.Info => UiText.Get("Ui_Info"),
+        _ => severity.ToString()
+    };
+
     private static string FormatMetricKey(MetricKey key) => key switch
     {
         MetricKey.CpuPercent => "CPU",
         MetricKey.MemoryMb => "RAM",
         MetricKey.GpuPercent => "GPU",
-        MetricKey.DiskReadMbPerSec => "Disk read",
-        MetricKey.DiskWriteMbPerSec => "Disk write",
-        MetricKey.TemperatureC => "Temperature",
+        MetricKey.DiskReadMbPerSec => UiText.Get("Ui_DiskRead"),
+        MetricKey.DiskWriteMbPerSec => UiText.Get("Ui_DiskWrite"),
+        MetricKey.TemperatureC => UiText.Get("Ui_Temperature"),
         _ => key.ToString()
     };
 }
@@ -1892,9 +1981,9 @@ public static class MetricDisplayFactory
 
     private static string FormatReliability(MetricReliability reliability) => reliability switch
     {
-        MetricReliability.Stable => "Recorded",
-        MetricReliability.BestEffort => "Recorded, best effort",
-        MetricReliability.Unavailable => "Not supported",
+        MetricReliability.Stable => UiText.Get("Ui_Recorded"),
+        MetricReliability.BestEffort => UiText.Get("Ui_RecordedBestEffort"),
+        MetricReliability.Unavailable => UiText.Get("Ui_NotSupported"),
         _ => reliability.ToString()
     };
 }

@@ -57,7 +57,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const int SessionsTabIndex = 2;
     private const int SessionDetailsTabIndex = 3;
     private const int SettingsTabIndex = 5;
-    private const int SettingsFeedbackTabIndex = 3;
+    private const int SettingsFeedbackTabIndex = 4;
     private const int GlobalWatchOverviewSectionIndex = 0;
     private const int GlobalWatchJournalSectionIndex = 1;
     private const int GlobalWatchRecommendationsSectionIndex = 2;
@@ -167,7 +167,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _downloadedUpdateInstallerPath = string.Empty;
     private string _bugReportText = string.Empty;
     private string _featureFeedbackText = string.Empty;
-    private string _feedbackStatusText = "No feedback saved yet.";
+    private string _feedbackStatusText = UiText.Get("Ui_NoFeedbackSaved");
     private bool _includeLatestSessionInFeedback = true;
     private bool _includeScreenshotInFeedback;
     private string _liveAssignmentStatusText = "select target";
@@ -239,6 +239,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private IRunningSessionHandle? _activeHandle;
     private CancellationTokenSource? _selfMonitoringCts;
     private CancellationTokenSource? _globalWatchCts;
+    private DateTimeOffset? _lastSuccessfulGlobalWatchScanAt;
     private DateTimeOffset _lastLiveUiRefresh = DateTimeOffset.MinValue;
     private MetricCapabilities _liveCapabilities = new()
     {
@@ -754,7 +755,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool StartWithWindows
     {
         get => _startWithWindows;
-        set => SetProperty(ref _startWithWindows, value);
+        set
+        {
+            if (SetProperty(ref _startWithWindows, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public bool StartMinimizedToTray
@@ -786,7 +793,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string StoragePath
     {
         get => _storagePath;
-        set => SetProperty(ref _storagePath, value);
+        set
+        {
+            if (SetProperty(ref _storagePath, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public string SelectedExecutablePath
@@ -942,19 +955,37 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool AutomaticallyCheckForUpdates
     {
         get => _automaticallyCheckForUpdates;
-        set => SetProperty(ref _automaticallyCheckForUpdates, value);
+        set
+        {
+            if (SetProperty(ref _automaticallyCheckForUpdates, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public bool AutomaticallyInstallUpdatesOnStartup
     {
         get => _automaticallyInstallUpdatesOnStartup;
-        set => SetProperty(ref _automaticallyInstallUpdatesOnStartup, value);
+        set
+        {
+            if (SetProperty(ref _automaticallyInstallUpdatesOnStartup, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public string UpdateStatusText
     {
         get => _updateStatusText;
-        private set => SetProperty(ref _updateStatusText, value);
+        private set
+        {
+            if (SetProperty(ref _updateStatusText, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public string UpdateLatestVersionText
@@ -990,7 +1021,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string FeedbackStatusText
     {
         get => _feedbackStatusText;
-        private set => SetProperty(ref _feedbackStatusText, value);
+        private set
+        {
+            if (SetProperty(ref _feedbackStatusText, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public string FeedbackDirectoryText => GetFeedbackDirectory();
@@ -1008,6 +1045,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public bool HasFeedbackDeliveryHistory => FeedbackDeliveryHistory.Count > 0;
+    public bool HasComparisonRows => ComparisonRows.Count > 0;
+    public bool ShowComparisonEmptyState => !HasComparisonRows;
 
     public bool IsCheckingForUpdates
     {
@@ -1271,7 +1310,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string GlobalWatchLastScanText
     {
         get => _globalWatchLastScanText;
-        private set => SetProperty(ref _globalWatchLastScanText, value);
+        private set
+        {
+            if (SetProperty(ref _globalWatchLastScanText, value))
+            {
+                NotifyHealthCheckProperties();
+            }
+        }
     }
 
     public string GlobalWatchJournalStatusText
@@ -1661,9 +1706,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSessionDetailMetrics => SessionDetailMetricSummaries.Count > 0;
     public bool HasSessionDetailRecommendations => SessionDetailRecommendations.Count > 0;
     public string SessionDetailTitle => SelectedSession is null
-        ? "No session selected"
-        : $"{SelectedSession.AppName} review";
-    public string SessionDetailSubtitle => SelectedSession?.SessionLabel ?? "Open a saved session from Sessions.";
+        ? GetText("Ui_NoSessionSelected")
+        : UiText.Format("Ui_SessionReviewTitle", SelectedSession.AppName);
+    public string SessionDetailSubtitle => SelectedSession?.SessionLabel ?? GetText("Ui_OpenSavedSessionFromSessions");
 
     public bool IsRecording
     {
@@ -1820,7 +1865,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectedRetentionOption = RetentionOptions.FirstOrDefault(option => option.Days == thresholds.Retention.RetentionDays)
             ?? RetentionOptions.FirstOrDefault(option => option.Days == 30);
         await ApplyRetentionPolicyAsync(thresholds.Retention, cancellationToken);
-        ThresholdSettingsStatusText = "Threshold profiles loaded. Assigned apps use profile limits; others use global fallback.";
+        ThresholdSettingsStatusText = GetText("Ui_ThresholdProfilesLoaded");
         ApplyStartupRegistration(thresholds.Behavior);
         await RefreshRunningProcessesAsync(cancellationToken);
         await ReloadSessionsAsync(selectSessionId: null, cancellationToken);
@@ -1874,10 +1919,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private static string FormatBudget(double? value, double budget) =>
         value is null
-            ? "unknown"
+            ? UiText.Get("Ui_Unavailable")
             : value.Value <= budget
-                ? "within budget"
-                : "above budget";
+                ? UiText.Get("Ui_WithinBudget")
+                : UiText.Get("Ui_AboveBudget");
 }
 
 internal static class ObservableCollectionExtensions

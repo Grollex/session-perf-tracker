@@ -379,10 +379,24 @@
 
         <Border Style="{StaticResource Panel}">
             <StackPanel>
-                <DockPanel Margin="0,0,0,14">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock Text="{DynamicResource Ui_Events}" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock DockPanel.Dock="Right" Text="{Binding EventCountText}" Style="{StaticResource MutedText}" />
-                </DockPanel>
+                    <Border Grid.Column="1"
+                            Padding="8,2"
+                            CornerRadius="6"
+                            Background="#11171C"
+                            BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="1">
+                        <TextBlock Text="{Binding EventCountText}"
+                                   Style="{StaticResource MutedText}"
+                                   MinWidth="18"
+                                   TextAlignment="Center" />
+                    </Border>
+                </Grid>
                 <ItemsControl ItemsSource="{Binding VisibleEvents}"
                               Visibility="{Binding HasLiveEvents, Converter={StaticResource BoolToVisibilityConverter}}">
                     <ItemsControl.ItemTemplate>

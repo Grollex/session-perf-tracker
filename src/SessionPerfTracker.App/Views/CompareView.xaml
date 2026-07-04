@@ -42,63 +42,93 @@
 
         <Border Style="{StaticResource Panel}">
             <StackPanel>
-                <DockPanel Margin="0,0,0,14">
-                    <TextBlock Text="{DynamicResource Ui_MetricDelta}" Style="{StaticResource SectionTitle}" />
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="{DynamicResource Ui_MetricDelta}"
+                               Style="{StaticResource SectionTitle}"
+                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
                         <Button Content="{DynamicResource Ui_ExportHtml}"
                                 Click="ExportCurrentCompareHtml_Click"
                                 Style="{StaticResource ToolbarButton}"
+                                IsEnabled="{Binding HasComparisonRows}"
                                 Margin="0,0,8,0" />
                         <Button Content="{DynamicResource Ui_ExportCsv}"
                                 Click="ExportCurrentCompareCsv_Click"
+                                IsEnabled="{Binding HasComparisonRows}"
                                 Style="{StaticResource ToolbarButton}" />
                     </StackPanel>
-                </DockPanel>
+                </Grid>
                 <TextBlock Text="{Binding ExportStatusText}"
                            Style="{StaticResource MutedText}"
                            Margin="0,0,0,12" />
-                <Border Style="{StaticResource ToolbarPanel}" Margin="0,0,0,8">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.2*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{DynamicResource Ui_Metric}" Style="{StaticResource MutedText}" />
-                    <TextBlock Grid.Column="1" Text="{DynamicResource Ui_LeftAvg}" Style="{StaticResource MutedText}" />
-                    <TextBlock Grid.Column="2" Text="{DynamicResource Ui_RightAvg}" Style="{StaticResource MutedText}" />
-                    <TextBlock Grid.Column="3" Text="{DynamicResource Ui_Delta}" Style="{StaticResource MutedText}" />
-                    <TextBlock Grid.Column="4" Text="{DynamicResource Ui_MaxDelta}" Style="{StaticResource MutedText}" />
-                    <TextBlock Grid.Column="5" Text="{DynamicResource Ui_Better}" Style="{StaticResource MutedText}" />
-                </Grid>
+                <StackPanel Visibility="{Binding HasComparisonRows, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Border Style="{StaticResource ToolbarPanel}" Margin="0,0,0,8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Ui_Metric}" Style="{StaticResource MutedText}" />
+                        <TextBlock Grid.Column="1" Text="{DynamicResource Ui_LeftAvg}" Style="{StaticResource MutedText}" />
+                        <TextBlock Grid.Column="2" Text="{DynamicResource Ui_RightAvg}" Style="{StaticResource MutedText}" />
+                        <TextBlock Grid.Column="3" Text="{DynamicResource Ui_Delta}" Style="{StaticResource MutedText}" />
+                        <TextBlock Grid.Column="4" Text="{DynamicResource Ui_MaxDelta}" Style="{StaticResource MutedText}" />
+                        <TextBlock Grid.Column="5" Text="{DynamicResource Ui_Better}" Style="{StaticResource MutedText}" />
+                    </Grid>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding ComparisonRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,9"
+                                        Background="#151B20"
+                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid MinHeight="38">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Metric}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding LeftAvg}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding RightAvg}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3" Text="{Binding Delta}" Foreground="{StaticResource WarnBrush}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="4" Text="{Binding MaxDelta}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="5" Text="{Binding Winner}" Foreground="{StaticResource GoodBrush}" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <Border Style="{StaticResource EmptyState}"
+                        Margin="0,0,0,8"
+                        MinHeight="120"
+                        Visibility="{Binding ShowComparisonEmptyState, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Ui_CompareEmptyTitle}"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="{DynamicResource Ui_CompareEmptyBody}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
                 </Border>
-                <ItemsControl ItemsSource="{Binding ComparisonRows}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource KpiTile}" Margin="0,0,0,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="1.2*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Metric}" FontWeight="SemiBold" />
-                                    <TextBlock Grid.Column="1" Text="{Binding LeftAvg}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding RightAvg}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding Delta}" Foreground="{StaticResource WarnBrush}" />
-                                    <TextBlock Grid.Column="4" Text="{Binding MaxDelta}" />
-                                    <TextBlock Grid.Column="5" Text="{Binding Winner}" Foreground="{StaticResource GoodBrush}" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
                 <Border Style="{StaticResource EmptyState}" Margin="0,8,0,0">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_UnavailableMetrics}" Style="{StaticResource MutedText}" />

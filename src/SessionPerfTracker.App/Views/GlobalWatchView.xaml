@@ -235,8 +235,8 @@
     <Grid Grid.Row="6">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="14" />
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="320" />
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0" Style="{StaticResource Panel}">
@@ -248,7 +248,7 @@
                           Style="{StaticResource DataListView}">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Width="250">
+                            <GridViewColumn Width="235">
                                 <GridViewColumn.Header>
                                     <Button x:Name="GlobalWatchProcessHeaderButton"
                                             Content="{Binding GlobalWatchProcessHeaderText}"
@@ -277,7 +277,7 @@
                                             Style="{StaticResource TableHeaderSortButton}" />
                                 </GridViewColumn.Header>
                             </GridViewColumn>
-                            <GridViewColumn Width="110" DisplayMemberBinding="{Binding MemoryText}">
+                            <GridViewColumn Width="104" DisplayMemberBinding="{Binding MemoryText}">
                                 <GridViewColumn.Header>
                                     <Button x:Name="GlobalWatchRamHeaderButton"
                                             Content="{Binding GlobalWatchRamHeaderText}"
@@ -285,7 +285,7 @@
                                             Style="{StaticResource TableHeaderSortButton}" />
                                 </GridViewColumn.Header>
                             </GridViewColumn>
-                            <GridViewColumn Width="110" DisplayMemberBinding="{Binding DiskTotalText}">
+                            <GridViewColumn Width="104" DisplayMemberBinding="{Binding DiskTotalText}">
                                 <GridViewColumn.Header>
                                     <Button x:Name="GlobalWatchDiskHeaderButton"
                                             Content="{Binding GlobalWatchDiskHeaderText}"
@@ -293,7 +293,7 @@
                                             Style="{StaticResource TableHeaderSortButton}" />
                                 </GridViewColumn.Header>
                             </GridViewColumn>
-                            <GridViewColumn Width="104">
+                            <GridViewColumn Width="98">
                                 <GridViewColumn.Header>
                                     <Button x:Name="GlobalWatchProfileHeaderButton"
                                             Content="{Binding GlobalWatchProfileHeaderText}"
@@ -315,7 +315,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Width="92">
+                            <GridViewColumn Width="88">
                                 <GridViewColumn.Header>
                                     <Button x:Name="GlobalWatchHealthHeaderButton"
                                             Content="{Binding GlobalWatchHealthHeaderText}"
@@ -462,7 +462,11 @@
                         <TextBlock Grid.Row="4"
                                    Grid.Column="1"
                                    Text="{Binding SelectedGlobalProcessPathText}"
-                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="Consolas"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   TextWrapping="Wrap"
+                                   MaxHeight="58"
                                    ToolTip="{Binding SelectedGlobalProcessPathText}" />
                         <TextBlock Grid.Row="6" Text="{DynamicResource Ui_Description}" Style="{StaticResource MutedText}" />
                         <TextBlock Grid.Row="6"
@@ -667,20 +671,26 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Style="{StaticResource Panel}">
-                <DockPanel>
-                    <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
                         <TextBlock Text="{DynamicResource Ui_WatchJournal}"
                                    FontSize="20"
                                    FontWeight="SemiBold" />
                         <TextBlock Text="{Binding GlobalWatchJournalStatusText}"
                                    Style="{StaticResource MutedText}"
-                                   Margin="0,4,0,0" />
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap" />
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Right"
+                    <TextBlock Grid.Column="2"
                                Text="{DynamicResource Ui_GroupedJournalHint}"
                                Style="{StaticResource MutedText}"
                                VerticalAlignment="Top" />
-                </DockPanel>
+                </Grid>
             </Border>
 
             <Border Grid.Row="2" Style="{StaticResource Panel}">
@@ -887,16 +897,22 @@
                 <RowDefinition Height="12" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <DockPanel Grid.Row="0">
-                <StackPanel>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
                     <TextBlock Text="{DynamicResource Ui_ProfileRecommendations}"
                                FontSize="20"
                                FontWeight="SemiBold" />
                     <TextBlock Text="{DynamicResource Ui_RecommendationHint}"
                                Style="{StaticResource MutedText}"
-                               Margin="0,4,0,0" />
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Right"
+                <StackPanel Grid.Column="2"
                             Orientation="Horizontal"
                             VerticalAlignment="Top">
                     <Button Content="{DynamicResource Ui_Promote}"
@@ -913,7 +929,7 @@
                             Click="DenySelectedRecommendations_Click"
                             Style="{StaticResource TertiaryButton}" />
                 </StackPanel>
-            </DockPanel>
+            </Grid>
 
             <WrapPanel Grid.Row="2"
                        VerticalAlignment="Center"
@@ -961,45 +977,132 @@
                         Margin="0,0,8,6" />
             </WrapPanel>
 
-            <ListView x:Name="ProfileRecommendationsList"
-                      Grid.Row="4"
-                      ItemsSource="{Binding ProfileRecommendations}"
-                      SelectedItem="{Binding SelectedProfileRecommendation}"
-                      SelectionMode="Extended"
-                      Style="{StaticResource DataListView}">
-                <ListView.View>
-                    <GridView>
-                        <GridViewColumn Header="{DynamicResource Ui_Exe}" Width="150" DisplayMemberBinding="{Binding ExeName}" />
-                        <GridViewColumn Header="{DynamicResource Ui_CurrentProfile}" Width="190">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding CurrentProfileText}" TextTrimming="CharacterEllipsis" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn Header="{DynamicResource Ui_Suggested}" Width="130" DisplayMemberBinding="{Binding SuggestedProfileText}" />
-                        <GridViewColumn Header="{DynamicResource Ui_Warnings}" Width="80" DisplayMemberBinding="{Binding WarningCountText}" />
-                        <GridViewColumn Header="{DynamicResource Ui_Reason}" Width="210">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Reason}" TextTrimming="CharacterEllipsis" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn Header="{DynamicResource Ui_Path}" Width="280">
-                            <GridViewColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding PathText}"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding PathText}" />
-                                </DataTemplate>
-                            </GridViewColumn.CellTemplate>
-                        </GridViewColumn>
-                        <GridViewColumn Header="{DynamicResource Ui_FirstSeen}" Width="140" DisplayMemberBinding="{Binding FirstSeenText}" />
-                        <GridViewColumn Header="{DynamicResource Ui_LastSeen}" Width="140" DisplayMemberBinding="{Binding LastSeenText}" />
-                    </GridView>
-                </ListView.View>
-            </ListView>
+            <Grid Grid.Row="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Padding="10,0,10,6"
+                        BorderBrush="{StaticResource BorderBrushSoft}"
+                        BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="196" />
+                            <ColumnDefinition Width="98" />
+                            <ColumnDefinition Width="112" />
+                            <ColumnDefinition Width="168" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="124" />
+                            <ColumnDefinition Width="132" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Ui_Exe}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="1" Text="{DynamicResource Ui_CurrentProfile}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="2" Text="{DynamicResource Ui_Suggested}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="3" Text="{DynamicResource Ui_Warnings}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="4" Text="{DynamicResource Ui_Reason}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="5" Text="{DynamicResource Ui_Path}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="6" Text="{DynamicResource Ui_FirstSeen}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
+                        <TextBlock Grid.Column="7" Text="{DynamicResource Ui_LastSeen}" Style="{StaticResource MutedText}" />
+                    </Grid>
+                </Border>
+
+                <ListBox x:Name="ProfileRecommendationsList"
+                         Grid.Row="1"
+                         ItemsSource="{Binding ProfileRecommendations}"
+                         SelectedItem="{Binding SelectedProfileRecommendation}"
+                         SelectionMode="Extended"
+                         Background="#11171C"
+                         BorderThickness="0"
+                         Foreground="{StaticResource TextBrush}"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="RecommendationRow"
+                                                Height="38"
+                                                Padding="10,0"
+                                                Background="Transparent"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="1"
+                                                VerticalAlignment="Top">
+                                            <ContentPresenter HorizontalAlignment="Stretch"
+                                                              VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="RecommendationRow" Property="Background" Value="{StaticResource ItemSelectedBrush}" />
+                                                <Setter TargetName="RecommendationRow" Property="BorderBrush" Value="{StaticResource ItemSelectedBorderBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="RecommendationRow" Property="Background" Value="#1B2630" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="196" />
+                                    <ColumnDefinition Width="98" />
+                                    <ColumnDefinition Width="112" />
+                                    <ColumnDefinition Width="168" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="124" />
+                                    <ColumnDefinition Width="132" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding ExeName}"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding ExeName}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CurrentProfileText}"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding CurrentProfileText}" />
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding SuggestedProfileText}"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding WarningCountText}"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="4"
+                                           Text="{Binding Reason}"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Reason}" />
+                                <TextBlock Grid.Column="5"
+                                           Text="{Binding PathText}"
+                                           FontFamily="Consolas"
+                                           FontSize="11"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding PathText}" />
+                                <TextBlock Grid.Column="6"
+                                           Text="{Binding FirstSeenText}"
+                                           Margin="0,0,12,0"
+                                           TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="7"
+                                           Text="{Binding LastSeenText}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
 
             <TextBlock Grid.Row="6"
                        Text="{Binding ProfileRecommendationStatusText}"
@@ -1014,21 +1117,27 @@
                 <RowDefinition Height="12" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <DockPanel Grid.Row="0">
-                <StackPanel>
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
                     <TextBlock Text="{DynamicResource Ui_DeniedIgnored}"
                                FontSize="16"
                                FontWeight="SemiBold" />
                     <TextBlock Text="{DynamicResource Ui_IgnoredHint}"
                                Style="{StaticResource MutedText}"
-                               Margin="0,4,0,0" />
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
                 </StackPanel>
-                <Button DockPanel.Dock="Right"
+                <Button Grid.Column="2"
                         Content="{DynamicResource Ui_RemoveDeny}"
                         Click="RemoveRecommendationDeny_Click"
                         Style="{StaticResource CompactButton}"
                         VerticalAlignment="Top" />
-            </DockPanel>
+            </Grid>
 
             <ListBox Grid.Row="2"
                      ItemsSource="{Binding DeniedProfileRecommendations}"
@@ -1062,16 +1171,22 @@
                         <RowDefinition Height="12" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <DockPanel Grid.Row="0">
-                        <StackPanel>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
                             <TextBlock Text="{DynamicResource Ui_SuspiciousWatchlistTitle}"
                                        FontSize="20"
                                        FontWeight="SemiBold" />
                             <TextBlock Text="{DynamicResource Ui_SuspiciousHint}"
                                        Style="{StaticResource MutedText}"
-                                       Margin="0,4,0,0" />
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel DockPanel.Dock="Right"
+                        <StackPanel Grid.Column="2"
                                     Orientation="Horizontal"
                                     VerticalAlignment="Top">
                             <Button Content="{DynamicResource Ui_ViewDetails}"
@@ -1082,7 +1197,7 @@
                                     Click="RemoveSelectedSuspiciousWatchItem_Click"
                                     Style="{StaticResource CompactButton}" />
                         </StackPanel>
-                    </DockPanel>
+                    </Grid>
 
                     <ListView Grid.Row="2"
                               ItemsSource="{Binding SuspiciousWatchItems}"
@@ -1308,14 +1423,29 @@
                         <RowDefinition Height="12" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="{DynamicResource Ui_BanHistory}"
-                                   FontSize="16"
-                                   FontWeight="SemiBold" />
-                        <TextBlock Text="{DynamicResource Ui_BanHistoryHint}"
-                                   Style="{StaticResource MutedText}"
-                                   Margin="0,4,0,0" />
-                    </StackPanel>
+                    <DockPanel>
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_BanHistory}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="{DynamicResource Ui_BanHistoryHint}"
+                                       Style="{StaticResource MutedText}"
+                                       Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource Ui_ExportHtml}"
+                                    Click="ExportProcessActionAuditHtml_Click"
+                                    IsEnabled="{Binding HasProcessBanEvents}"
+                                    Style="{StaticResource CompactButton}" />
+                            <Button Content="{DynamicResource Ui_ExportCsv}"
+                                    Click="ExportProcessActionAuditCsv_Click"
+                                    IsEnabled="{Binding HasProcessBanEvents}"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="8,0,0,0" />
+                        </StackPanel>
+                    </DockPanel>
                     <ListView Grid.Row="2"
                               ItemsSource="{Binding ProcessBanEvents}"
                               Style="{StaticResource DataListView}"

@@ -34,12 +34,12 @@
                 Background="#12191F"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,0,1">
-            <DockPanel>
-                <Button DockPanel.Dock="Right"
-                        Content="{DynamicResource Ui_ReportBugQuick}"
-                        Click="ReportBug_Click"
-                        Style="{StaticResource InfoButton}"
-                        MinWidth="92" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Image Source="Assets/app.ico"
@@ -56,40 +56,55 @@
                                    TextWrapping="NoWrap" />
                     </StackPanel>
                 </StackPanel>
-            </DockPanel>
+                <Button Grid.Column="2"
+                        Content="{DynamicResource Ui_ReportBugQuick}"
+                        Click="ReportBug_Click"
+                        Style="{StaticResource InfoButton}"
+                        MinWidth="92" />
+            </Grid>
         </Border>
 
         <Border Grid.Row="1"
-                Padding="14,9"
-                Background="#12202A"
+                Padding="14,6"
+                Background="#111C24"
                 BorderBrush="#315C7A"
                 BorderThickness="0,0,0,1"
                 Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
-            <DockPanel>
-                <Button DockPanel.Dock="Right"
-                        Content="{DynamicResource Ui_TrustExplainerDismiss}"
-                        Click="DismissTrustExplainer_Click"
-                        Style="{StaticResource TertiaryButton}"
-                        Margin="12,0,0,0" />
-                <Grid>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid Grid.Column="0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="4" />
-                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Border Width="4"
                             CornerRadius="2"
                             Background="{StaticResource ItemSelectedBorderBrush}" />
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="{DynamicResource Ui_TrustExplainerTitle}"
-                                   FontWeight="SemiBold"
-                                   Margin="0,0,0,2" />
+                    <TextBlock Grid.Column="2"
+                               Text="{DynamicResource Ui_TrustExplainerTitle}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
                     <TextBlock Text="{DynamicResource Ui_TrustExplainerBody}"
+                               Grid.Column="4"
                                Style="{StaticResource MutedText}"
-                               TextWrapping="Wrap" />
-                    </StackPanel>
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
                 </Grid>
-            </DockPanel>
+                <Button Grid.Column="2"
+                        Content="{DynamicResource Ui_TrustExplainerDismiss}"
+                        Click="DismissTrustExplainer_Click"
+                        Style="{StaticResource TertiaryButton}"
+                        MinHeight="28"
+                        Padding="10,0" />
+            </Grid>
         </Border>
 
         <Border Grid.Row="2"
@@ -98,18 +113,26 @@
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,0,1"
                 Visibility="{Binding HasCrossScreenMonitoringStrip, Converter={StaticResource BoolToVisibilityConverter}}">
-            <DockPanel>
-                <Button DockPanel.Dock="Right"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           Text="{Binding CrossScreenMonitoringStripText}"
+                           Style="{StaticResource MutedText}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="2"
                         Content="{DynamicResource Ui_OpenLive}"
                         Click="OpenLive_Click"
                         Style="{StaticResource CompactButton}" />
-                <TextBlock Text="{Binding CrossScreenMonitoringStripText}"
-                           Style="{StaticResource MutedText}"
-                           VerticalAlignment="Center" />
-            </DockPanel>
+            </Grid>
         </Border>
 
-        <TabControl Grid.Row="3"
+        <TabControl x:Name="MainTabs"
+                    Grid.Row="3"
                     TabStripPlacement="Left"
                     Padding="14,18,18,18"
                     SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">

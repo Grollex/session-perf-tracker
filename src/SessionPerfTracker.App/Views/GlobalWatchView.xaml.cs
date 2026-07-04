@@ -285,4 +285,20 @@ public partial class GlobalWatchView : System.Windows.Controls.UserControl
             await ViewModel.RemoveSelectedProcessBanAsync();
         }
     }
+
+    private async void ExportProcessActionAuditHtml_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.ExportProcessActionAuditHtmlAsync();
+        }
+    }
+
+    private async void ExportProcessActionAuditCsv_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.ExportProcessActionAuditCsvAsync();
+        }
+    }
 }

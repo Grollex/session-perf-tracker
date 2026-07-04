@@ -105,9 +105,15 @@ public sealed class HttpUpdateService : IUpdateService
         Directory.CreateDirectory(updateDirectory);
         var fileName = GetInstallerFileName(manifest);
         var destinationPath = Path.Combine(updateDirectory, fileName);
+        var isRemoteInstaller = IsHttpOrHttpsUrl(manifest.InstallerUrl);
+
+        if (isRemoteInstaller)
+        {
+            ValidateRemoteInstallerSha256(manifest.Sha256);
+        }
 
         if (Uri.TryCreate(manifest.InstallerUrl, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            && IsHttpOrHttpsUri(uri))
         {
             await using var stream = await _httpClient.GetStreamAsync(uri, cancellationToken);
             await using var output = File.Create(destinationPath);
@@ -198,6 +204,26 @@ public sealed class HttpUpdateService : IUpdateService
         return Path.GetFullPath(Path.Combine(sourceDirectory ?? Environment.CurrentDirectory, installerUrl));
     }
 
+    private static bool IsHttpOrHttpsUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && IsHttpOrHttpsUri(uri);
+
+    private static bool IsHttpOrHttpsUri(Uri uri) =>
+        uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
+
+    private static void ValidateRemoteInstallerSha256(string? sha256)
+    {
+        if (string.IsNullOrWhiteSpace(sha256))
+        {
+            throw new InvalidOperationException("Remote update manifest must include a SHA256 hash before the installer can be downloaded.");
+        }
+
+        var normalized = NormalizeSha256(sha256);
+        if (normalized.Length != 64 || normalized.Any(static c => !Uri.IsHexDigit(c)))
+        {
+            throw new InvalidOperationException("Remote update manifest contains an invalid SHA256 hash.");
+        }
+    }
+
     private static string GetInstallerFileName(UpdateManifest manifest)
     {
         if (Uri.TryCreate(manifest.InstallerUrl, UriKind.Absolute, out var uri))
@@ -223,11 +249,16 @@ public sealed class HttpUpdateService : IUpdateService
         await using var stream = File.OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream, cancellationToken);
         var actual = Convert.ToHexString(hash);
-        if (!string.Equals(actual, expectedSha256.Replace(" ", string.Empty), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(actual, NormalizeSha256(expectedSha256), StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Downloaded installer failed SHA256 verification.");
         }
     }
+
+    private static string NormalizeSha256(string sha256) =>
+        sha256.Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Trim();
 
     private static string ResolveCurrentVersion()
     {
