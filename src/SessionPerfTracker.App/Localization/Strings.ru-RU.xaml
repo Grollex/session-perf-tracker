@@ -3,7 +3,7 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib">
     <system:String x:Key="Ui_Live">Запись</system:String>
     <system:String x:Key="Ui_GlobalWatch">Глобальный обзор</system:String>
-    <system:String x:Key="Ui_AppSubtitle">Запись и анализ производительности</system:String>
+    <system:String x:Key="Ui_AppSubtitle">Показывает, что тормозило ПК.</system:String>
     <system:String x:Key="Ui_Overview">Обзор</system:String>
     <system:String x:Key="Ui_Journal">Журнал</system:String>
     <system:String x:Key="Ui_Recommendations">Рекомендации</system:String>
@@ -158,6 +158,8 @@
     <system:String x:Key="Ui_HealthLastGlobalWatchScan">Последний успешный скан Global Watch: {0:yyyy-MM-dd HH:mm:ss}.</system:String>
     <system:String x:Key="Ui_StartupInitializationFailedStatus">Запуск выполнен с проблемой хранения: {0}</system:String>
     <system:String x:Key="Ui_StartupInitializationFailedMessage">Session Perf Tracker не смог полностью инициализировать хранение данных, но окно останется открытым. Детали: {0}</system:String>
+    <system:String x:Key="Ui_EarlyVersionTitle">Ранняя версия</system:String>
+    <system:String x:Key="Ui_EarlyVersionBody">Шероховатости пока возможны. Присылайте проблемы, ошибки, непонятное поведение и идеи через Баг или Настройки &gt; Обратная связь.</system:String>
     <system:String x:Key="Ui_ReportBugQuick">Баг</system:String>
     <system:String x:Key="Ui_TrustExplainerTitle">О доверии к релизу</system:String>
     <system:String x:Key="Ui_TrustExplainerBody">Эта бесплатная сборка подписана self-signed сертификатом, поэтому Windows все равно может показать SmartScreen. Ставьте обновления только из GitHub Releases; скачанный установщик проверяется по SHA256 перед запуском.</system:String>

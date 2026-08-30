@@ -15,6 +15,7 @@ AppId={{D56D5C3D-0A07-4BD9-8A23-4FCECB22DA7B}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher=Session Perf Tracker
+AppComments=Early Windows performance session tracker. Please report problems through Report bug or Settings - Feedback.
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -33,6 +34,7 @@ RestartApplications=yes
 VersionInfoVersion={#MyAppVersion}
 VersionInfoProductVersion={#MyAppVersion}
 VersionInfoProductName={#MyAppName}
+VersionInfoDescription=Records app and game performance sessions and helps spot CPU, RAM, and disk spikes.
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

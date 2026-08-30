@@ -1,59 +1,46 @@
-# 🚀 Session Perf Tracker
+# Session Perf Tracker
 
-**Session Perf Tracker** — это мощный инструмент для тех, кто хочет держать свою Windows под полным контролем. Если обычный Диспетчер задач кажется вам "пустым", а система внезапно начинает тормозить из-за фоновых процессов — это приложение для вас.
+> Early version: Session Perf Tracker is still young. If it crashes, misses something, looks confusing, or gets in your way, please send it through **Report bug** or **Settings -> Feedback** in the app. Rough reports are useful too.
 
-![Session Perf Tracker](https://raw.githubusercontent.com/Grollex/session-perf-tracker/main/docs/images/banner.png) *(замените на реальный путь к скриншоту, если он есть)*
+Session Perf Tracker is a small Windows tool for figuring out what happened while an app or game was running.
 
----
+Start a session for the program you care about, play or work normally, and stop the session when you are done. The app keeps a timeline of CPU, memory, disk activity, startup time, exits, and suspicious spikes so you can look back without guessing.
 
-## 🔥 В чем "сок" приложения?
+## What It Helps With
 
-Это не просто монитор ресурсов. Это интеллектуальная система управления процессами, которая помогает:
+- See whether a game, editor, browser, launcher, or helper process was eating CPU, RAM, or disk.
+- Compare two runs after changing graphics settings, mods, drivers, or app versions.
+- Keep an eye on background processes with Global Watch.
+- Save useful bug reports with app/version info, optional screenshots, and the latest session summary.
+- Export session reports to HTML or CSV when you want to share or archive the data.
 
-1.  **🔍 Находить "тихих убийц" производительности**:
-    Приложение отслеживает не только текущую нагрузку, но и ведет **Журнал (Journal)**. Вы увидите, какой процесс "спайкал" CPU или забивал диск, пока вы играли или работали, даже если это длилось всего секунду.
+## Main Features
 
-2.  **🛡️ Автоматические запреты (Process Bans)**:
-    Надоело, что какой-то апдейтер или фоновая служба лезет в систему в неподходящий момент? Вы можете добавить процесс в черный список. Приложение может не только **убить** его, но и **запретить** повторный запуск.
+- **Live sessions**: record a target process with optional child-process tracking.
+- **Global Watch**: scan running processes and highlight unusual load.
+- **Profiles**: use different thresholds for games, browsers, light background apps, hardcore workloads, and custom targets.
+- **Recommendations**: turn repeated profile-limit warnings into suggested profile assignments.
+- **Session comparison**: compare two saved sessions side by side.
+- **Feedback reports**: send or save problem reports and feature ideas from inside the app.
+- **Process bans**: block repeat launches of selected processes while the app is running. Use with care.
 
-3.  **📈 Анализ сессий (Performance Sessions)**:
-    Запускайте мониторинг конкретной игры или тяжелого софта (например, Premiere Pro). По завершении вы получите детальный отчет: среднее потребление, пики, события (фризы, нехватка RAM) и экспорт в CSV/HTML.
+## Install
 
-4.  **⚡ Система Анти-Шума (Anti-Noise)**:
-    Интеллектуальные фильтры позволяют отсекать мелкие колебания и фокусироваться только на реальных аномалиях производительности. Вы не будете отвлекаться на мусорные уведомления.
+1. Download the latest Windows x64 installer from [Releases](https://github.com/Grollex/session-perf-tracker/releases).
+2. Run the installer.
+3. Launch Session Perf Tracker.
+4. Pick your language on first launch, or leave the default English UI.
 
-5.  **🧠 Умные рекомендации**:
-    Система сама анализирует поведение приложений и предлагает оптимальные профили (например, "Браузеры", "Игры", "Headless"), чтобы вы точно знали, когда процесс вышел за рамки дозволенного.
+## Notes
 
-6.  **🔬 Глубокая диагностика**:
-    В один клик можно сделать **снимок RAM** или **системного контекста**, чтобы понять, что именно вызвало сбой или утечку памяти.
+- This is an early build, so some edges are still being tested in real use.
+- Install updates only from GitHub Releases.
+- Windows SmartScreen may warn about the installer because the project uses a self-signed/free signing path.
 
----
+## Development
 
-## 🛠 Ключевые функции
+The app is built with WPF and .NET using a clean separation between the UI, domain logic, and infrastructure layers.
 
-*   **Global Watch**: Обзор всей системы в реальном времени с подсветкой подозрительной активности.
-*   **Targeted Monitoring**: Привязка профилей к конкретным EXE.
-*   **Comparison Engine**: Сравнивайте две разные сессии (например, игру с разными настройками графики), чтобы увидеть разницу в нагрузке.
-*   **Suspicious Watchlist**: Автоматическое отслеживание новых и подозрительных процессов.
-*   **Self-Monitoring**: Программа потребляет минимум ресурсов и сама сообщает о своем "оверхеде".
-
----
-
-## 🚀 Как начать?
-
-1.  Скачайте последний релиз со страницы [Releases](https://github.com/Grollex/session-perf-tracker/releases).
-2.  Запустите `SessionPerfTracker.exe`.
-3.  Настройте свои пороги (Thresholds) в настройках или используйте пресеты.
-4.  Наслаждайтесь чистой и быстрой системой!
-
----
-
-## 👨‍💻 Разработчикам и Агентам
-
-Проект построен на **Clean Architecture (.NET 8 + WPF)**. 
-- Подробности архитектуры и инструкции для AI-агентов находятся в [AGENTS.md](./AGENTS.md).
-- Локализация (RU/EN) поддерживается через XAML Resource Dictionaries.
-
----
-*Сделано с любовью к производительности. Grollex.*
+- Agent/development notes live in [AGENTS.md](./AGENTS.md).
+- Release packaging notes live in [docs/release-packaging.md](./docs/release-packaging.md).
+- UI localization is stored in XAML resource dictionaries under `src/SessionPerfTracker.App/Localization`.

@@ -26,6 +26,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -65,6 +66,35 @@
         </Border>
 
         <Border Grid.Row="1"
+                Padding="14,7"
+                Background="#1B1710"
+                BorderBrush="#6C5931"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="4"
+                        CornerRadius="2"
+                        Background="{StaticResource WarnBrush}" />
+                <TextBlock Grid.Column="2"
+                           Text="{DynamicResource Ui_EarlyVersionTitle}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4"
+                           Text="{DynamicResource Ui_EarlyVersionBody}"
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
                 Padding="14,6"
                 Background="#111C24"
                 BorderBrush="#315C7A"
@@ -107,7 +137,7 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Padding="12,7"
                 Background="#12191F"
                 BorderBrush="{StaticResource BorderBrushSoft}"
@@ -132,7 +162,7 @@
         </Border>
 
         <TabControl x:Name="MainTabs"
-                    Grid.Row="3"
+                    Grid.Row="4"
                     TabStripPlacement="Left"
                     Padding="14,18,18,18"
                     SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">

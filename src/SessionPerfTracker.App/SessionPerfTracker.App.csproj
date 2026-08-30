@@ -18,6 +18,8 @@
     <Product>Session Perf Tracker</Product>
     <Company>Session Perf Tracker</Company>
     <Authors>Session Perf Tracker</Authors>
+    <Description>Windows desktop app for recording app and game performance sessions, spotting CPU/RAM/disk spikes, and collecting useful feedback reports while the project is still early.</Description>
+    <PackageDescription>Windows desktop app for recording app and game performance sessions, spotting CPU/RAM/disk spikes, and collecting useful feedback reports while the project is still early.</PackageDescription>
     <VersionFile>$(MSBuildProjectDirectory)\..\..\VERSION</VersionFile>
     <ProjectVersion Condition="Exists('$(VersionFile)')">$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</ProjectVersion>
     <ProjectVersion Condition="'$(ProjectVersion)' == ''">1.5.5</ProjectVersion>
