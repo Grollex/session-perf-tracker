@@ -57,6 +57,16 @@ public sealed partial class MainWindowViewModel
         SelectedTabIndex = SettingsTabIndex;
     }
 
+    public void OpenLanguageSettings(bool firstRun = false)
+    {
+        SelectedSettingsTabIndex = SettingsLanguageTabIndex;
+        SelectedTabIndex = SettingsTabIndex;
+        if (firstRun)
+        {
+            LanguageSettingsStatusText = GetText("Ui_LanguageFirstRunPrompt");
+        }
+    }
+
     private async Task ExportSelectedSessionAsync(string format, CancellationToken cancellationToken)
     {
         if (SelectedSession is null)

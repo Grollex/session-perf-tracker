@@ -28,6 +28,7 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly string _storagePath;
+    private readonly bool _shouldPromptForLanguageOnLoaded;
     private WinForms.NotifyIcon? _notifyIcon;
     private bool _isExitRequested;
     private bool _trayNotificationShown;
@@ -51,9 +52,11 @@ public partial class MainWindow : Window
         Directory.CreateDirectory(exportsPath);
         var updatesPath = Path.Combine(appDataPath, "updates");
         Directory.CreateDirectory(updatesPath);
-        _storagePath = Path.Combine(appDataPath, "sessionperftracker.db");
+        var storagePath = Path.Combine(appDataPath, "sessionperftracker.db");
         var legacySessionsPath = Path.Combine(appDataPath, "sessions.json");
         var legacySettingsPath = Path.Combine(appDataPath, "settings.json");
+        _storagePath = storagePath;
+        _shouldPromptForLanguageOnLoaded = !File.Exists(storagePath) && !File.Exists(legacySettingsPath);
 
         var sessionStore = new SqliteSessionStore(_storagePath, summaryService, legacySessionsPath);
         var thresholdSettingsStore = new SqliteThresholdSettingsStore(_storagePath, legacySettingsPath);
@@ -93,8 +96,10 @@ public partial class MainWindow : Window
             updatesPath);
         _viewModel.UpdateAvailablePromptRequested += OnUpdateAvailablePromptRequested;
         _viewModel.DestructiveProcessActionConfirmationRequested += OnDestructiveProcessActionConfirmationRequested;
+        _viewModel.SelfUninstallConfirmationRequested += OnSelfUninstallConfirmationRequested;
         _viewModel.UpdateInstallerLaunched += OnUpdateInstallerLaunched;
         _viewModel.LanguageRestartRequested += OnLanguageRestartRequested;
+        _viewModel.SelfUninstallLaunched += OnSelfUninstallLaunched;
         DataContext = _viewModel;
         InitializeTrayIcon();
         Loaded += OnLoaded;
@@ -105,7 +110,33 @@ public partial class MainWindow : Window
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;
-        await _viewModel.InitializeAsync(_storagePath);
+        try
+        {
+            await _viewModel.InitializeAsync(_storagePath);
+        }
+        catch (Exception error)
+        {
+            _viewModel.ReportStartupInitializationFailure(error);
+            Show();
+            MessageBox.Show(
+                this,
+                FormatText("Ui_StartupInitializationFailedMessage", error.Message),
+                _viewModel.AppWindowTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (_shouldPromptForLanguageOnLoaded
+            && !App.StartMinimizedToTray
+            && string.IsNullOrWhiteSpace(App.VisualQaDirectory))
+        {
+            _viewModel.OpenLanguageSettings(firstRun: true);
+            Show();
+            Activate();
+            Focus();
+        }
+
         if (App.StartMinimizedToTray && _viewModel.MinimizeToTrayOnClose)
         {
             Hide();
@@ -127,8 +158,10 @@ public partial class MainWindow : Window
     {
         _viewModel.UpdateAvailablePromptRequested -= OnUpdateAvailablePromptRequested;
         _viewModel.DestructiveProcessActionConfirmationRequested -= OnDestructiveProcessActionConfirmationRequested;
+        _viewModel.SelfUninstallConfirmationRequested -= OnSelfUninstallConfirmationRequested;
         _viewModel.UpdateInstallerLaunched -= OnUpdateInstallerLaunched;
         _viewModel.LanguageRestartRequested -= OnLanguageRestartRequested;
+        _viewModel.SelfUninstallLaunched -= OnSelfUninstallLaunched;
         _notifyIcon?.Dispose();
         _notifyIcon = null;
         _viewModel.Shutdown();
@@ -247,7 +280,8 @@ public partial class MainWindow : Window
             ("11-settings-profiles.png", 5, null, 1),
             ("12-settings-storage.png", 5, null, 2),
             ("13-settings-health.png", 5, null, 3),
-            ("14-settings-feedback.png", 5, null, 4)
+            ("14-settings-language.png", 5, null, 4),
+            ("15-settings-feedback.png", 5, null, 5)
         };
 
         foreach (var capture in captures)
@@ -377,9 +411,28 @@ public partial class MainWindow : Window
         e.IsConfirmed = result == MessageBoxResult.Yes;
     }
 
+    private void OnSelfUninstallConfirmationRequested(
+        object? sender,
+        SelfUninstallConfirmationEventArgs e)
+    {
+        var result = MessageBox.Show(
+            this,
+            e.Message,
+            e.Title,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        e.IsConfirmed = result == MessageBoxResult.Yes;
+    }
+
     private void OnUpdateInstallerLaunched(object? sender, EventArgs e)
     {
         Dispatcher.Invoke(ExitForUpdateIfRequested);
+    }
+
+    private void OnSelfUninstallLaunched(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(ExitForSelfUninstall);
     }
 
     private void ExitForUpdateIfRequested()
@@ -389,6 +442,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        _isExitRequested = true;
+        _notifyIcon?.Dispose();
+        _notifyIcon = null;
+        System.Windows.Application.Current.Shutdown();
+    }
+
+    private void ExitForSelfUninstall()
+    {
         _isExitRequested = true;
         _notifyIcon?.Dispose();
         _notifyIcon = null;

@@ -48,11 +48,16 @@ Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{a
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Parameters: "--register-startup-and-exit"; Flags: runasoriginaluser runhidden waituntilterminated
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--unregister-startup-and-exit"; Flags: runhidden waituntilterminated; RunOnceId: "SessionPerfTrackerRemoveStartup"
 
 [UninstallDelete]
-; User data intentionally remains in %LocalAppData%\SessionPerfTracker after uninstall.
+Type: filesandordirs; Name: "{localappdata}\SessionPerfTracker"; Check: ShouldPurgeUserData
+
+[Code]
+function ShouldPurgeUserData(): Boolean;
+begin
+  Result := ExpandConstant('{param:PURGEUSERDATA|0}') = '1';
+end;

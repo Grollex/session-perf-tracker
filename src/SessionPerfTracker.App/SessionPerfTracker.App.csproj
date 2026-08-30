@@ -18,10 +18,13 @@
     <Product>Session Perf Tracker</Product>
     <Company>Session Perf Tracker</Company>
     <Authors>Session Perf Tracker</Authors>
-    <Version>1.5.0</Version>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
-    <InformationalVersion>1.5.0</InformationalVersion>
+    <VersionFile>$(MSBuildProjectDirectory)\..\..\VERSION</VersionFile>
+    <ProjectVersion Condition="Exists('$(VersionFile)')">$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</ProjectVersion>
+    <ProjectVersion Condition="'$(ProjectVersion)' == ''">1.5.5</ProjectVersion>
+    <Version>$(ProjectVersion)</Version>
+    <AssemblyVersion>$(ProjectVersion).0</AssemblyVersion>
+    <FileVersion>$(ProjectVersion).0</FileVersion>
+    <InformationalVersion>$(ProjectVersion)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

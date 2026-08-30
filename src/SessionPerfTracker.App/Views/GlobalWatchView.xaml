@@ -5,10 +5,100 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
     <UserControl.Resources>
-        <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="RecommendationExpander" TargetType="Expander">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Expander">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <ToggleButton Grid.Row="0"
+                                              IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              Content="{TemplateBinding Header}"
+                                              ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              Background="Transparent"
+                                              BorderThickness="0"
+                                              Padding="0"
+                                              HorizontalContentAlignment="Stretch"
+                                              Focusable="False"
+                                              Cursor="Hand">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Grid x:Name="HeaderRoot"
+                                                  MinHeight="34"
+                                                  Background="Transparent">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="24" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border x:Name="GlyphFrame"
+                                                        Width="16"
+                                                        Height="16"
+                                                        CornerRadius="8"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Center"
+                                                        Background="#17232A"
+                                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                                        BorderThickness="1">
+                                                    <Path x:Name="Glyph"
+                                                          Data="M 5 6 L 8 9 L 11 6"
+                                                          Stroke="{StaticResource TextBrush}"
+                                                          StrokeThickness="1.6"
+                                                          StrokeStartLineCap="Round"
+                                                          StrokeEndLineCap="Round" />
+                                                </Border>
+                                                <ContentPresenter Grid.Column="1"
+                                                                  Content="{TemplateBinding Content}"
+                                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                  ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                                                  HorizontalAlignment="Stretch"
+                                                                  VerticalAlignment="Center"
+                                                                  RecognizesAccessKey="True" />
+                                            </Grid>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="HeaderRoot" Property="Background" Value="#172029" />
+                                                    <Setter TargetName="GlyphFrame" Property="BorderBrush" Value="{StaticResource ItemSelectedBorderBrush}" />
+                                                </Trigger>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter TargetName="Glyph" Property="Data" Value="M 5 10 L 8 7 L 11 10" />
+                                                    <Setter TargetName="GlyphFrame" Property="Background" Value="#14202A" />
+                                                    <Setter TargetName="GlyphFrame" Property="BorderBrush" Value="{StaticResource ItemSelectedBorderBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <ContentPresenter x:Name="ExpandSite"
+                                                  Grid.Row="1"
+                                                  ContentSource="Content"
+                                                  Visibility="Collapsed" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsExpanded" Value="True">
+                                    <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
 <TabControl Margin="16,0,0,0"
             TabStripPlacement="Top"
+            Style="{StaticResource SubTabControl}"
             Padding="0"
             SelectedIndex="{Binding SelectedGlobalWatchSectionIndex, Mode=TwoWay}"
             ItemContainerStyle="{StaticResource SubTabItem}">
@@ -881,8 +971,8 @@
             <TabItem Header="{DynamicResource Ui_Recommendations}">
 <Grid>
     <Grid.RowDefinitions>
-        <RowDefinition Height="*" />
-        <RowDefinition Height="14" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="10" />
         <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -890,26 +980,26 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="10" />
+                <RowDefinition Height="8" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="12" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="12" />
+                <RowDefinition Height="8" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="6" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="14" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="{DynamicResource Ui_ProfileRecommendations}"
-                               FontSize="20"
+                               FontSize="18"
                                FontWeight="SemiBold" />
                     <TextBlock Text="{DynamicResource Ui_RecommendationHint}"
                                Style="{StaticResource MutedText}"
-                               Margin="0,4,0,0"
+                               Margin="0,3,0,0"
                                TextWrapping="Wrap" />
                 </StackPanel>
                 <StackPanel Grid.Column="2"
@@ -980,31 +1070,27 @@
             <Grid Grid.Row="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Border Padding="10,0,10,6"
+                <Border Padding="32,0,10,5"
                         BorderBrush="{StaticResource BorderBrushSoft}"
                         BorderThickness="0,0,0,1">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="150" />
-                            <ColumnDefinition Width="196" />
-                            <ColumnDefinition Width="98" />
+                            <ColumnDefinition Width="152" />
+                            <ColumnDefinition Width="210" />
                             <ColumnDefinition Width="112" />
-                            <ColumnDefinition Width="168" />
+                            <ColumnDefinition Width="84" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="124" />
-                            <ColumnDefinition Width="132" />
+                            <ColumnDefinition Width="122" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource Ui_Exe}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="1" Text="{DynamicResource Ui_CurrentProfile}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="2" Text="{DynamicResource Ui_Suggested}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="3" Text="{DynamicResource Ui_Warnings}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="4" Text="{DynamicResource Ui_Reason}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="5" Text="{DynamicResource Ui_Path}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="6" Text="{DynamicResource Ui_FirstSeen}" Style="{StaticResource MutedText}" Margin="0,0,12,0" />
-                        <TextBlock Grid.Column="7" Text="{DynamicResource Ui_LastSeen}" Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{DynamicResource Ui_Exe}" Style="{StaticResource MutedText}" Margin="0,0,10,0" TextWrapping="NoWrap" />
+                        <TextBlock Grid.Column="1" Text="{DynamicResource Ui_CurrentProfile}" Style="{StaticResource MutedText}" Margin="0,0,10,0" TextWrapping="NoWrap" />
+                        <TextBlock Grid.Column="2" Text="{DynamicResource Ui_Suggested}" Style="{StaticResource MutedText}" Margin="0,0,10,0" TextWrapping="NoWrap" />
+                        <TextBlock Grid.Column="3" Text="{DynamicResource Ui_Warnings}" Style="{StaticResource MutedText}" Margin="0,0,10,0" TextWrapping="NoWrap" />
+                        <TextBlock Grid.Column="4" Text="{DynamicResource Ui_Reason}" Style="{StaticResource MutedText}" Margin="0,0,10,0" TextWrapping="NoWrap" />
+                        <TextBlock Grid.Column="5" Text="{DynamicResource Ui_LastSeen}" Style="{StaticResource MutedText}" TextWrapping="NoWrap" />
                     </Grid>
                 </Border>
 
@@ -1016,23 +1102,33 @@
                          Background="#11171C"
                          BorderThickness="0"
                          Foreground="{StaticResource TextBrush}"
+                         MinHeight="44"
+                         MaxHeight="300"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.CanContentScroll="False">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
+                            <Setter Property="MinHeight" Value="38" />
+                            <Setter Property="VerticalAlignment" Value="Top" />
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
                                         <Border x:Name="RecommendationRow"
-                                                Height="38"
-                                                Padding="10,0"
+                                                Padding="8,0"
                                                 Background="Transparent"
                                                 BorderBrush="Transparent"
                                                 BorderThickness="1"
                                                 VerticalAlignment="Top">
                                             <ContentPresenter HorizontalAlignment="Stretch"
-                                                              VerticalAlignment="Center" />
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsSelected" Value="True">
@@ -1050,55 +1146,104 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="150" />
-                                    <ColumnDefinition Width="196" />
-                                    <ColumnDefinition Width="98" />
-                                    <ColumnDefinition Width="112" />
-                                    <ColumnDefinition Width="168" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="124" />
-                                    <ColumnDefinition Width="132" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding ExeName}"
-                                           FontWeight="SemiBold"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding ExeName}" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding CurrentProfileText}"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding CurrentProfileText}" />
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding SuggestedProfileText}"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="3"
-                                           Text="{Binding WarningCountText}"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="4"
-                                           Text="{Binding Reason}"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding Reason}" />
-                                <TextBlock Grid.Column="5"
-                                           Text="{Binding PathText}"
-                                           FontFamily="Consolas"
-                                           FontSize="11"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding PathText}" />
-                                <TextBlock Grid.Column="6"
-                                           Text="{Binding FirstSeenText}"
-                                           Margin="0,0,12,0"
-                                           TextTrimming="CharacterEllipsis" />
-                                <TextBlock Grid.Column="7"
-                                           Text="{Binding LastSeenText}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </Grid>
+                            <Expander Style="{StaticResource RecommendationExpander}"
+                                      IsExpanded="False">
+                                <Expander.Header>
+                                    <Grid MinHeight="34">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="152" />
+                                            <ColumnDefinition Width="210" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="84" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="122" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding ExeName}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,0,10,0"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding ExeName}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding CurrentProfileText}"
+                                                   Margin="0,0,10,0"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding CurrentProfileText}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding SuggestedProfileText}"
+                                                   Margin="0,0,10,0"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding WarningCountText}"
+                                                   Margin="0,0,10,0"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="4"
+                                                   Text="{Binding Reason}"
+                                                   Margin="0,0,10,0"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Reason}" />
+                                        <TextBlock Grid.Column="5"
+                                                   Text="{Binding LastSeenText}"
+                                                   TextWrapping="NoWrap"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Expander.Header>
+                                <Border Padding="24,6,8,10"
+                                        Background="#12191F"
+                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                        BorderThickness="0,1,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="104" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="86" />
+                                            <ColumnDefinition Width="132" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="6" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="6" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Text="{DynamicResource Ui_Path}" Style="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Grid.ColumnSpan="3"
+                                                   Text="{Binding PathText}"
+                                                   FontFamily="Consolas"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource MutedBrush}"
+                                                   TextWrapping="Wrap"
+                                                   ToolTip="{Binding PathText}" />
+
+                                        <TextBlock Grid.Row="2" Text="{DynamicResource Ui_FirstSeen}" Style="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="1"
+                                                   Text="{Binding FirstSeenText}"
+                                                   TextWrapping="NoWrap" />
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="2"
+                                                   Text="{DynamicResource Ui_LastSeen}"
+                                                   Style="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="2"
+                                                   Grid.Column="3"
+                                                   Text="{Binding LastSeenText}"
+                                                   TextWrapping="NoWrap" />
+
+                                        <TextBlock Grid.Row="4" Text="{DynamicResource Ui_Details}" Style="{StaticResource MutedText}" />
+                                        <TextBlock Grid.Row="4"
+                                                   Grid.Column="1"
+                                                   Grid.ColumnSpan="3"
+                                                   Text="{Binding DisplayText}"
+                                                   TextWrapping="Wrap" />
+                                    </Grid>
+                                </Border>
+                            </Expander>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

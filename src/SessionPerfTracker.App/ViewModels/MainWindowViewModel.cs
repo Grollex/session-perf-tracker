@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using SessionPerfTracker.App.Services;
 using SessionPerfTracker.Domain.Metrics;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
@@ -45,6 +46,21 @@ public sealed class DestructiveProcessActionConfirmationEventArgs : EventArgs
     public bool IsConfirmed { get; set; }
 }
 
+public sealed class SelfUninstallConfirmationEventArgs : EventArgs
+{
+    public SelfUninstallConfirmationEventArgs(
+        string title,
+        string message)
+    {
+        Title = title;
+        Message = message;
+    }
+
+    public string Title { get; }
+    public string Message { get; }
+    public bool IsConfirmed { get; set; }
+}
+
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     private const double AvgCpuBudgetPercent = 2;
@@ -57,13 +73,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private const int SessionsTabIndex = 2;
     private const int SessionDetailsTabIndex = 3;
     private const int SettingsTabIndex = 5;
-    private const int SettingsFeedbackTabIndex = 4;
+    private const int SettingsLanguageTabIndex = 4;
+    private const int SettingsFeedbackTabIndex = 5;
     private const int GlobalWatchOverviewSectionIndex = 0;
     private const int GlobalWatchJournalSectionIndex = 1;
     private const int GlobalWatchRecommendationsSectionIndex = 2;
     private const int GlobalWatchSuspiciousSectionIndex = 3;
     private const int GlobalWatchJournalUiLimit = 120;
-    private static readonly TimeSpan GlobalWatchJournalCooldown = TimeSpan.FromSeconds(60);
     private string TargetModeRunningProcess => GetText("Ui_RunningProcess");
     private string TargetModeAssignedApps => GetText("Ui_AssignedAppsProfiles");
     private string TargetModeExecutable => GetText("Ui_ManualExecutableLaunch");
@@ -99,16 +115,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IProcessControlService _processControlService;
     private readonly IExportService _exportService;
     private readonly IUpdateService _updateService;
+    private readonly GlobalWatchJournalCoordinator _globalWatchJournalCoordinator;
+    private readonly ProfileRecommendationCoordinator _profileRecommendationCoordinator;
+    private readonly ProcessBanCoordinator _processBanCoordinator;
+    private readonly FeedbackReportService _feedbackReportService;
+    private readonly SelfUninstallService _selfUninstallService;
+    private readonly UpdateStatusFormatter _updateStatusFormatter;
+    private readonly HealthStatusCoordinator _healthStatusCoordinator;
     private string GetText(string key) => Application.Current.TryFindResource(key) as string ?? key;
     private string FormatText(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, GetText(key), args);
     private readonly string _defaultExportDirectory;
     private readonly string _updateDownloadDirectory;
     private readonly List<SelfMonitoringSample> _selfMonitoringSamples = [];
     private readonly List<GlobalProcessRowViewModel> _allGlobalProcessRows = [];
-    private readonly Dictionary<string, List<DateTimeOffset>> _globalWatchOverLimitWarnings = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, DateTimeOffset> _globalWatchJournalLastEntryByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _runningSuspiciousPaths = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _runningBannedPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _globalWatchScanLock = new(1, 1);
     private SessionListItemViewModel? _selectedSession;
     private SessionListItemViewModel? _compareLeft;
@@ -168,6 +188,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _bugReportText = string.Empty;
     private string _featureFeedbackText = string.Empty;
     private string _feedbackStatusText = UiText.Get("Ui_NoFeedbackSaved");
+    private string _selfUninstallStatusText = string.Empty;
     private bool _includeLatestSessionInFeedback = true;
     private bool _includeScreenshotInFeedback;
     private string _liveAssignmentStatusText = "select target";
@@ -219,13 +240,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _captureRam = true;
     private bool _captureDiskRead = true;
     private bool _captureDiskWrite = true;
-    private bool _automaticallyCheckForUpdates;
-    private bool _automaticallyInstallUpdatesOnStartup = true;
+    private bool _automaticallyCheckForUpdates = true;
+    private bool _automaticallyInstallUpdatesOnStartup;
     private bool _isCheckingForUpdates;
     private bool _isUpdateAvailable;
     private bool _isUpdateRestartRequested;
     private bool _minimizeToTrayOnClose = true;
-    private bool _startWithWindows = true;
+    private bool _startWithWindows;
     private bool _startMinimizedToTray = true;
     private bool _trustExplainerDismissed;
     private bool _globalWatchOnlyOverLimit;
@@ -252,8 +273,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public event EventHandler<UpdateAvailablePromptEventArgs>? UpdateAvailablePromptRequested;
     public event EventHandler<DestructiveProcessActionConfirmationEventArgs>? DestructiveProcessActionConfirmationRequested;
+    public event EventHandler<SelfUninstallConfirmationEventArgs>? SelfUninstallConfirmationRequested;
     public event EventHandler? UpdateInstallerLaunched;
     public event EventHandler? LanguageRestartRequested;
+    public event EventHandler? SelfUninstallLaunched;
 
     public MainWindowViewModel(
         ISessionStore sessionStore,
@@ -283,6 +306,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _processControlService = processControlService;
         _exportService = exportService;
         _updateService = updateService;
+        _globalWatchJournalCoordinator = new GlobalWatchJournalCoordinator();
+        _profileRecommendationCoordinator = new ProfileRecommendationCoordinator(_globalWatchJournalCoordinator);
+        _processBanCoordinator = new ProcessBanCoordinator(processControlService);
+        _feedbackReportService = new FeedbackReportService();
+        _selfUninstallService = new SelfUninstallService();
+        _updateStatusFormatter = new UpdateStatusFormatter(GetText, FormatText);
+        _healthStatusCoordinator = new HealthStatusCoordinator(StartupRegistryValueName, GetText, FormatText);
         _defaultExportDirectory = defaultExportDirectory;
         _updateDownloadDirectory = updateDownloadDirectory;
         _exportDirectoryText = defaultExportDirectory;
@@ -311,8 +341,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _selectedProcessBanDurationOption = ProcessBanDurationOptions[1];
         LanguageOptions =
         [
-            new LanguageOptionViewModel(LocalizationManager.Russian, GetText("Ui_LanguageRussian")),
-            new LanguageOptionViewModel(LocalizationManager.English, GetText("Ui_LanguageEnglish"))
+            new LanguageOptionViewModel(LocalizationManager.English, GetText("Ui_LanguageEnglish")),
+            new LanguageOptionViewModel(LocalizationManager.Russian, GetText("Ui_LanguageRussian"))
         ];
         _selectedLanguageOption = LanguageOptions[0];
     }
@@ -345,6 +375,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _suspiciousWatchStatusText = GetText("Ui_SuspiciousWatchStatusDefault");
         _processBanStatusText = GetText("Ui_ProcessBanStatusDefault");
         _languageSettingsStatusText = GetText("Ui_LanguageSettingsLoaded");
+        _selfUninstallStatusText = GetText("Ui_SelfUninstallReady");
         _selfCpuBudgetStatusText = GetText("Ui_StatusUnknown");
         _selfRamBudgetStatusText = GetText("Ui_StatusUnknown");
         _selfWritesBudgetStatusText = GetText("Ui_StatusConfigured");
@@ -790,6 +821,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         private set => SetProperty(ref _languageSettingsStatusText, value);
     }
 
+    public string SelfUninstallStatusText
+    {
+        get => _selfUninstallStatusText;
+        private set => SetProperty(ref _selfUninstallStatusText, value);
+    }
+
     public string StoragePath
     {
         get => _storagePath;
@@ -1030,7 +1067,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public string FeedbackDirectoryText => GetFeedbackDirectory();
+    public string FeedbackDirectoryText => _feedbackReportService.GetFeedbackDirectory();
 
     public bool IncludeLatestSessionInFeedback
     {
@@ -1873,6 +1910,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StartSelfMonitoring();
         StartGlobalWatch();
         _ = AutoInstallUpdatesOnStartupAsync(thresholds.Updates, cancellationToken);
+    }
+
+    public void ReportStartupInitializationFailure(Exception error)
+    {
+        var message = FormatText("Ui_StartupInitializationFailedStatus", error.Message);
+        StorageStatusText = message;
+        ThresholdSettingsStatusText = message;
+        UpdateStatusText = message;
+        NotifyHealthCheckProperties();
     }
 
     public void Shutdown()

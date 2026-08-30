@@ -224,8 +224,8 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
 
         return settings with
         {
-            LanguageCode = languageCode.Equals("en-US", StringComparison.OrdinalIgnoreCase)
-                ? "en-US"
+            LanguageCode = languageCode.Equals("ru-RU", StringComparison.OrdinalIgnoreCase)
+                ? "ru-RU"
                 : AppLanguageSettings.DefaultLanguageCode
         };
     }

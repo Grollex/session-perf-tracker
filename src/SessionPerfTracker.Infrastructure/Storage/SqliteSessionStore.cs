@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
@@ -8,6 +9,11 @@ namespace SessionPerfTracker.Infrastructure.Storage;
 
 public sealed class SqliteSessionStore : ISessionStore
 {
+    private const string LegacyImportCompletedKey = "legacy_sessions_import_completed";
+    private const string LegacyImportPathKey = "legacy_sessions_import_path";
+    private const string LegacyImportCompletedAtKey = "legacy_sessions_import_completed_at";
+    private const string LegacyImportFailureKey = "legacy_sessions_import_last_failure";
+
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = false,
@@ -139,7 +145,16 @@ public sealed class SqliteSessionStore : ISessionStore
             Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
             await using var connection = await OpenConnectionAsync(cancellationToken);
             await CreateSchemaAsync(connection, cancellationToken);
-            await ImportLegacyJsonIfNeededAsync(connection, cancellationToken);
+            try
+            {
+                await ImportLegacyJsonIfNeededAsync(connection, cancellationToken);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                Trace.TraceWarning("Legacy Session Perf Tracker session import failed: {0}", error);
+                await TryRecordLegacyImportFailureAsync(connection, error, cancellationToken);
+            }
+
             _initialized = true;
         }
         finally
@@ -155,12 +170,18 @@ public sealed class SqliteSessionStore : ISessionStore
             return;
         }
 
+        if (await IsLegacyImportCompletedAsync(connection, cancellationToken))
+        {
+            return;
+        }
+
         await using (var countCommand = connection.CreateCommand())
         {
             countCommand.CommandText = "SELECT COUNT(*) FROM sessions;";
             var count = (long)(await countCommand.ExecuteScalarAsync(cancellationToken) ?? 0L);
             if (count > 0)
             {
+                await MarkLegacyImportCompletedAsync(connection, transaction: null, cancellationToken);
                 return;
             }
         }
@@ -172,6 +193,7 @@ public sealed class SqliteSessionStore : ISessionStore
             cancellationToken);
         if (legacy?.Sessions.Count is not > 0)
         {
+            await MarkLegacyImportCompletedAsync(connection, transaction: null, cancellationToken);
             return;
         }
 
@@ -181,7 +203,48 @@ public sealed class SqliteSessionStore : ISessionStore
             await SaveSessionCoreAsync(connection, transaction, session, cancellationToken);
         }
 
+        await MarkLegacyImportCompletedAsync(connection, transaction, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task<bool> IsLegacyImportCompletedAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT value FROM storage_metadata WHERE key = $key LIMIT 1;";
+        command.Parameters.AddWithValue("$key", LegacyImportCompletedKey);
+        var value = await command.ExecuteScalarAsync(cancellationToken) as string;
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task MarkLegacyImportCompletedAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        var completedAt = DateTimeOffset.UtcNow.ToString("O");
+        await UpsertStorageMetadataAsync(connection, transaction, LegacyImportCompletedKey, "true", cancellationToken);
+        await UpsertStorageMetadataAsync(connection, transaction, LegacyImportCompletedAtKey, completedAt, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(_legacyJsonPath))
+        {
+            await UpsertStorageMetadataAsync(connection, transaction, LegacyImportPathKey, _legacyJsonPath, cancellationToken);
+        }
+    }
+
+    private static async Task TryRecordLegacyImportFailureAsync(
+        SqliteConnection connection,
+        Exception error,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var message = $"{DateTimeOffset.UtcNow:O} {error.GetType().Name}: {error.Message}";
+            await UpsertStorageMetadataAsync(connection, transaction: null, LegacyImportFailureKey, message, cancellationToken);
+        }
+        catch
+        {
+        }
     }
 
     private async Task<SessionRecord?> LoadSessionAsync(
@@ -530,6 +593,11 @@ public sealed class SqliteSessionStore : ISessionStore
             );
 
             CREATE INDEX IF NOT EXISTS ix_event_context_session ON event_context_snapshots(session_id);
+
+            CREATE TABLE IF NOT EXISTS storage_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """, cancellationToken);
     }
 
@@ -548,6 +616,29 @@ public sealed class SqliteSessionStore : ISessionStore
     {
         await using var command = connection.CreateCommand();
         command.CommandText = commandText;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task UpsertStorageMetadataAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction? transaction,
+        string key,
+        string value,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        if (transaction is not null)
+        {
+            command.Transaction = (SqliteTransaction)transaction;
+        }
+
+        command.CommandText = """
+            INSERT INTO storage_metadata (key, value)
+            VALUES ($key, $value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """;
+        command.Parameters.AddWithValue("$key", key);
+        command.Parameters.AddWithValue("$value", value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

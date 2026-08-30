@@ -13,7 +13,7 @@ public static class LocalizationManager
     {
         if (string.IsNullOrWhiteSpace(languageCode))
         {
-            return Russian;
+            return English;
         }
 
         languageCode = languageCode.Trim();
@@ -23,7 +23,13 @@ public static class LocalizationManager
             return English;
         }
 
-        return Russian;
+        if (languageCode.Equals("ru", StringComparison.OrdinalIgnoreCase)
+            || languageCode.Equals(Russian, StringComparison.OrdinalIgnoreCase))
+        {
+            return Russian;
+        }
+
+        return English;
     }
 
     public static void ApplyLanguage(string? languageCode)

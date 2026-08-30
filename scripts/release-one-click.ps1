@@ -222,6 +222,50 @@ function Save-StoredReleaseVersion {
     Set-Content -LiteralPath $versionFile -Value $ReleasedVersion -Encoding ASCII
 }
 
+function Prepare-GitReleaseSource {
+    param(
+        [Parameter(Mandatory = $true)][string]$Tag,
+        [Parameter(Mandatory = $true)][string]$Version
+    )
+
+    $gitPath = Get-CommandPathOrNull "git"
+    if (-not $gitPath) {
+        return
+    }
+
+    $insideGit = (Invoke-NativeQuiet "git" "rev-parse" "--is-inside-work-tree") -eq 0
+    if (-not $insideGit) {
+        return
+    }
+
+    $trackedStatus = & git status --porcelain --untracked-files=no
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not inspect git status before publishing $Tag."
+    }
+
+    $dirtyOutsideVersion = @($trackedStatus | Where-Object {
+        $path = $_.Substring(3).Trim()
+        $path -ne "VERSION"
+    })
+    if ($dirtyOutsideVersion.Count -gt 0) {
+        throw "Tracked files other than VERSION are dirty. Commit or stash tracked changes before publishing $Tag."
+    }
+
+    $versionDiff = Invoke-NativeQuiet "git" "diff" "--quiet" "--" "VERSION"
+    if ($versionDiff -ne 0) {
+        Write-Host "Committing VERSION bump for $Version..." -ForegroundColor Cyan
+        & git add -- VERSION
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not stage VERSION."
+        }
+
+        & git commit -m "Bump release version to $Version"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not commit VERSION bump for $Version."
+        }
+    }
+}
+
 Add-LocalToolPaths
 
 $normalizedVersion = Normalize-ReleaseVersion $Version
@@ -256,6 +300,7 @@ while (-not $normalizedVersion) {
 }
 
 $Version = $normalizedVersion
+Save-StoredReleaseVersion $Version
 
 if ([string]::IsNullOrWhiteSpace($ReleaseNotes)) {
     $ReleaseNotes = "Session Perf Tracker $Version"
@@ -312,6 +357,7 @@ $publishedReleaseUrl = "https://github.com/$repository/releases/tag/$tag"
 
 if (-not $SkipUpload) {
     Ensure-GitHubCliAuth
+    Prepare-GitReleaseSource -Tag $tag -Version $Version
     Publish-GitHubRelease `
         -Tag $tag `
         -Version $Version `
@@ -321,8 +367,6 @@ if (-not $SkipUpload) {
         -ReleaseNotes $ReleaseNotes `
         -Repository $repository
 }
-
-Save-StoredReleaseVersion $Version
 
 Write-Host ""
 Write-Host "Release files are ready:" -ForegroundColor Green

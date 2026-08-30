@@ -477,6 +477,37 @@
             <Setter Property="BorderThickness" Value="0" />
         </Style>
 
+        <Style x:Key="SubTabControl" TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="ClipToBounds" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid ClipToBounds="False"
+                              KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabPanel x:Name="HeaderPanel"
+                                      Grid.Row="0"
+                                      Margin="0,5,0,8"
+                                      IsItemsHost="True"
+                                      ClipToBounds="False"
+                                      KeyboardNavigation.TabIndex="1"
+                                      Panel.ZIndex="1" />
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Grid.Row="1"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                              KeyboardNavigation.TabIndex="2"
+                                              KeyboardNavigation.TabNavigation="Local" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="Background" Value="Transparent" />
@@ -532,49 +563,38 @@
 
         <Style x:Key="SubTabItem" TargetType="TabItem">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#11171C" />
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="Padding" Value="18,11" />
-            <Setter Property="Margin" Value="0,0,12,14" />
-            <Setter Property="MinWidth" Value="148" />
-            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+            <Setter Property="MinWidth" Value="128" />
+            <Setter Property="MinHeight" Value="34" />
             <Setter Property="FontSize" Value="12" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="UseLayoutRounding" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="TabBorder"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="7"
+                                BorderThickness="0,0,0,2"
+                                CornerRadius="0"
+                                MinHeight="{TemplateBinding MinHeight}"
                                 Padding="{TemplateBinding Padding}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="4" />
-                                    <ColumnDefinition Width="12" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border x:Name="SelectedStripe"
-                                        Width="4"
-                                        CornerRadius="2"
-                                        Background="Transparent" />
-                                <ContentPresenter Grid.Column="2"
-                                                  ContentSource="Header"
+                            <ContentPresenter ContentSource="Header"
                                                   RecognizesAccessKey="True"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   SnapsToDevicePixels="True" />
-                            </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource TabHoverBrush}" />
-                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#26323B" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="{StaticResource TabSelectedBrush}" />
+                                <Setter TargetName="TabBorder" Property="Background" Value="Transparent" />
                                 <Setter TargetName="TabBorder" Property="BorderBrush" Value="{StaticResource ItemSelectedBorderBrush}" />
-                                <Setter TargetName="SelectedStripe" Property="Background" Value="{StaticResource ItemSelectedBorderBrush}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">

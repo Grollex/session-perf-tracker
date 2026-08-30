@@ -2,10 +2,9 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Net.Http;
-using System.Text;
 using System.Windows;
 using Microsoft.Win32;
+using SessionPerfTracker.App.Services;
 using SessionPerfTracker.Domain.Metrics;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
@@ -18,13 +17,7 @@ namespace SessionPerfTracker.App.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
-    private const string FeedbackNtfyTopic = "spt-grollex-feedback-8f3d7c2a51b44e6ca9d0";
     private const string StartupRegistryValueName = "Session Perf Tracker";
-    private static readonly Uri FeedbackNtfyUri = new($"https://ntfy.sh/{FeedbackNtfyTopic}");
-    private static readonly HttpClient FeedbackHttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(12)
-    };
 
     public async Task SaveThresholdSettingsAsync(CancellationToken cancellationToken = default)
     {
@@ -47,73 +40,34 @@ public sealed partial class MainWindowViewModel
         ThresholdSettingsStatusText = "Global fallback saved.";
     }
 
-    public string HealthAutostartStatusText
-    {
-        get
-        {
-            if (!StartWithWindows)
-            {
-                return GetText("Ui_HealthAutostartDisabled");
-            }
+    public string HealthAutostartStatusText =>
+        _healthStatusCoordinator.FormatAutostartStatus(StartWithWindows);
 
-            var registered = TryGetStartupRegistryValue(out var value);
-            return registered
-                ? FormatText("Ui_HealthAutostartEnabled", value)
-                : GetText("Ui_HealthAutostartMismatch");
-        }
-    }
-
-    public string HealthUpdateStatusText
-    {
-        get
-        {
-            var mode = AutomaticallyCheckForUpdates
-                ? AutomaticallyInstallUpdatesOnStartup
-                    ? GetText("Ui_HealthUpdateAutoInstall")
-                    : GetText("Ui_HealthUpdateAutoCheck")
-                : GetText("Ui_HealthUpdateManual");
-            return $"{mode} {UpdateStatusText}";
-        }
-    }
+    public string HealthUpdateStatusText =>
+        _healthStatusCoordinator.FormatUpdateStatus(
+            AutomaticallyCheckForUpdates,
+            AutomaticallyInstallUpdatesOnStartup,
+            UpdateStatusText);
 
     public string HealthFeedbackStatusText
     {
         get
         {
             var delivery = FeedbackDeliveryHistory.FirstOrDefault();
-            return delivery is null
-                ? FeedbackStatusText
-                : FormatText("Ui_HealthFeedbackLastDelivery", delivery.TimestampText, delivery.Status);
+            return _healthStatusCoordinator.FormatFeedbackStatus(
+                FeedbackStatusText,
+                delivery is null ? null : new FeedbackDeliverySnapshot(delivery.TimestampText, delivery.Status));
         }
     }
 
-    public string HealthStorageStatusText
-    {
-        get
-        {
-            var directory = ResolveStorageDirectory();
-            if (string.IsNullOrWhiteSpace(directory))
-            {
-                return GetText("Ui_HealthStorageUnknown");
-            }
+    public string HealthStorageStatusText =>
+        _healthStatusCoordinator.FormatStorageStatus(StoragePath);
 
-            try
-            {
-                Directory.CreateDirectory(directory);
-                return FormatText("Ui_HealthStorageAvailable", directory);
-            }
-            catch (Exception error)
-            {
-                return FormatText("Ui_HealthStorageUnavailable", error.Message);
-            }
-        }
-    }
+    public string HealthVersionStatusText =>
+        _healthStatusCoordinator.FormatVersionStatus(CurrentVersionText);
 
-    public string HealthVersionStatusText => FormatText("Ui_HealthVersionStatus", CurrentVersionText);
-
-    public string HealthLastGlobalWatchScanText => _lastSuccessfulGlobalWatchScanAt is null
-        ? GetText("Ui_HealthNoGlobalWatchScan")
-        : FormatText("Ui_HealthLastGlobalWatchScan", _lastSuccessfulGlobalWatchScanAt.Value.ToLocalTime());
+    public string HealthLastGlobalWatchScanText =>
+        _healthStatusCoordinator.FormatLastGlobalWatchScan(_lastSuccessfulGlobalWatchScanAt);
 
     private void NotifyHealthCheckProperties()
     {
@@ -123,41 +77,6 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HealthStorageStatusText));
         OnPropertyChanged(nameof(HealthVersionStatusText));
         OnPropertyChanged(nameof(HealthLastGlobalWatchScanText));
-    }
-
-    private static bool TryGetStartupRegistryValue(out string value)
-    {
-        value = string.Empty;
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
-            value = key?.GetValue(StartupRegistryValueName) as string ?? string.Empty;
-            return !string.IsNullOrWhiteSpace(value);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private string ResolveStorageDirectory()
-    {
-        if (string.IsNullOrWhiteSpace(StoragePath))
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var path = Path.GetFullPath(StoragePath);
-            return Path.HasExtension(path)
-                ? Path.GetDirectoryName(path) ?? string.Empty
-                : path;
-        }
-        catch
-        {
-            return string.Empty;
-        }
     }
 
     public async Task SaveAntiNoiseSettingsAsync(CancellationToken cancellationToken = default)
@@ -242,6 +161,47 @@ public sealed partial class MainWindowViewModel
 
         LanguageSettingsStatusText = GetText("Ui_LanguageSavedRestarting");
         LanguageRestartRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    public Task RequestSelfUninstallAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var uninstaller = _selfUninstallService.FindUninstaller();
+        if (uninstaller is null)
+        {
+            SelfUninstallStatusText = GetText("Ui_SelfUninstallUnavailable");
+            return Task.CompletedTask;
+        }
+
+        var handler = SelfUninstallConfirmationRequested;
+        if (handler is null)
+        {
+            SelfUninstallStatusText = GetText("Ui_SelfUninstallUnavailable");
+            return Task.CompletedTask;
+        }
+
+        var confirmation = new SelfUninstallConfirmationEventArgs(
+            GetText("Ui_SelfUninstallConfirmTitle"),
+            FormatText("Ui_SelfUninstallConfirmMessage", uninstaller.FullName));
+        handler(this, confirmation);
+        if (!confirmation.IsConfirmed)
+        {
+            SelfUninstallStatusText = GetText("Ui_SelfUninstallCancelled");
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            _selfUninstallService.LaunchUninstaller(uninstaller);
+            SelfUninstallStatusText = GetText("Ui_SelfUninstallLaunched");
+            SelfUninstallLaunched?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception error)
+        {
+            SelfUninstallStatusText = FormatText("Ui_SelfUninstallFailed", error.Message);
+        }
+
+        return Task.CompletedTask;
     }
 
     public async Task SaveSelectedProfileAsync(CancellationToken cancellationToken = default)
@@ -572,26 +532,35 @@ public sealed partial class MainWindowViewModel
         CancellationToken cancellationToken = default)
     {
         var feedbackText = BugReportText.Trim();
-        var path = await SaveFeedbackAsync("bug-report", BugReportText, screenshotPath, cancellationToken);
+        var context = CreateFeedbackReportContext();
+        var path = await _feedbackReportService.SaveAsync(
+            "bug-report",
+            BugReportText,
+            screenshotPath,
+            context,
+            IncludeLatestSessionInFeedback,
+            cancellationToken);
         if (string.IsNullOrWhiteSpace(path))
         {
-            FeedbackStatusText = "Describe the bug before saving a report.";
+            FeedbackStatusText = GetText("Ui_BugReportEmpty");
             return;
         }
 
-        var delivery = await TrySendFeedbackAsync(
+        var delivery = await _feedbackReportService.TrySendAsync(
             "Bug report",
             "warning,bug",
             "bug-report",
             feedbackText,
             screenshotPath,
+            context,
+            IncludeLatestSessionInFeedback,
             cancellationToken);
 
-        AddFeedbackDeliveryHistory("Bug report", delivery.Sent, path, delivery.Error);
+        AddFeedbackDeliveryHistory(GetText("Ui_FeedbackKindBugReport"), delivery.Sent, path, delivery.Error);
         BugReportText = string.Empty;
         FeedbackStatusText = delivery.Sent
-            ? $"Bug report saved and sent: {path}"
-            : $"Bug report saved locally, but could not be sent: {path}";
+            ? GetText("Ui_FeedbackThanksSent")
+            : FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"));
     }
 
     public async Task SaveFeatureFeedbackAsync(
@@ -599,38 +568,42 @@ public sealed partial class MainWindowViewModel
         CancellationToken cancellationToken = default)
     {
         var feedbackText = FeatureFeedbackText.Trim();
-        var path = await SaveFeedbackAsync("feature-idea", FeatureFeedbackText, screenshotPath, cancellationToken);
+        var context = CreateFeedbackReportContext();
+        var path = await _feedbackReportService.SaveAsync(
+            "feature-idea",
+            FeatureFeedbackText,
+            screenshotPath,
+            context,
+            IncludeLatestSessionInFeedback,
+            cancellationToken);
         if (string.IsNullOrWhiteSpace(path))
         {
-            FeedbackStatusText = "Write an idea or suggestion before saving feedback.";
+            FeedbackStatusText = GetText("Ui_FeatureFeedbackEmpty");
             return;
         }
 
-        var delivery = await TrySendFeedbackAsync(
+        var delivery = await _feedbackReportService.TrySendAsync(
             "Feature idea",
             "bulb,sparkles",
             "feature-idea",
             feedbackText,
             screenshotPath,
+            context,
+            IncludeLatestSessionInFeedback,
             cancellationToken);
 
-        AddFeedbackDeliveryHistory("Feature idea", delivery.Sent, path, delivery.Error);
+        AddFeedbackDeliveryHistory(GetText("Ui_FeedbackKindFeatureIdea"), delivery.Sent, path, delivery.Error);
         FeatureFeedbackText = string.Empty;
         FeedbackStatusText = delivery.Sent
-            ? $"Feature idea saved and sent: {path}"
-            : $"Feature idea saved locally, but could not be sent: {path}";
+            ? GetText("Ui_FeedbackThanksSent")
+            : FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"));
     }
 
     public Task OpenFeedbackDirectoryAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var directory = GetFeedbackDirectory();
-        Directory.CreateDirectory(directory);
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = directory,
-            UseShellExecute = true
-        });
+        var directory = _feedbackReportService.GetFeedbackDirectory();
+        _feedbackReportService.OpenFeedbackDirectory();
         FeedbackStatusText = $"Opened feedback folder: {directory}";
         return Task.CompletedTask;
     }
@@ -638,7 +611,7 @@ public sealed partial class MainWindowViewModel
     public Task OpenLatestFeedbackReportAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var latest = FindLatestFeedbackReport();
+        var latest = _feedbackReportService.FindLatestReport();
         if (latest is null)
         {
             FeedbackStatusText = "No saved feedback report found.";
@@ -656,7 +629,7 @@ public sealed partial class MainWindowViewModel
 
     public async Task CopyLatestFeedbackReportAsync(CancellationToken cancellationToken = default)
     {
-        var latest = FindLatestFeedbackReport();
+        var latest = _feedbackReportService.FindLatestReport();
         if (latest is null)
         {
             FeedbackStatusText = "No saved feedback report found.";
@@ -712,7 +685,7 @@ public sealed partial class MainWindowViewModel
                 _updateDownloadDirectory,
                 cancellationToken);
             DownloadedUpdateInstallerPath = installerPath;
-            UpdateStatusText = HasSha256(_availableUpdateManifest)
+            UpdateStatusText = UpdateStatusFormatter.HasSha256(_availableUpdateManifest)
                 ? FormatText("Ui_UpdateInstallerDownloadedShaVerified", installerPath)
                 : FormatText("Ui_UpdateInstallerDownloadedNoShaLocal", installerPath);
             await _updateService.LaunchInstallerAsync(installerPath, cancellationToken);
@@ -726,7 +699,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            UpdateStatusText = FormatText("Ui_UpdateInstallLaunchFailed", FormatUpdateError(error));
+            UpdateStatusText = FormatText("Ui_UpdateInstallLaunchFailed", _updateStatusFormatter.FormatError(error));
         }
         finally
         {
@@ -931,150 +904,6 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private async Task<string?> SaveFeedbackAsync(
-        string kind,
-        string text,
-        string? screenshotPath,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
-        var directory = GetFeedbackDirectory();
-        Directory.CreateDirectory(directory);
-        var timestamp = DateTimeOffset.Now;
-        var fileName = $"{timestamp:yyyyMMdd_HHmmss}_{kind}.md";
-        var path = Path.Combine(directory, fileName);
-        var content = BuildFeedbackReport(
-            kind,
-            text.Trim(),
-            timestamp,
-            includePrivateSystemInfo: true,
-            screenshotPath: screenshotPath,
-            includeLatestSession: IncludeLatestSessionInFeedback);
-        await File.WriteAllTextAsync(path, content, cancellationToken);
-        PruneFeedbackScreenshots(directory);
-        return path;
-    }
-
-    private static void PruneFeedbackScreenshots(string directory)
-    {
-        const int maxScreenshotFiles = 40;
-        var oldestAllowed = DateTimeOffset.Now.AddDays(-30);
-
-        try
-        {
-            var screenshots = Directory
-                .EnumerateFiles(directory, "*_screenshot.png", SearchOption.TopDirectoryOnly)
-                .Select(path => new FileInfo(path))
-                .Where(file => file.Exists)
-                .OrderByDescending(file => file.LastWriteTimeUtc)
-                .ToArray();
-
-            foreach (var file in screenshots
-                         .Where(file => file.LastWriteTimeUtc < oldestAllowed.UtcDateTime)
-                         .Concat(screenshots.Skip(maxScreenshotFiles))
-                         .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    file.Delete();
-                }
-                catch
-                {
-                    // Feedback cleanup must never block saving or sending a report.
-                }
-            }
-        }
-        catch
-        {
-        }
-    }
-
-    private async Task<FeedbackDeliveryResult> TrySendFeedbackAsync(
-        string title,
-        string tags,
-        string kind,
-        string text,
-        string? screenshotPath,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var report = BuildFeedbackReport(
-                kind,
-                text,
-                DateTimeOffset.Now,
-                includePrivateSystemInfo: false,
-                screenshotPath: screenshotPath is null ? null : Path.GetFileName(screenshotPath),
-                includeLatestSession: IncludeLatestSessionInFeedback);
-            using var request = new HttpRequestMessage(HttpMethod.Post, FeedbackNtfyUri)
-            {
-                Content = new StringContent(report, Encoding.UTF8, "text/plain")
-            };
-            request.Headers.TryAddWithoutValidation("Title", $"Session Perf Tracker: {title}");
-            request.Headers.TryAddWithoutValidation("Tags", tags);
-            request.Headers.TryAddWithoutValidation("Priority", kind == "bug-report" ? "4" : "3");
-            request.Headers.TryAddWithoutValidation("Markdown", "yes");
-
-            using var response = await FeedbackHttpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return new FeedbackDeliveryResult(false, $"Remote service returned {(int)response.StatusCode} {response.ReasonPhrase}.");
-            }
-
-            if (string.IsNullOrWhiteSpace(screenshotPath))
-            {
-                return new FeedbackDeliveryResult(true, null);
-            }
-
-            var attachment = await TrySendFeedbackAttachmentAsync(screenshotPath, kind, cancellationToken);
-            return attachment.Sent
-                ? new FeedbackDeliveryResult(true, null)
-                : attachment;
-        }
-        catch (Exception error)
-        {
-            return new FeedbackDeliveryResult(false, error.Message);
-        }
-    }
-
-    private static async Task<FeedbackDeliveryResult> TrySendFeedbackAttachmentAsync(
-        string screenshotPath,
-        string kind,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (!File.Exists(screenshotPath))
-            {
-                return new FeedbackDeliveryResult(false, "Screenshot attachment file was not found.");
-            }
-
-            await using var stream = File.OpenRead(screenshotPath);
-            using var request = new HttpRequestMessage(HttpMethod.Put, FeedbackNtfyUri)
-            {
-                Content = new StreamContent(stream)
-            };
-            request.Headers.TryAddWithoutValidation("Title", $"Session Perf Tracker: {kind} screenshot");
-            request.Headers.TryAddWithoutValidation("Tags", "camera");
-            request.Headers.TryAddWithoutValidation("Priority", "3");
-            request.Headers.TryAddWithoutValidation("Filename", Path.GetFileName(screenshotPath));
-            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-
-            using var response = await FeedbackHttpClient.SendAsync(request, cancellationToken);
-            return response.IsSuccessStatusCode
-                ? new FeedbackDeliveryResult(true, null)
-                : new FeedbackDeliveryResult(false, $"Screenshot upload returned {(int)response.StatusCode} {response.ReasonPhrase}.");
-        }
-        catch (Exception error)
-        {
-            return new FeedbackDeliveryResult(false, error.Message);
-        }
-    }
-
     private void AddFeedbackDeliveryHistory(string kind, bool sent, string localPath, string? error)
     {
         FeedbackDeliveryHistory.Insert(
@@ -1090,106 +919,20 @@ public sealed partial class MainWindowViewModel
         NotifyHealthCheckProperties();
     }
 
-    private string BuildFeedbackReport(
-        string kind,
-        string text,
-        DateTimeOffset timestamp,
-        bool includePrivateSystemInfo,
-        string? screenshotPath,
-        bool includeLatestSession)
-    {
-        var lines = new List<string>
-        {
-            $"# Session Perf Tracker {kind}",
-            "",
-            $"Created: {timestamp:yyyy-MM-dd HH:mm:ss zzz}",
-            $"Version: {CurrentVersionText}",
-            $"OS: {Environment.OSVersion}",
-            $"Storage: {StoragePath}",
-            $"Selected tab: {SelectedTabIndex}",
-            $"Recording: {IsRecording}",
-            $"Live target: {LiveSessionTargetText}",
-            $"Live status: {LiveSessionStateText}",
-            $"Capture: {LiveConfigCollectorsText}",
-            $"Session profile: {ActiveThresholdSourceText}",
-            $"Storage status: {StorageStatusText}",
-            $"Export status: {ExportStatusText}",
-            $"Update status: {UpdateStatusText}",
-            "",
-            "## User text",
-            "",
-            text,
-            "",
-            "## Recent live warning",
-            "",
-            string.IsNullOrWhiteSpace(LiveWarningText) ? "None" : LiveWarningText
-        };
-
-        if (!string.IsNullOrWhiteSpace(screenshotPath))
-        {
-            lines.Add("");
-            lines.Add("## Screenshot");
-            lines.Add("");
-            lines.Add(screenshotPath);
-        }
-
-        if (includeLatestSession && _allSessionItems.FirstOrDefault() is { } latestSession)
-        {
-            lines.Add("");
-            lines.Add("## Latest session summary");
-            lines.Add("");
-            AddLatestSessionSummary(lines, latestSession.Session);
-        }
-
-        if (includePrivateSystemInfo)
-        {
-            lines.Insert(6, $"User: {Environment.UserName}");
-            lines.Insert(6, $"Machine: {Environment.MachineName}");
-        }
-
-        return string.Join(Environment.NewLine, lines);
-    }
-
-    private static void AddLatestSessionSummary(List<string> lines, SessionRecord session)
-    {
-        lines.Add($"Target: {session.Target.DisplayName}");
-        lines.Add($"Started: {session.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
-        lines.Add($"Duration: {(int)session.Summary.Duration.TotalMinutes}m {session.Summary.Duration.Seconds:00}s");
-        lines.Add($"Status: {session.Status}");
-        lines.Add($"Events: {session.Summary.EventCount}");
-        lines.Add($"Spikes: {session.Summary.SpikeCount}");
-        lines.Add($"Breaches: {session.Summary.ThresholdBreachCount}");
-        lines.Add($"Stability: {session.Summary.StabilityStatus}");
-        if (!string.IsNullOrWhiteSpace(session.Summary.StabilityReason))
-        {
-            lines.Add($"Stability reason: {session.Summary.StabilityReason}");
-        }
-
-        foreach (var metric in session.Summary.Metrics.Take(6))
-        {
-            lines.Add($"{metric.Label}: avg {metric.Avg:N1} {metric.Unit}, max {metric.Max:N1} {metric.Unit}, breaches {metric.ThresholdBreaches}");
-        }
-    }
-
-    private static string GetFeedbackDirectory() =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SessionPerfTracker",
-            "feedback");
-
-    private static FileInfo? FindLatestFeedbackReport()
-    {
-        var directory = GetFeedbackDirectory();
-        if (!Directory.Exists(directory))
-        {
-            return null;
-        }
-
-        return new DirectoryInfo(directory)
-            .EnumerateFiles("*.md", SearchOption.TopDirectoryOnly)
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .FirstOrDefault();
-    }
+    private FeedbackReportContext CreateFeedbackReportContext() => new(
+        CurrentVersionText,
+        StoragePath,
+        SelectedTabIndex,
+        IsRecording,
+        LiveSessionTargetText,
+        LiveSessionStateText,
+        LiveConfigCollectorsText,
+        ActiveThresholdSourceText,
+        StorageStatusText,
+        ExportStatusText,
+        UpdateStatusText,
+        LiveWarningText,
+        _allSessionItems.FirstOrDefault()?.Session);
 
     private async Task AutoCheckForUpdatesIfNeededAsync(
         AppUpdateSettings settings,
@@ -1266,7 +1009,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            UpdateStatusText = FormatText("Ui_UpdateStartupFailed", FormatUpdateError(error));
+            UpdateStatusText = FormatText("Ui_UpdateStartupFailed", _updateStatusFormatter.FormatError(error));
         }
         finally
         {
@@ -1336,7 +1079,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            UpdateStatusText = FormatText("Ui_UpdateCheckFailed", FormatUpdateError(error));
+            UpdateStatusText = FormatText("Ui_UpdateCheckFailed", _updateStatusFormatter.FormatError(error));
         }
         finally
         {
@@ -1350,92 +1093,8 @@ public sealed partial class MainWindowViewModel
         UpdateReleaseNotesText = string.IsNullOrWhiteSpace(result.Manifest?.ReleaseNotes)
             ? GetText("Ui_NoReleaseNotesProvided")
             : result.Manifest.ReleaseNotes;
-        UpdateStatusText = FormatUpdateCheckStatus(result);
+        UpdateStatusText = _updateStatusFormatter.FormatCheckStatus(result);
     }
-
-    private string FormatUpdateCheckStatus(UpdateCheckResult result)
-    {
-        if (result.IsUpdateAvailable && result.Manifest is not null)
-        {
-            var shaStatus = HasSha256(result.Manifest)
-                ? GetText("Ui_UpdateShaAvailable")
-                : GetText("Ui_UpdateShaMissingDownloadBlocked");
-            return FormatText(
-                "Ui_UpdateAvailableStatus",
-                result.CurrentVersion,
-                result.Manifest.Version,
-                shaStatus);
-        }
-
-        var serviceStatus = FormatUpdateServiceStatus(result.Status);
-        if (!string.Equals(serviceStatus, result.Status, StringComparison.Ordinal))
-        {
-            return serviceStatus;
-        }
-
-        if (!string.IsNullOrWhiteSpace(result.LatestVersion))
-        {
-            return FormatText("Ui_UpdateUpToDateStatus", result.CurrentVersion);
-        }
-
-        return serviceStatus;
-    }
-
-    private string FormatUpdateServiceStatus(string status)
-    {
-        if (string.Equals(status, "Update manifest URL is not configured.", StringComparison.Ordinal))
-        {
-            return GetText("Ui_UpdateManifestUrlNotConfigured");
-        }
-
-        if (string.Equals(status, "Update manifest is missing version or installerUrl.", StringComparison.Ordinal))
-        {
-            return GetText("Ui_UpdateManifestMissingFields");
-        }
-
-        if (status.StartsWith("Latest version ", StringComparison.OrdinalIgnoreCase)
-            && status.EndsWith(" found, but version comparison was not possible.", StringComparison.OrdinalIgnoreCase))
-        {
-            return FormatText("Ui_UpdateVersionComparisonFailed", status);
-        }
-
-        if (status.StartsWith("Update check failed: ", StringComparison.OrdinalIgnoreCase))
-        {
-            return FormatText("Ui_UpdateCheckFailed", FormatUpdateError(status["Update check failed: ".Length..]));
-        }
-
-        return status;
-    }
-
-    private string FormatUpdateError(Exception error) => FormatUpdateError(error.Message);
-
-    private string FormatUpdateError(string message)
-    {
-        if (message.Contains("must include a SHA256 hash", StringComparison.OrdinalIgnoreCase))
-        {
-            return GetText("Ui_UpdateErrorMissingSha256");
-        }
-
-        if (message.Contains("invalid SHA256 hash", StringComparison.OrdinalIgnoreCase))
-        {
-            return GetText("Ui_UpdateErrorInvalidSha256");
-        }
-
-        if (message.Contains("failed SHA256 verification", StringComparison.OrdinalIgnoreCase))
-        {
-            return GetText("Ui_UpdateErrorSha256Mismatch");
-        }
-
-        if (message.Contains("installer URL", StringComparison.OrdinalIgnoreCase))
-        {
-            return GetText("Ui_UpdateErrorInstallerUrlMissing");
-        }
-
-        return message;
-    }
-
-    private static bool HasSha256(UpdateManifest manifest) =>
-        !string.IsNullOrWhiteSpace(manifest.Sha256);
 
     private void LoadSelectedProfileFields()
     {
@@ -1575,18 +1234,8 @@ public sealed partial class MainWindowViewModel
         return displayName;
     }
 
-    private static string NormalizeExeNameForAssignment(string exeName)
-    {
-        exeName = Path.GetFileName(exeName.Trim());
-        if (string.IsNullOrWhiteSpace(exeName))
-        {
-            return string.Empty;
-        }
-
-        return exeName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-            ? exeName.ToLowerInvariant()
-            : $"{exeName}.exe".ToLowerInvariant();
-    }
+    private static string NormalizeExeNameForAssignment(string exeName) =>
+        ExecutableIdentity.NormalizeExeNameForAssignment(exeName);
 
     private static bool TryParseWholeSeconds(string text, out int seconds)
     {
@@ -1605,6 +1254,4 @@ public sealed partial class MainWindowViewModel
 
         return value > 0;
     }
-
-    private sealed record FeedbackDeliveryResult(bool Sent, string? Error);
 }

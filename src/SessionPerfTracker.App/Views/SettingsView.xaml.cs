@@ -49,6 +49,14 @@ public partial class SettingsView : System.Windows.Controls.UserControl
         }
     }
 
+    private async void RequestSelfUninstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.RequestSelfUninstallAsync();
+        }
+    }
+
     private async void SaveThresholdSettings_Click(object sender, RoutedEventArgs e)
     {
         if (ViewModel is not null)

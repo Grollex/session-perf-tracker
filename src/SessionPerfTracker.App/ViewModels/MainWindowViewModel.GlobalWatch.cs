@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using SessionPerfTracker.App.Services;
 using SessionPerfTracker.Domain.Metrics;
 using SessionPerfTracker.App.Localization;
 using SessionPerfTracker.Domain.Abstractions;
@@ -578,7 +579,7 @@ public sealed partial class MainWindowViewModel
             .Where(item => !string.Equals(item.ExeName, denied.ExeName, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(item.SuggestedProfileId, denied.SuggestedProfileId, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var history = AddRecommendationHistory(
+        var history = ProfileRecommendationCoordinator.AddHistory(
             recommendationSettings.History,
             "recommendation_deny_removed",
             denied.ExeName,
@@ -773,7 +774,7 @@ public sealed partial class MainWindowViewModel
                 }
             },
             cancellationToken);
-        _runningBannedPaths.Remove(selected.NormalizedPath);
+        _processBanCoordinator.ClearRunningMatch(selected.NormalizedPath);
         RefreshProcessBanCollections();
         ProcessBanStatusText = $"{selected.ExeName} ban removed. Future launches are allowed unless another ban exists.";
     }
@@ -1034,7 +1035,7 @@ public sealed partial class MainWindowViewModel
         active.Insert(0, rule);
 
         var history = processBans.History.ToList();
-        history.Insert(0, CreateProcessBanEvent(
+        history.Insert(0, _processBanCoordinator.CreateEvent(
             rule,
             "ban_created",
             activeRow,
@@ -1080,7 +1081,7 @@ public sealed partial class MainWindowViewModel
         var latestSettings = _thresholdSettingsStore.Current;
         var latestProcessBans = latestSettings.ProcessBans;
         var latestHistory = latestProcessBans.History.ToList();
-        latestHistory.Insert(0, CreateProcessBanEvent(
+        latestHistory.Insert(0, _processBanCoordinator.CreateEvent(
             rule,
             "ban_kill",
             activeRow,
@@ -1362,9 +1363,9 @@ public sealed partial class MainWindowViewModel
         {
             var recommendation = item.Recommendation;
             assignments[recommendation.ExeName] = recommendation.SuggestedProfileId;
-            _globalWatchOverLimitWarnings.Remove(recommendation.ExeName);
+            _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
             active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
-            history = AddRecommendationHistory(
+            history = ProfileRecommendationCoordinator.AddHistory(
                 history,
                 "recommendation_promoted",
                 recommendation.ExeName,
@@ -1416,7 +1417,7 @@ public sealed partial class MainWindowViewModel
         foreach (var item in selected)
         {
             var recommendation = item.Recommendation;
-            _globalWatchOverLimitWarnings.Remove(recommendation.ExeName);
+            _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
             active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
             if (!denied.Any(deniedItem => string.Equals(deniedItem.ExeName, recommendation.ExeName, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(deniedItem.SuggestedProfileId, recommendation.SuggestedProfileId, StringComparison.OrdinalIgnoreCase)))
@@ -1431,7 +1432,7 @@ public sealed partial class MainWindowViewModel
                 });
             }
 
-            history = AddRecommendationHistory(
+            history = ProfileRecommendationCoordinator.AddHistory(
                 history,
                 "recommendation_denied",
                 recommendation.ExeName,
@@ -1560,35 +1561,6 @@ public sealed partial class MainWindowViewModel
             : $"{ProcessBans.Count:N0} active ban{(ProcessBans.Count == 1 ? string.Empty : "s")}; enforcement runs during Global Watch scans.";
     }
 
-    private static bool IsProcessBanActive(ProcessBanRule rule, DateTimeOffset now) =>
-        !string.IsNullOrWhiteSpace(rule.NormalizedPath)
-        && (rule.ExpiresAt is null || rule.ExpiresAt > now);
-
-    private static ProcessBanEvent CreateProcessBanEvent(
-        ProcessBanRule rule,
-        string action,
-        GlobalProcessRowViewModel? row,
-        int terminatedCount,
-        string? details)
-    {
-        return new ProcessBanEvent
-        {
-            Id = $"ban_event_{Guid.NewGuid():N}",
-            Timestamp = DateTimeOffset.UtcNow,
-            NormalizedPath = rule.NormalizedPath,
-            ExeName = rule.ExeName,
-            ProductName = string.IsNullOrWhiteSpace(row?.ProductName) ? rule.ProductName : row.ProductName,
-            CompanyName = string.IsNullOrWhiteSpace(row?.CompanyName) ? rule.CompanyName : row.CompanyName,
-            SignerStatus = string.IsNullOrWhiteSpace(row?.SignerStatus) ? rule.SignerStatus : row.SignerStatus,
-            Action = action,
-            DurationLabel = rule.DurationLabel,
-            ProcessId = row?.IsGroup == true ? null : row?.ProcessId,
-            ProcessName = row?.DisplayName,
-            TerminatedCount = terminatedCount,
-            Details = details
-        };
-    }
-
     private static string FormatProcessControlResult(string action, ProcessControlResult result)
     {
         var detail = result.Messages.Count == 0
@@ -1624,74 +1596,8 @@ public sealed partial class MainWindowViewModel
         SuspiciousWatchStatusText = "Suspicious mark removed. Existing launch history is kept for review.";
     }
 
-    private GlobalWatchJournalEntry CreateGlobalWatchJournalEntry(
-        GlobalProcessRowViewModel row,
-        DateTimeOffset capturedAt,
-        string healthState,
-        string reason,
-        string? recommendationId = null)
-    {
-        return new GlobalWatchJournalEntry
-        {
-            Id = $"watch_{Guid.NewGuid():N}",
-            Timestamp = capturedAt,
-            ExeName = NormalizeExeNameForAssignment(row.ExeName),
-            DisplayName = row.DisplayName,
-            ProcessId = row.IsGroup ? null : row.ProcessId,
-            FullPath = IsUnavailablePath(row.FullPath) ? null : row.FullPath,
-            WatchMode = row.IsGroup ? GlobalModeApplications : GlobalModeProcesses,
-            ProfileSource = row.ProfileSourceText,
-            HealthState = healthState,
-            Reason = reason,
-            CpuPercent = row.CpuPercent,
-            MemoryMb = row.MemoryMb,
-            DiskReadMbPerSec = row.DiskReadMbPerSec,
-            DiskWriteMbPerSec = row.DiskWriteMbPerSec,
-            RecommendationId = recommendationId
-        };
-    }
-
     private static bool IsUnavailablePath(string? path) =>
-        string.IsNullOrWhiteSpace(path)
-        || string.Equals(path, "Unavailable", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(path, "n/a", StringComparison.OrdinalIgnoreCase);
-
-    private static List<GlobalWatchJournalEntry> TrimGlobalWatchJournalEntries(
-        IEnumerable<GlobalWatchJournalEntry> entries,
-        int maxEntries)
-    {
-        return entries
-            .OrderByDescending(item => item.Timestamp)
-            .Take(Math.Clamp(maxEntries, 50, 5000))
-            .ToList();
-    }
-
-    private static List<ProfileRecommendationHistoryEntry> AddRecommendationHistory(
-        IReadOnlyList<ProfileRecommendationHistoryEntry> history,
-        string kind,
-        string exeName,
-        string suggestedProfileId,
-        string suggestedProfileName,
-        string reason,
-        string? fullPath = null)
-    {
-        return new[]
-            {
-                new ProfileRecommendationHistoryEntry
-                {
-                    Kind = kind,
-                    ExeName = NormalizeExeNameForAssignment(exeName),
-                    FullPath = IsUnavailablePath(fullPath) ? null : fullPath,
-                    SuggestedProfileId = suggestedProfileId,
-                    SuggestedProfileName = suggestedProfileName,
-                    Timestamp = DateTimeOffset.UtcNow,
-                    Reason = reason
-                }
-            }
-            .Concat(history)
-            .Take(500)
-            .ToList();
-    }
+        ExecutableIdentity.IsUnavailablePath(path);
 
     private void StartGlobalWatch()
     {
@@ -2194,20 +2100,12 @@ public sealed partial class MainWindowViewModel
         DateTimeOffset capturedAt,
         CancellationToken cancellationToken)
     {
-        var entriesToAdd = new List<GlobalWatchJournalEntry>();
-        foreach (var row in rows.Where(row => row.IsNearLimit || row.IsOutOfProfile))
-        {
-            var key = $"{SelectedGlobalWatchMode}|{row.SelectionKey}|{row.HealthBadgeText}|{row.ProfileReason}";
-            if (_globalWatchJournalLastEntryByKey.TryGetValue(key, out var lastEntryAt)
-                && capturedAt - lastEntryAt < GlobalWatchJournalCooldown)
-            {
-                continue;
-            }
-
-            _globalWatchJournalLastEntryByKey[key] = capturedAt;
-            entriesToAdd.Add(CreateGlobalWatchJournalEntry(row, capturedAt, row.HealthBadgeText, row.ProfileReason));
-        }
-
+        var entriesToAdd = _globalWatchJournalCoordinator.CreateThresholdEntries(
+            rows,
+            SelectedGlobalWatchMode,
+            GlobalModeApplications,
+            GlobalModeProcesses,
+            capturedAt);
         if (entriesToAdd.Count == 0)
         {
             return;
@@ -2220,7 +2118,7 @@ public sealed partial class MainWindowViewModel
             {
                 WatchJournal = journal with
                 {
-                    Entries = TrimGlobalWatchJournalEntries(entriesToAdd.Concat(journal.Entries), journal.MaxEntries)
+                    Entries = _globalWatchJournalCoordinator.TrimEntries(entriesToAdd.Concat(journal.Entries), journal.MaxEntries)
                 }
             },
             cancellationToken);
@@ -2315,77 +2213,12 @@ public sealed partial class MainWindowViewModel
         CancellationToken cancellationToken)
     {
         var settings = _thresholdSettingsStore.Current;
-        var processBans = settings.ProcessBans;
-        if (processBans.Active.Count == 0)
-        {
-            _runningBannedPaths.Clear();
-            return;
-        }
-
-        var active = processBans.Active
-            .Where(rule => IsProcessBanActive(rule, capturedAt))
-            .GroupBy(rule => rule.NormalizedPath, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group
-                .OrderByDescending(rule => rule.CreatedAt)
-                .First())
-            .ToList();
-        var changed = active.Count != processBans.Active.Count;
-        var activeByPath = active
-            .Where(rule => !string.IsNullOrWhiteSpace(rule.NormalizedPath))
-            .ToDictionary(rule => rule.NormalizedPath, StringComparer.OrdinalIgnoreCase);
-        var runningByPath = rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath)
-                && activeByPath.ContainsKey(row.NormalizedFullPath))
-            .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
-        var history = processBans.History.ToList();
-        var totalTerminated = 0;
-
-        foreach (var rule in active)
-        {
-            if (!runningByPath.TryGetValue(rule.NormalizedPath, out var matchingRows))
-            {
-                _runningBannedPaths.Remove(rule.NormalizedPath);
-                continue;
-            }
-
-            var processIds = matchingRows
-                .Select(row => row.ProcessId)
-                .Where(processId => processId > 0)
-                .Distinct()
-                .ToArray();
-            if (processIds.Length == 0)
-            {
-                continue;
-            }
-
-            var result = await _processControlService.KillProcessesAsync(
-                processIds,
-                "active process ban",
-                cancellationToken);
-            totalTerminated += result.TerminatedCount;
-
-            if (_runningBannedPaths.Add(rule.NormalizedPath)
-                || result.TerminatedCount > 0)
-            {
-                var representative = matchingRows
-                    .OrderByDescending(row => row.CpuPercent ?? 0)
-                    .First();
-                var enforcementWasBlocked = result.TerminatedCount == 0
-                    && result.Messages.Any(message => message.StartsWith("Skipped ", StringComparison.OrdinalIgnoreCase));
-                history.Insert(0, CreateProcessBanEvent(
-                    rule,
-                    enforcementWasBlocked ? "ban_blocked" : "ban_enforced",
-                    representative,
-                    result.TerminatedCount,
-                    result.Messages.Count == 0
-                        ? "Active process ban matched a running process."
-                        : string.Join(" ", result.Messages.Take(3))));
-                changed = true;
-            }
-        }
-
-        if (!changed)
+        var result = await _processBanCoordinator.EnforceActiveBansAsync(
+            settings.ProcessBans,
+            rows,
+            capturedAt,
+            cancellationToken);
+        if (!result.Changed)
         {
             return;
         }
@@ -2393,23 +2226,16 @@ public sealed partial class MainWindowViewModel
         await _thresholdSettingsStore.SaveAsync(
             settings with
             {
-                ProcessBans = processBans with
-                {
-                    Active = active,
-                    History = history
-                        .OrderByDescending(entry => entry.Timestamp)
-                        .Take(processBans.MaxHistory)
-                        .ToList()
-                }
+                ProcessBans = result.ProcessBans
             },
             cancellationToken);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             RefreshProcessBanCollections();
-            if (totalTerminated > 0)
+            if (result.TotalTerminated > 0)
             {
-                ProcessBanStatusText = $"Process bans enforced at {capturedAt.ToLocalTime():HH:mm:ss}: {totalTerminated:N0} process{(totalTerminated == 1 ? string.Empty : "es")} terminated.";
+                ProcessBanStatusText = $"Process bans enforced at {capturedAt.ToLocalTime():HH:mm:ss}: {result.TotalTerminated:N0} process{(result.TotalTerminated == 1 ? string.Empty : "es")} terminated.";
             }
         });
     }
@@ -2420,107 +2246,13 @@ public sealed partial class MainWindowViewModel
         CancellationToken cancellationToken)
     {
         var settings = _thresholdSettingsStore.Current;
-        var recommendationSettings = settings.Recommendations;
-        var active = recommendationSettings.Active.ToList();
-        var history = recommendationSettings.History.ToList();
-        var watchJournal = settings.WatchJournal;
-        var journalEntries = watchJournal.Entries.ToList();
-        var changed = false;
-        var window = TimeSpan.FromMinutes(recommendationSettings.TriggerWindowMinutes);
-        var cutoff = capturedAt - window;
-
-        foreach (var group in rows
-                     .Where(row => row.IsOutOfProfile && !string.IsNullOrWhiteSpace(row.ExeName))
-                     .GroupBy(row => row.ExeName, StringComparer.OrdinalIgnoreCase))
-        {
-            var row = group
-                .OrderByDescending(item => item.IsCritical)
-                .ThenByDescending(item => item.IsOverLimit)
-                .ThenByDescending(item => item.CpuPercent ?? 0)
-                .ThenByDescending(item => item.MemoryMb ?? 0)
-                .First();
-            var suggestedProfile = ResolveNextProfile(row.ProfileId, settings);
-            if (suggestedProfile is null || IsRecommendationDenied(recommendationSettings, row.ExeName, suggestedProfile.Id))
-            {
-                continue;
-            }
-
-            if (!_globalWatchOverLimitWarnings.TryGetValue(row.ExeName, out var warnings))
-            {
-                warnings = [];
-                _globalWatchOverLimitWarnings[row.ExeName] = warnings;
-            }
-
-            warnings.RemoveAll(timestamp => timestamp < cutoff);
-            warnings.Add(capturedAt);
-
-            if (warnings.Count < recommendationSettings.TriggerWarningCount)
-            {
-                continue;
-            }
-
-            var recommendationId = CreateRecommendationId(row.ExeName, row.ProfileId, suggestedProfile.Id);
-            var existingIndex = active.FindIndex(item => string.Equals(item.Id, recommendationId, StringComparison.OrdinalIgnoreCase));
-            if (existingIndex >= 0)
-            {
-                var existing = active[existingIndex];
-                if ((capturedAt - existing.LastSeen).TotalSeconds >= 30)
-                {
-                    active[existingIndex] = existing with
-                    {
-                        WarningCount = Math.Max(existing.WarningCount, warnings.Count),
-                        LastSeen = capturedAt,
-                        Reason = row.RecommendationReason,
-                        FullPath = IsUnavailablePath(row.FullPath) ? existing.FullPath : row.FullPath
-                    };
-                    changed = true;
-                }
-
-                continue;
-            }
-
-            active.Add(new ProfileRecommendationRecord
-            {
-                Id = recommendationId,
-                ExeName = row.ExeName,
-                FullPath = IsUnavailablePath(row.FullPath) ? null : row.FullPath,
-                CurrentProfileId = row.ProfileId,
-                CurrentProfileName = row.ProfileName,
-                CurrentProfileSource = row.IsAssignedProfile ? "Assigned profile" : "Global fallback",
-                SuggestedProfileId = suggestedProfile.Id,
-                SuggestedProfileName = suggestedProfile.Name,
-                WarningCount = warnings.Count,
-                Reason = row.RecommendationReason,
-                FirstSeen = warnings.Min(),
-                LastSeen = capturedAt
-            });
-            journalEntries.Insert(0, CreateGlobalWatchJournalEntry(
-                row,
-                capturedAt,
-                "Recommendation",
-                $"{row.ExeName} repeatedly exceeded {row.ProfileSourceText}; suggested {suggestedProfile.Name}.",
-                recommendationId));
-            history = AddRecommendationHistory(
-                history,
-                "recommendation_created",
-                row.ExeName,
-                suggestedProfile.Id,
-                suggestedProfile.Name,
-                $"{row.ExeName} repeatedly exceeded {row.ProfileSourceText}; suggested {suggestedProfile.Name}.",
-                row.FullPath);
-            changed = true;
-        }
-
-        foreach (var key in _globalWatchOverLimitWarnings.Keys.ToArray())
-        {
-            _globalWatchOverLimitWarnings[key].RemoveAll(timestamp => timestamp < cutoff);
-            if (_globalWatchOverLimitWarnings[key].Count == 0)
-            {
-                _globalWatchOverLimitWarnings.Remove(key);
-            }
-        }
-
-        if (!changed)
+        var update = _profileRecommendationCoordinator.Update(
+            settings,
+            rows,
+            capturedAt,
+            GlobalModeApplications,
+            GlobalModeProcesses);
+        if (!update.Changed)
         {
             return;
         }
@@ -2528,17 +2260,8 @@ public sealed partial class MainWindowViewModel
         await _thresholdSettingsStore.SaveAsync(
             settings with
             {
-                Recommendations = recommendationSettings with
-                {
-                    Active = active
-                        .OrderByDescending(item => item.LastSeen)
-                        .ToList(),
-                    History = history
-                },
-                WatchJournal = watchJournal with
-                {
-                    Entries = TrimGlobalWatchJournalEntries(journalEntries, watchJournal.MaxEntries)
-                }
+                Recommendations = update.Recommendations,
+                WatchJournal = update.WatchJournal
             },
             cancellationToken);
 
@@ -2549,31 +2272,6 @@ public sealed partial class MainWindowViewModel
             ProfileRecommendationStatusText = $"{ProfileRecommendations.Count:N0} active profile recommendations.";
         });
     }
-
-    private static ThresholdProfile? ResolveNextProfile(string profileId, CpuRamThresholdSettings settings)
-    {
-        var nextProfileId = profileId switch
-        {
-            ThresholdProfileDefaults.LightBackgroundId => ThresholdProfileDefaults.BrowsersChatsId,
-            ThresholdProfileDefaults.BrowsersChatsId => ThresholdProfileDefaults.GamesId,
-            ThresholdProfileDefaults.GamesId => ThresholdProfileDefaults.HardcoreId,
-            _ => null
-        };
-
-        return nextProfileId is null
-            ? null
-            : settings.Profiles.FirstOrDefault(profile => string.Equals(profile.Id, nextProfileId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsRecommendationDenied(
-        ProfileRecommendationSettings recommendationSettings,
-        string exeName,
-        string suggestedProfileId) =>
-        recommendationSettings.Denied.Any(item => string.Equals(item.ExeName, exeName, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(item.SuggestedProfileId, suggestedProfileId, StringComparison.OrdinalIgnoreCase));
-
-    private static string CreateRecommendationId(string exeName, string currentProfileId, string suggestedProfileId) =>
-        $"{NormalizeExeNameForAssignment(exeName)}|{currentProfileId}|{suggestedProfileId}".ToLowerInvariant();
 
     private void NotifySelectedGlobalProcessProperties()
     {
