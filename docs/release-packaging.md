@@ -129,7 +129,9 @@ The workflow:
 - runs `scripts/package-windows.ps1 -BuildInstaller`;
 - smoke-tests the packaged executable with `scripts/test-packaged-app.ps1`;
 - generates SHA256-backed `version.json`;
-- publishes the installer and manifest as GitHub Release assets.
+- publishes the installer, manifest and `SHA256SUMS.txt` as GitHub Release assets, but only when the release does not exist yet.
+
+The one-click local release pushes the tag and then creates the release with signed assets, so the tag-triggered workflow finds an existing release and only verifies the build. Before 1.6.0 the workflow overwrote the signed installer and `version.json` with its unsigned build, which left the 1.5.4/1.5.5 `SHA256SUMS.txt` (uploaded locally) out of sync with the published installer.
 
 The generated manifest points to:
 

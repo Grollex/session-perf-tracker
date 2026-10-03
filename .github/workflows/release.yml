@@ -94,7 +94,25 @@ jobs:
           .\scripts\test-release-artifacts.ps1 `
             -Version "${{ steps.version.outputs.version }}"
 
+      # The local one-click release pushes the tag and then publishes signed assets itself.
+      # Never overwrite those with this unsigned CI build; CI then only verifies the tag.
+      - name: Check for an existing release
+        id: existing
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.version.outputs.tag }}" --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release ${{ steps.version.outputs.tag }} already exists; keeping its assets."
+            "exists=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "exists=false" >> $env:GITHUB_OUTPUT
+          }
+          exit 0
+
       - name: Publish GitHub Release
+        if: steps.existing.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}

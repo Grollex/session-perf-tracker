@@ -25,7 +25,7 @@
 - [x] Add optional bug-report attachments: latest session summary and/or current screen snapshot.
 - [x] Implement real hang detection or hide the live `Hangs` counter until it is backed by real data.
 - [x] Decide what to do with the hidden session header: revive it as a compact dashboard or remove the dead XAML.
-- [ ] Implement reliable GPU/temperature collectors, or move unavailable metrics out of the main user-facing flow. Status: Future note, skipped for now.
+- [x] Implement reliable GPU/temperature collectors, or move unavailable metrics out of the main user-facing flow. Done in 1.6.0: GPU load/VRAM/temperature (driver permitting); CPU temperature intentionally not collected.
 - [x] Add a first-run trust/release explainer for self-signed builds, SHA256 verification, and GitHub Releases.
 - [x] Add feedback delivery status/history for recently sent and failed reports.
 - [x] Add `Copy report` and `Open latest report` actions for saved feedback files.
@@ -84,10 +84,28 @@
 ## Review Follow-Ups 2026-07-04
 
 - [x] 1. Release version discipline: keep `VERSION`, app assembly metadata, release tags, and GitHub assets in sync.
-- [ ] 2. Update settings bug: do not re-enable automatic update checks just because `LastCheckedAt` is empty.
+- [x] 2. Update settings bug: do not re-enable automatic update checks just because `LastCheckedAt` is empty.
 - [x] 3. Trust defaults: make startup auto-install and Start with Windows opt-in for self-signed builds.
-- [ ] 4. Settings write safety: serialize settings updates or add an atomic update API so background Global Watch writes cannot overwrite UI settings.
-- [ ] 5. Update service testability: use the injected `HttpClient` for manifest checks as well as installer downloads.
-- [ ] 6. Feedback privacy and retention: make remote feedback configurable/opt-in and cap local markdown feedback reports.
+- [x] 4. Settings write safety: serialize settings updates or add an atomic update API so background Global Watch writes cannot overwrite UI settings.
+- [x] 5. Update service testability: use the injected `HttpClient` for manifest checks as well as installer downloads.
+- [x] 6. Feedback privacy and retention: make remote feedback configurable/opt-in and cap local markdown feedback reports.
 - [x] 7. ViewModel size reduction: extract Global Watch, update, feedback, process-ban, recommendation, and health coordination services.
-- [ ] 8. Release workflow assets: publish `SHA256SUMS.txt` and run release artifact smoke checks in GitHub Actions release workflow.
+- [x] 8. Release workflow assets: publish `SHA256SUMS.txt` and run release artifact smoke checks in GitHub Actions release workflow.
+
+## 1.6.0 - Monitoring Core, GPU, Tracked Lists
+
+- [x] Snapshot-based process collection (one NT snapshot per tick) for sessions, Global Watch and target lists.
+- [x] GPU monitoring end to end: live tiles, samples, summaries, compare, HTML/CSV export, Global Watch column/sort, profile GPU limits.
+- [x] Child-process continuation after the root exits; crash exit-code classification; hang detection; elevation retry.
+- [x] Incremental session storage, header-only session list, interrupted-session recovery, diff-based settings writes.
+- [x] Tracked executables: path + fingerprint up front, presence verification, automatic relocation, path history, manual locate.
+- [x] Live and Global Watch redesign; render only while visible; vertical scrollbar fix.
+- [x] Localize ~110 status messages; Live "Last session" line; regression tests (tracking, storage, runner, matcher, localization keys).
+- [x] Overhead target met: about 0.2% of a 16-thread machine with Live open, under 0.1% minimized.
+
+## Next Ideas (Not Started)
+
+- [ ] Prime the system load strip on startup so CPU/GPU show values before the second Global Watch scan.
+- [ ] Localize recorder-generated session notes at display time (they are stored in English).
+- [ ] Localize the remaining English Process Inspector detail lines.
+- [ ] Optional per-session GPU adapter selection on multi-GPU systems (today: busiest engine across adapters).

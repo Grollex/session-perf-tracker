@@ -3,7 +3,7 @@
 Run these from:
 
 ```powershell
-cd "C:\Users\ThatSameHrian\Documents\New project"
+cd "C:\Users\ThatSameHrian\Documents\Session Per Tracker Development"
 ```
 
 ## Project Inspection
@@ -42,7 +42,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\release-one-click
 dotnet test "SessionPerfTracker.slnx" -c Release
 ```
 
-The solution currently includes `SessionPerfTracker.UnitTests`.
+The solution currently includes `SessionPerfTracker.UnitTests`. Some tests start short-lived `powershell`/`ping` processes, so run them on Windows.
+
+## Visual QA (isolated data)
+
+```powershell
+$qa = "$env:TEMP\spt-qa"
+.\src\SessionPerfTracker.App\bin\Release\net10.0-windows\SessionPerfTracker.App.exe --data-dir "$qa\data" --visual-qa-dir "$qa\shots" --visual-qa-record
+```
+
+`--data-dir` keeps QA away from `%LocalAppData%\SessionPerfTracker`; `--visual-qa-record` records a scripted load generator before the tab screenshots.
 
 ## Tool Diagnostics
 
