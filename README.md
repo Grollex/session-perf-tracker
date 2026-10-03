@@ -35,7 +35,7 @@ The app is meant to stay out of the way while it watches other programs:
 - One kernel process snapshot per tick instead of per-process queries; GPU counters are read in one batch.
 - Sessions are written incrementally, so long recordings do not rewrite the database.
 - The UI only renders while it is visible; when minimized or in the tray, background work continues without drawing.
-- Measured on a 16-thread desktop: about 0.2% of total CPU with the Live tab open and about 0.07% when minimized (v1.5.5 used about 0.5%).
+- Measured with the 1.6.0 release build on a 16-thread desktop: about 0.1% of total CPU with the Live tab open and idle, about 0.06% minimized, and about 0.4% while recording a session at 1-second sampling (v1.5.5 used about 0.5% while idle). Memory stays around 150 MB.
 
 ## Install
 

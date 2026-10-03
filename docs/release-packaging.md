@@ -204,15 +204,19 @@ There is no background updater service, forced update, or delta patching.
 
 ## Verified Local Outputs
 
-The local build-only release workflow was verified with version `1.5.0` using
+The local build-only release workflow was verified with version `1.6.0` using
 `release-one-click.ps1 -SkipUpload -NoOpen`. It produced:
 
 ```text
 artifacts\release\win-x64\publish\SessionPerfTracker.App.exe
-artifacts\release\dist\SessionPerfTracker-1.5.0-win-x64-self-contained.zip
-artifacts\release\installer\SessionPerfTracker-1.5.0-win-x64-setup.exe
+artifacts\release\dist\SessionPerfTracker-1.6.0-win-x64-self-contained.zip
+artifacts\release\dist\SHA256SUMS.txt
+artifacts\release\installer\SessionPerfTracker-1.6.0-win-x64-setup.exe
 artifacts\release\update\version.json
 ```
+
+The self-signed certificate reports `UnknownError` ("root certificate which is not trusted") in
+`Get-AuthenticodeSignature`; that is expected for this free signing path.
 
 `-SkipUpload` does not publish a GitHub Release or push a tag, but it does update
 the root `VERSION` file to the supplied version.

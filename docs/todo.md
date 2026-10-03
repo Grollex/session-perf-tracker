@@ -101,11 +101,11 @@
 - [x] Tracked executables: path + fingerprint up front, presence verification, automatic relocation, path history, manual locate.
 - [x] Live and Global Watch redesign; render only while visible; vertical scrollbar fix.
 - [x] Localize ~110 status messages; Live "Last session" line; regression tests (tracking, storage, runner, matcher, localization keys).
-- [x] Overhead target met: about 0.2% of a 16-thread machine with Live open, under 0.1% minimized.
+- [x] Overhead target met: about 0.1% of a 16-thread machine with Live open, under 0.1% minimized, about 0.4% while recording.
 
 ## Next Ideas (Not Started)
 
 - [ ] Prime the system load strip on startup so CPU/GPU show values before the second Global Watch scan.
-- [ ] Localize recorder-generated session notes at display time (they are stored in English).
-- [ ] Localize the remaining English Process Inspector detail lines.
+- [x] Localize recorder-generated session notes, exit/stability reasons and identity values at display time.
+- [ ] Localize the remaining English Process Inspector detail lines and metric evidence lines.
 - [ ] Optional per-session GPU adapter selection on multi-GPU systems (today: busiest engine across adapters).

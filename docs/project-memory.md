@@ -17,7 +17,8 @@
 
 - Process data comes from one NT process snapshot per tick (x64 structure offsets); GPU from PDH English counters plus D3DKMT adapter queries.
 - Per-process GPU% = busiest engine type; dedicated/shared memory per process; adapter VRAM totals; GPU temperature only where the driver reports it. CPU temperature is intentionally not collected (needs a kernel driver).
-- Measured overhead (Release build, 16 logical CPUs, Live tab open): about 2.9% of one core (0.18% of the machine); minimized about 1.0% of one core (0.07%). v1.5.5 measured about 8% of one core.
+- Measured overhead of the packaged 1.6.0 build (16 logical CPUs): Live tab open and idle about 1.7% of one core (0.11% of the machine); minimized about 0.9% of one core (0.055%); steady recording at 1 s sampling about 6.9% of one core (0.43%). Private memory about 150 MB. v1.5.5 measured about 8% of one core while idle.
+- Measurement helper: start the app with `--data-dir` on a scratch folder and compare `TotalProcessorTime` over 45-60 s windows (visible, minimized).
 - Path coverage for running processes went from about 60% to over 99% after the kernel image-name fallback.
 
 ## QA Notes
