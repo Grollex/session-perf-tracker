@@ -333,7 +333,7 @@ public partial class MainWindow : Window
         const string script =
             "$end=(Get-Date).AddSeconds(6); $a=New-Object System.Collections.ArrayList; "
             + "while((Get-Date) -lt $end){ if($a.Count -lt 50){ [void]$a.Add((New-Object byte[] 4MB)) } else { [void][math]::Sqrt(2) } }; "
-            + "Start-Process ping -ArgumentList '-n','8','127.0.0.1' -WindowStyle Hidden";
+            + "Start-Process ping -ArgumentList '-n','20','127.0.0.1' -WindowStyle Hidden";
         using var generator = Process.Start(new ProcessStartInfo
         {
             FileName = powerShell,

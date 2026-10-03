@@ -157,7 +157,7 @@ public sealed class SessionListItemViewModel
             "Best-effort crash-like exit signal was recorded." => GetText("Ui_StabilityReasonCrashLike"),
             "Target exited unexpectedly, but no crash-like signal was recorded." => GetText("Ui_StabilityReasonUnexpectedExit"),
             "No stability issues detected." => GetText("Ui_StabilityReasonHealthy"),
-            _ => reason
+            _ => GeneratedTextLocalizer.Localize(reason, GetText)
         };
     }
 
@@ -2022,7 +2022,7 @@ public sealed class SessionRecommendationViewModel
 
         var key = $"Ui_SessionRec_{NormalizeRecommendationId(recommendation.Id)}_Evidence";
         var value = UiText.Get(key);
-        return value == key ? recommendation.Evidence : value;
+        return value == key ? GeneratedTextLocalizer.Localize(recommendation.Evidence, UiText.Get) : value;
     }
 
     private static string NormalizeRecommendationId(string id) => id.Replace('-', '_');

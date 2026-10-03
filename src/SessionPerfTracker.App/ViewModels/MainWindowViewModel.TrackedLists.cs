@@ -250,12 +250,12 @@ public sealed partial class MainWindowViewModel
         var selected = SelectedGlobalProcess;
         if (selected is null)
         {
-            return "n/a";
+            return GetText("Ui_Unavailable");
         }
 
         if (!TryGetSelectedGlobalProcessUsablePath(out var path))
         {
-            return selected.SignerStatus;
+            return ShowValue(selected.SignerStatus);
         }
 
         if (_signerTextByPath.TryGetValue(path, out var cached))
@@ -273,8 +273,8 @@ public sealed partial class MainWindowViewModel
                 text = fingerprint?.SignerStatus is null
                     ? GetText("Ui_StatusUnknown")
                     : string.IsNullOrWhiteSpace(fingerprint.SignerSubject)
-                        ? fingerprint.SignerStatus
-                        : $"{fingerprint.SignerStatus} — {fingerprint.SignerSubject}";
+                        ? ShowValue(fingerprint.SignerStatus)
+                        : $"{ShowValue(fingerprint.SignerStatus)} — {fingerprint.SignerSubject}";
             }
             catch
             {

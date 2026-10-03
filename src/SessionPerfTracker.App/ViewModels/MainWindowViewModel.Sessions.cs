@@ -398,7 +398,7 @@ public sealed partial class MainWindowViewModel
 
         if (!string.IsNullOrWhiteSpace(session.Notes))
         {
-            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactNotes"), session.Notes));
+            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactNotes"), GeneratedTextLocalizer.Localize(session.Notes, GetText)));
         }
 
         if (session.Summary.Overhead is { SampleCount: > 0 } overhead)
@@ -485,7 +485,7 @@ public sealed partial class MainWindowViewModel
             "Best-effort crash-like exit signal was recorded." => GetText("Ui_StabilityReasonCrashLike"),
             "Target exited unexpectedly, but no crash-like signal was recorded." => GetText("Ui_StabilityReasonUnexpectedExit"),
             "No stability issues detected." => GetText("Ui_StabilityReasonHealthy"),
-            _ => reason
+            _ => GeneratedTextLocalizer.Localize(reason, GetText)
         };
     }
 
@@ -508,20 +508,12 @@ public sealed partial class MainWindowViewModel
         };
     }
 
-    private string FormatExitReason(string reason)
+    private string FormatExitReason(string reason) => reason switch
     {
-        if (reason.StartsWith("The target process exited with non-zero exit code", StringComparison.OrdinalIgnoreCase))
-        {
-            return GetText("Ui_ExitReasonNonZero");
-        }
-
-        return reason switch
-        {
-            "Target process was closed externally." => GetText("Ui_ExitReasonExternalClose"),
-            "Target process stopped normally." => GetText("Ui_ExitReasonNormalStop"),
-            _ => reason
-        };
-    }
+        "Target process was closed externally." => GetText("Ui_ExitReasonExternalClose"),
+        "Target process stopped normally." => GetText("Ui_ExitReasonNormalStop"),
+        _ => GeneratedTextLocalizer.Localize(reason, GetText)
+    };
 
     private static string FormatRamDiagnostic(RamAccountingDiagnosticSnapshot snapshot)
     {

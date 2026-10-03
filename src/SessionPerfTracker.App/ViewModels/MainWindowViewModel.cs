@@ -1654,19 +1654,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? GetText("Ui_StGroupHint")
             : GetText("Ui_StProcessHint");
     public string SelectedGlobalProcessExeText => SelectedGlobalProcess?.ExeName ?? "n/a";
-    public string SelectedGlobalProcessPathText => SelectedGlobalProcess?.FullPath ?? "n/a";
-    public string SelectedGlobalProcessProductText => SelectedGlobalProcess?.ProductName ?? "n/a";
-    public string SelectedGlobalProcessDescriptionText => SelectedGlobalProcess?.FileDescription ?? "n/a";
-    public string SelectedGlobalProcessCompanyText => SelectedGlobalProcess?.CompanyName ?? "n/a";
+    public string SelectedGlobalProcessPathText => ShowValue(SelectedGlobalProcess?.FullPath);
+    public string SelectedGlobalProcessProductText => ShowValue(SelectedGlobalProcess?.ProductName);
+    public string SelectedGlobalProcessDescriptionText => ShowValue(SelectedGlobalProcess?.FileDescription);
+    public string SelectedGlobalProcessCompanyText => ShowValue(SelectedGlobalProcess?.CompanyName);
     public string SelectedGlobalProcessSignerText => ResolveSelectedSignerText();
-    public string SelectedGlobalProcessVersionText => SelectedGlobalProcess?.Version ?? "n/a";
-    public string SelectedGlobalProcessOriginalFileText => SelectedGlobalProcess?.OriginalFileName ?? "n/a";
-    public string SelectedGlobalProcessParentText => SelectedGlobalProcess?.ParentProcessText ?? "n/a";
+    public string SelectedGlobalProcessVersionText => ShowValue(SelectedGlobalProcess?.Version);
+    public string SelectedGlobalProcessOriginalFileText => ShowValue(SelectedGlobalProcess?.OriginalFileName);
+    public string SelectedGlobalProcessParentText => ShowValue(SelectedGlobalProcess?.ParentProcessText);
     public string SelectedGlobalProcessDescendantsText => SelectedGlobalProcess is null
-        ? "n/a"
+        ? GetText("Ui_Unavailable")
         : SelectedGlobalProcess.IsGroup
-            ? $"{SelectedGlobalProcess.InstanceCount:N0} instances; {SelectedGlobalProcess.IncludedProcesses.Count:N0} included processes"
-            : $"{SelectedGlobalProcess.DescendantCountText} descendants";
+            ? FormatText("Ui_GenGroupInstances", SelectedGlobalProcess.InstanceCount, SelectedGlobalProcess.IncludedProcesses.Count)
+            : FormatText("Ui_GenDescendants", SelectedGlobalProcess.DescendantCountText);
     public string SelectedGlobalProcessPidText => SelectedGlobalProcess is null
         ? "n/a"
         : SelectedGlobalProcess.IsGroup ? $"{SelectedGlobalProcess.InstanceCount:N0} instances" : SelectedGlobalProcess.ProcessIdText;
@@ -1679,9 +1679,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ? "n/a"
         : $"{SelectedGlobalProcess.GpuText} · {SelectedGlobalProcess.GpuMemoryText}";
     public string SelectedGlobalProcessStatusText => SelectedGlobalProcess?.StateText ?? "not selected";
-    public string SelectedGlobalProcessProfileText => SelectedGlobalProcess?.ProfileSourceText ?? "n/a";
+    public string SelectedGlobalProcessProfileText => ShowValue(SelectedGlobalProcess?.ProfileSourceText);
     public string SelectedGlobalProcessHealthText => SelectedGlobalProcess?.HealthBadgeText ?? "n/a";
-    public string SelectedGlobalProcessReasonText => SelectedGlobalProcess?.ProfileReason ?? GetText("Ui_SelectProcessProfileHealth");
+    public string SelectedGlobalProcessReasonText => SelectedGlobalProcess is null
+        ? GetText("Ui_SelectProcessProfileHealth")
+        : ShowValue(SelectedGlobalProcess.ProfileReason);
+
+    private string ShowValue(string? value) => GeneratedTextLocalizer.LocalizeValue(value, GetText);
     public string SelectedGlobalProcessIncludedText => SelectedGlobalProcess?.IncludedProcessSummaryText ?? "n/a";
     public string SelectedGlobalProcessWhatItDoesText
     {
