@@ -99,13 +99,40 @@ public sealed class HttpUpdateServiceTests
         return Convert.ToHexString(hash);
     }
 
+    [Fact]
+    public async Task Manifest_with_utf8_bom_served_as_octet_stream_is_parsed()
+    {
+        // Locally packaged manifests are written by Windows PowerShell with a UTF-8 BOM, and GitHub
+        // serves release assets as application/octet-stream without a charset.
+        var json = """
+            {
+                "version":  "99.0.0",
+                "installerUrl":  "https://example.com/SessionPerfTracker-99.0.0-win-x64-setup.exe",
+                "sha256":  "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF"
+            }
+            """;
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(System.Text.Encoding.UTF8.GetBytes(json)).ToArray();
+        var service = new HttpUpdateService(new HttpClient(new StubHttpMessageHandler(bytes)));
+
+        var result = await service.CheckAsync("https://updates.example.test/version.json");
+
+        Assert.True(result.IsUpdateAvailable, result.Status);
+        Assert.Equal("99.0.0", result.Manifest?.Version);
+    }
+
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
-        private readonly string _content;
+        private readonly string? _content;
+        private readonly byte[]? _bytes;
 
         public StubHttpMessageHandler(string content)
         {
             _content = content;
+        }
+
+        public StubHttpMessageHandler(byte[] bytes)
+        {
+            _bytes = bytes;
         }
 
         public Uri? RequestedUri { get; private set; }
@@ -115,10 +142,18 @@ public sealed class HttpUpdateServiceTests
             CancellationToken cancellationToken)
         {
             RequestedUri = request.RequestUri;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            HttpContent content;
+            if (_bytes is null)
             {
-                Content = new StringContent(_content)
-            });
+                content = new StringContent(_content!);
+            }
+            else
+            {
+                content = new ByteArrayContent(_bytes);
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
         }
     }
 }
