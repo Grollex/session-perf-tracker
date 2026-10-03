@@ -110,7 +110,7 @@ public partial class GlobalWatchView : System.Windows.Controls.UserControl
         {
             System.Windows.MessageBox.Show(
                 Window.GetWindow(this),
-                $"Could not open Process Inspector:\n{error.Message}",
+                string.Format(System.Globalization.CultureInfo.CurrentCulture, SessionPerfTracker.App.ViewModels.UiText.Get("Ui_StInspectorOpenFailed"), error.Message),
                 "Process Inspector",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);

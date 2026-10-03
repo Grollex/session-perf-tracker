@@ -99,6 +99,17 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>Visual QA: selects a running process (with children) in Live and starts recording it.</summary>
+    internal async Task StartRecordingProcessAsync(int processId, CancellationToken cancellationToken = default)
+    {
+        await RefreshRunningProcessesAsync(cancellationToken);
+        ProcessFilterText = string.Empty;
+        SelectedTargetMode = TargetModeRunningProcess;
+        SelectedRunningTarget = RunningTargets.FirstOrDefault(item => item.ProcessId == processId);
+        SelectedTabIndex = LiveTabIndex;
+        await StartRecordingAsync(cancellationToken);
+    }
+
     public async Task StopRecordingAsync(CancellationToken cancellationToken = default)
     {
         if (_activeHandle is null)
@@ -129,7 +140,7 @@ public sealed partial class MainWindowViewModel
                 target = await ResolveSelectedAttachTargetAsync(cancellationToken);
                 if (target is null)
                 {
-                    RamDiagnosticText = "Select a running target first.";
+                    RamDiagnosticText = GetText("Ui_StSelectRunningTargetFirst");
                     return;
                 }
             }
@@ -139,7 +150,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            RamDiagnosticText = $"RAM diagnostic failed: {error.Message}";
+            RamDiagnosticText = FormatText("Ui_StRamDiagnosticFailed", error.Message);
         }
     }
 
@@ -153,7 +164,7 @@ public sealed partial class MainWindowViewModel
                 target = await ResolveSelectedAttachTargetAsync(cancellationToken);
                 if (target is null)
                 {
-                    SystemContextText = "Select a running target first.";
+                    SystemContextText = GetText("Ui_StSelectRunningTargetFirst");
                     return;
                 }
             }
@@ -181,12 +192,12 @@ public sealed partial class MainWindowViewModel
                 cancellationToken);
 
             SystemContextText = snapshot is null
-                ? "System context snapshot unavailable."
+                ? GetText("Ui_StContextUnavailable")
                 : FormatSystemContext(snapshot);
         }
         catch (Exception error)
         {
-            SystemContextText = $"System context snapshot failed: {error.Message}";
+            SystemContextText = FormatText("Ui_StContextFailed", error.Message);
         }
     }
 
@@ -609,6 +620,21 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasLiveEvents));
         OnPropertyChanged(nameof(ShowLiveEventEmptyState));
         OnPropertyChanged(nameof(LiveEventEmptyText));
+        OnPropertyChanged(nameof(ShowLastCompletedSessionInLive));
+    }
+
+    /// <summary>Opens the session that just finished in Live (it stays selected after the reload).</summary>
+    public void OpenLastCompletedSession()
+    {
+        var session = Sessions.FirstOrDefault(item => item.Id == _lastCompletedSessionId);
+        if (session is null)
+        {
+            SelectedTabIndex = SessionsTabIndex;
+            return;
+        }
+
+        SelectedSession = session;
+        OpenSelectedSessionDetails();
     }
 
     private void SetLiveSessionState(LiveSessionUiState state)
@@ -637,7 +663,8 @@ public sealed partial class MainWindowViewModel
     private void UpdateLastCompletedSession(SessionRecord session)
     {
         var item = new SessionListItemViewModel(session);
-        _lastCompletedSessionText = $"{item.AppName} - {item.StartedFullText} - {item.DurationText} - {item.StatusText}";
+        _lastCompletedSessionId = session.Id;
+        _lastCompletedSessionText = $"{item.AppName} · {item.StartedFullText} · {item.DurationText} · {item.StatusText}";
         _lastCompletedSessionHint = item.ExitText;
         OnPropertyChanged(nameof(HasLastCompletedSession));
         OnPropertyChanged(nameof(LastCompletedSessionText));

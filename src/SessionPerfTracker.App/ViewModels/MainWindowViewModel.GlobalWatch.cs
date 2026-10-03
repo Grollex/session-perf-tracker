@@ -64,7 +64,7 @@ public sealed partial class MainWindowViewModel
         var selectedProcess = GetSelectedGlobalWatchRow();
         if (selectedProcess is null)
         {
-            GlobalWatchStatusText = "Select a process in Global Watch first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectGlobalProcessFirst");
             return;
         }
 
@@ -74,7 +74,7 @@ public sealed partial class MainWindowViewModel
         var target = _allRunningTargets.FirstOrDefault(item => item.ProcessId == processId);
         if (target is null)
         {
-            GlobalWatchStatusText = $"{selectedProcess.Name} ({processId}) is no longer running.";
+            GlobalWatchStatusText = FormatText("Ui_StProcessNoLongerRunning", selectedProcess.Name, processId);
             return;
         }
 
@@ -85,18 +85,18 @@ public sealed partial class MainWindowViewModel
 
         if (wasRecording)
         {
-            GlobalWatchStatusText = $"{target.DisplayName} selected in Live. Current monitoring was stopped; press Start to apply changes.";
+            GlobalWatchStatusText = FormatText("Ui_StSelectedInLiveStopped", target.DisplayName);
             NotifyTargetSelectionProperties();
             return;
         }
 
-        RecordingStatusText = $"Starting detailed monitoring for {target.DisplayName}.";
+        RecordingStatusText = FormatText("Ui_StStartingMonitoring", target.DisplayName);
         if (!IsRecording)
         {
             LiveWarningText = string.Empty;
         }
 
-        GlobalWatchStatusText = $"{target.DisplayName} selected in Live for detailed monitoring.";
+        GlobalWatchStatusText = FormatText("Ui_StSelectedInLive", target.DisplayName);
         NotifyTargetSelectionProperties();
         await StartRecordingAsync(cancellationToken);
     }
@@ -106,7 +106,7 @@ public sealed partial class MainWindowViewModel
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetSelectedGlobalProcessUsablePath(out var path) || !File.Exists(path))
         {
-            GlobalWatchStatusText = "File location is unavailable for the selected process.";
+            GlobalWatchStatusText = GetText("Ui_StLocationUnavailable");
             return Task.CompletedTask;
         }
 
@@ -116,11 +116,11 @@ public sealed partial class MainWindowViewModel
             {
                 UseShellExecute = true
             });
-            GlobalWatchStatusText = $"Opened file location for {Path.GetFileName(path)}.";
+            GlobalWatchStatusText = FormatText("Ui_StOpenedLocation", Path.GetFileName(path));
         }
         catch (Exception error)
         {
-            GlobalWatchStatusText = $"Could not open file location: {error.Message}";
+            GlobalWatchStatusText = FormatText("Ui_StOpenLocationFailed", error.Message);
         }
 
         return Task.CompletedTask;
@@ -130,18 +130,18 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryGetSelectedGlobalProcessUsablePath(out var path))
         {
-            GlobalWatchStatusText = "Full path is unavailable for the selected process.";
+            GlobalWatchStatusText = GetText("Ui_StPathUnavailable");
             return;
         }
 
         try
         {
             Clipboard.SetText(path);
-            GlobalWatchStatusText = $"Copied full path for {Path.GetFileName(path)}.";
+            GlobalWatchStatusText = FormatText("Ui_StCopiedPath", Path.GetFileName(path));
         }
         catch (Exception error)
         {
-            GlobalWatchStatusText = $"Could not copy full path: {error.Message}";
+            GlobalWatchStatusText = FormatText("Ui_StCopyPathFailed", error.Message);
         }
     }
 
@@ -150,13 +150,13 @@ public sealed partial class MainWindowViewModel
         var selected = GetSelectedGlobalWatchRow();
         if (selected is null)
         {
-            GlobalWatchStatusText = "Select a process or application first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectProcessFirst");
             return false;
         }
 
         SetProcessInspectorTarget(ProcessInspectorTargetViewModel.FromGlobalProcess(
             selected,
-            "Global Watch Overview - latest scan",
+            GetText("Ui_StInspectorSourceLatestScan"),
             IsGlobalWatchGroupedMode));
         return true;
     }
@@ -184,7 +184,7 @@ public sealed partial class MainWindowViewModel
         cancellationToken.ThrowIfCancellationRequested();
         if (!TryGetInspectorUsablePath(out var path) || !File.Exists(path))
         {
-            GlobalWatchStatusText = "File location is unavailable for the inspector target.";
+            GlobalWatchStatusText = GetText("Ui_StInspectorLocationUnavailable");
             return Task.CompletedTask;
         }
 
@@ -194,11 +194,11 @@ public sealed partial class MainWindowViewModel
             {
                 UseShellExecute = true
             });
-            GlobalWatchStatusText = $"Opened file location for {Path.GetFileName(path)}.";
+            GlobalWatchStatusText = FormatText("Ui_StOpenedLocation", Path.GetFileName(path));
         }
         catch (Exception error)
         {
-            GlobalWatchStatusText = $"Could not open file location: {error.Message}";
+            GlobalWatchStatusText = FormatText("Ui_StOpenLocationFailed", error.Message);
         }
 
         return Task.CompletedTask;
@@ -208,18 +208,18 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryGetInspectorUsablePath(out var path))
         {
-            GlobalWatchStatusText = "Full path is unavailable for the inspector target.";
+            GlobalWatchStatusText = GetText("Ui_StInspectorPathUnavailable");
             return;
         }
 
         try
         {
             Clipboard.SetText(path);
-            GlobalWatchStatusText = $"Copied full path for {Path.GetFileName(path)}.";
+            GlobalWatchStatusText = FormatText("Ui_StCopiedPath", Path.GetFileName(path));
         }
         catch (Exception error)
         {
-            GlobalWatchStatusText = $"Could not copy full path: {error.Message}";
+            GlobalWatchStatusText = FormatText("Ui_StCopyPathFailed", error.Message);
         }
     }
 
@@ -227,7 +227,7 @@ public sealed partial class MainWindowViewModel
     {
         if (_processInspectorTarget?.ActiveRow is not { } activeRow)
         {
-            GlobalWatchStatusText = "Inspector target is not running; nothing to kill.";
+            GlobalWatchStatusText = GetText("Ui_StInspectorNotRunning");
             return;
         }
 
@@ -244,7 +244,7 @@ public sealed partial class MainWindowViewModel
     {
         if (_processInspectorTarget?.ActiveRow is not { } activeRow)
         {
-            GlobalWatchStatusText = "Inspector target is not running; nothing to kill.";
+            GlobalWatchStatusText = GetText("Ui_StInspectorNotRunning");
             return;
         }
 
@@ -264,13 +264,13 @@ public sealed partial class MainWindowViewModel
         var target = _processInspectorTarget;
         if (target is null)
         {
-            SuspiciousWatchStatusText = "Open a process or saved watch item in Details first.";
+            SuspiciousWatchStatusText = GetText("Ui_StOpenInDetailsFirst");
             return;
         }
 
         if (!TryGetInspectorUsablePath(out _))
         {
-            SuspiciousWatchStatusText = "Full path is unavailable; cannot mark it suspicious.";
+            SuspiciousWatchStatusText = GetText("Ui_StCannotMarkNoPath");
             return;
         }
 
@@ -308,7 +308,7 @@ public sealed partial class MainWindowViewModel
     {
         if (_processInspectorTarget is null || !TryGetInspectorUsablePath(out _))
         {
-            SuspiciousWatchStatusText = "Open a marked process or watch item in Details first.";
+            SuspiciousWatchStatusText = GetText("Ui_StOpenMarkedFirst");
             return;
         }
 
@@ -327,7 +327,7 @@ public sealed partial class MainWindowViewModel
         var target = _processInspectorTarget;
         if (target is null)
         {
-            ProfileRecommendationStatusText = "Open a process in Details first.";
+            ProfileRecommendationStatusText = GetText("Ui_StOpenProcessInDetailsFirst");
             return;
         }
 
@@ -335,7 +335,7 @@ public sealed partial class MainWindowViewModel
             string.Equals(item.ExeName, target.ExeName, StringComparison.OrdinalIgnoreCase));
         if (recommendation is null)
         {
-            ProfileRecommendationStatusText = $"No active recommendation for {target.ExeName}.";
+            ProfileRecommendationStatusText = FormatText("Ui_StNoRecommendationFor", target.ExeName);
             return;
         }
 
@@ -347,7 +347,7 @@ public sealed partial class MainWindowViewModel
 
     public Task PromoteSelectedRecommendationAsync(CancellationToken cancellationToken = default) =>
         SelectedProfileRecommendation is null
-            ? SetRecommendationStatusAsync("Select a recommendation to promote.")
+            ? SetRecommendationStatusAsync(GetText("Ui_StSelectRecommendationToPromote"))
             : PromoteRecommendationsAsync([SelectedProfileRecommendation], cancellationToken);
 
     public Task PromoteRecommendationsAsync(
@@ -357,7 +357,7 @@ public sealed partial class MainWindowViewModel
 
     public Task DenySelectedRecommendationAsync(CancellationToken cancellationToken = default) =>
         SelectedProfileRecommendation is null
-            ? SetRecommendationStatusAsync("Select a recommendation to ignore.")
+            ? SetRecommendationStatusAsync(GetText("Ui_StSelectRecommendationToIgnore"))
             : DenyRecommendationsAsync([SelectedProfileRecommendation], cancellationToken);
 
     public Task DenyRecommendationsAsync(
@@ -370,20 +370,20 @@ public sealed partial class MainWindowViewModel
         var selectedProcess = GetSelectedGlobalWatchRow();
         if (selectedProcess is null)
         {
-            GlobalWatchStatusText = "Select a process or exe group first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectProcessOrGroupFirst");
             return;
         }
 
         if (SelectedLiveAssignmentProfile is null)
         {
-            GlobalWatchStatusText = "Select a profile in the right panel first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectProfileRightPanel");
             return;
         }
 
         var exeName = NormalizeExeNameForAssignment(selectedProcess.ExeName);
         if (string.IsNullOrWhiteSpace(exeName))
         {
-            GlobalWatchStatusText = "Could not determine exe name for assignment.";
+            GlobalWatchStatusText = GetText("Ui_StAssignmentExeUnknown");
             return;
         }
 
@@ -408,7 +408,7 @@ public sealed partial class MainWindowViewModel
         var selectedProcess = GetSelectedGlobalWatchRow();
         if (selectedProcess is null)
         {
-            ProfileRecommendationStatusText = "Select a process or exe group first.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectProcessOrGroupFirst");
             return;
         }
 
@@ -416,7 +416,7 @@ public sealed partial class MainWindowViewModel
             string.Equals(item.ExeName, selectedProcess.ExeName, StringComparison.OrdinalIgnoreCase));
         if (recommendation is null)
         {
-            ProfileRecommendationStatusText = $"No active recommendation for {selectedProcess.ExeName}.";
+            ProfileRecommendationStatusText = FormatText("Ui_StNoRecommendationFor", selectedProcess.ExeName);
         }
         else
         {
@@ -433,7 +433,7 @@ public sealed partial class MainWindowViewModel
         recommendation ??= SelectedProfileRecommendation;
         if (recommendation is null)
         {
-            ProfileRecommendationStatusText = "Select a recommendation first.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectRecommendationFirst");
             return false;
         }
 
@@ -454,7 +454,7 @@ public sealed partial class MainWindowViewModel
         recommendation ??= SelectedProfileRecommendation;
         if (recommendation is null)
         {
-            ProfileRecommendationStatusText = "Select a recommendation first.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectRecommendationFirst");
             return false;
         }
 
@@ -476,7 +476,7 @@ public sealed partial class MainWindowViewModel
     {
         if (group is null)
         {
-            GlobalWatchJournalStatusText = "Select a journal group first.";
+            GlobalWatchJournalStatusText = GetText("Ui_StSelectJournalGroupFirst");
             return false;
         }
 
@@ -500,7 +500,7 @@ public sealed partial class MainWindowViewModel
     {
         if (group is null)
         {
-            GlobalWatchJournalStatusText = "Select a journal group first.";
+            GlobalWatchJournalStatusText = GetText("Ui_StSelectJournalGroupFirst");
             return false;
         }
 
@@ -576,7 +576,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedDeniedProfileRecommendation is null)
         {
-            ProfileRecommendationStatusText = "Select an ignored recommendation first.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectIgnoredRecommendationFirst");
             return;
         }
 
@@ -616,14 +616,14 @@ public sealed partial class MainWindowViewModel
         var selected = GetSelectedGlobalWatchRow();
         if (selected is null)
         {
-            SuspiciousWatchStatusText = "Select an application or process first.";
+            SuspiciousWatchStatusText = GetText("Ui_StSelectProcessFirst");
             return;
         }
 
         if (!TryGetSelectedGlobalProcessUsablePath(out _)
             || string.IsNullOrWhiteSpace(selected.NormalizedFullPath))
         {
-            SuspiciousWatchStatusText = "Full path is unavailable for this process; cannot mark it suspicious.";
+            SuspiciousWatchStatusText = GetText("Ui_StCannotMarkNoPath");
             return;
         }
 
@@ -663,7 +663,7 @@ public sealed partial class MainWindowViewModel
             || !TryGetSelectedGlobalProcessUsablePath(out _)
             || string.IsNullOrWhiteSpace(selected.NormalizedFullPath))
         {
-            SuspiciousWatchStatusText = "Select a marked application or process first.";
+            SuspiciousWatchStatusText = GetText("Ui_StSelectMarkedFirst");
             return;
         }
 
@@ -674,7 +674,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSuspiciousWatchItem is null)
         {
-            SuspiciousWatchStatusText = "Select a suspicious watchlist item first.";
+            SuspiciousWatchStatusText = GetText("Ui_StSelectSuspiciousItemFirst");
             return;
         }
 
@@ -686,7 +686,7 @@ public sealed partial class MainWindowViewModel
         suspiciousItem ??= SelectedSuspiciousWatchItem;
         if (suspiciousItem is null)
         {
-            SuspiciousWatchStatusText = "Select a suspicious watchlist item first.";
+            SuspiciousWatchStatusText = GetText("Ui_StSelectSuspiciousItemFirst");
             return false;
         }
 
@@ -709,7 +709,7 @@ public sealed partial class MainWindowViewModel
         var selected = GetSelectedGlobalWatchRow();
         if (selected is null)
         {
-            GlobalWatchStatusText = "Select a process or application first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectProcessFirst");
             return;
         }
 
@@ -727,7 +727,7 @@ public sealed partial class MainWindowViewModel
         var selected = GetSelectedGlobalWatchRow();
         if (selected is null)
         {
-            GlobalWatchStatusText = "Select a process or application first.";
+            GlobalWatchStatusText = GetText("Ui_StSelectProcessFirst");
             return;
         }
 
@@ -752,7 +752,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedProcessBan is null)
         {
-            ProcessBanStatusText = "Select a ban to remove.";
+            ProcessBanStatusText = GetText("Ui_StSelectBanToRemove");
             return;
         }
 
@@ -828,7 +828,7 @@ public sealed partial class MainWindowViewModel
         var selected = GetSelectedGlobalWatchRow();
         if (selected is null)
         {
-            ProcessBanStatusText = "Select a process or application first.";
+            ProcessBanStatusText = GetText("Ui_StSelectProcessFirst");
             return;
         }
 
@@ -846,7 +846,7 @@ public sealed partial class MainWindowViewModel
         var target = _processInspectorTarget;
         if (target is null)
         {
-            ProcessBanStatusText = "Open a process or saved watch item in Details first.";
+            ProcessBanStatusText = GetText("Ui_StOpenInDetailsFirst");
             return;
         }
 
@@ -1375,7 +1375,7 @@ public sealed partial class MainWindowViewModel
             .ToArray();
         if (selected.Length == 0)
         {
-            ProfileRecommendationStatusText = "Select one or more recommendations to promote.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectRecommendationsToPromote");
             return;
         }
 
@@ -1417,7 +1417,7 @@ public sealed partial class MainWindowViewModel
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
         ApplyGlobalWatchFilterAndSort();
-        ProfileRecommendationStatusText = $"Promoted {selected.Length:N0} recommendation{(selected.Length == 1 ? string.Empty : "s")}.";
+        ProfileRecommendationStatusText = FormatText("Ui_StPromotedRecommendations", selected.Length);
     }
 
     private async Task DenyRecommendationsCoreAsync(
@@ -1431,7 +1431,7 @@ public sealed partial class MainWindowViewModel
             .ToArray();
         if (selected.Length == 0)
         {
-            ProfileRecommendationStatusText = "Select one or more recommendations to ignore.";
+            ProfileRecommendationStatusText = GetText("Ui_StSelectRecommendationsToIgnore");
             return;
         }
 
@@ -1486,7 +1486,7 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         RefreshRecommendationCollections();
-        ProfileRecommendationStatusText = $"Ignored {selected.Length:N0} recommendation{(selected.Length == 1 ? string.Empty : "s")}.";
+        ProfileRecommendationStatusText = FormatText("Ui_StIgnoredRecommendations", selected.Length);
     }
 
     private void RefreshRecommendationCollections()
@@ -1527,8 +1527,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasGlobalWatchJournalEntries));
         OnPropertyChanged(nameof(HasGlobalWatchJournalGroups));
         GlobalWatchJournalStatusText = GlobalWatchJournalGroups.Count == 0
-            ? "Watch Journal is empty. Near, over, critical and recommendation states will appear here."
-            : $"{GlobalWatchJournalEntries.Count:N0} recent watch journal entries grouped into {GlobalWatchJournalGroups.Count:N0} branch log{(GlobalWatchJournalGroups.Count == 1 ? string.Empty : "s")}.";
+            ? GetText("Ui_StJournalEmpty")
+            : FormatText("Ui_StJournalSummary", GlobalWatchJournalEntries.Count, GlobalWatchJournalGroups.Count);
     }
 
     private static string CreateGlobalWatchJournalGroupKey(GlobalWatchJournalEntry entry)
@@ -1564,8 +1564,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasSuspiciousLaunchEntries));
         NotifySelectedGlobalProcessProperties();
         SuspiciousWatchStatusText = SuspiciousWatchItems.Count == 0
-            ? "No suspicious watchlist items yet. Mark a selected process or application from Global Watch."
-            : $"{SuspiciousWatchItems.Count:N0} suspicious item{(SuspiciousWatchItems.Count == 1 ? string.Empty : "s")} watched; {SuspiciousLaunchEntries.Count:N0} launch entries shown.";
+            ? GetText("Ui_StSuspiciousEmpty")
+            : FormatText("Ui_StSuspiciousSummary", SuspiciousWatchItems.Count, SuspiciousLaunchEntries.Count);
     }
 
     private void RefreshProcessBanCollections()
@@ -1588,8 +1588,8 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(HasProcessBanEvents));
         OnPropertyChanged(nameof(CanRemoveSelectedProcessBan));
         ProcessBanStatusText = ProcessBans.Count == 0
-            ? "No active process bans. Create one from Global Watch Overview or Process Inspector."
-            : $"{ProcessBans.Count:N0} active ban{(ProcessBans.Count == 1 ? string.Empty : "s")}; enforcement runs during Global Watch scans.";
+            ? GetText("Ui_StBansEmpty")
+            : FormatText("Ui_StBansSummary", ProcessBans.Count);
     }
 
     private static string FormatProcessControlResult(string action, ProcessControlResult result)
@@ -1620,7 +1620,7 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
         if (!removed)
         {
-            SuspiciousWatchStatusText = "Selected item is not marked suspicious.";
+            SuspiciousWatchStatusText = GetText("Ui_StNotMarkedSuspicious");
             return;
         }
 
@@ -1631,7 +1631,7 @@ public sealed partial class MainWindowViewModel
 
         RefreshSuspiciousWatchCollections();
         NotifySelectedGlobalProcessProperties();
-        SuspiciousWatchStatusText = "Suspicious mark removed. Existing launch history is kept for review.";
+        SuspiciousWatchStatusText = GetText("Ui_StSuspiciousMarkRemoved");
     }
 
     private static bool IsUnavailablePath(string? path) =>
@@ -1947,13 +1947,13 @@ public sealed partial class MainWindowViewModel
         var normalizedExeName = NormalizeExeNameForAssignment(exeName ?? string.Empty);
         if (string.IsNullOrWhiteSpace(normalizedExeName))
         {
-            GlobalWatchStatusText = $"Could not determine exe for {statusContext}.";
+            GlobalWatchStatusText = FormatText("Ui_StExeUnknownFor", statusContext);
             return false;
         }
 
         if (_allGlobalProcessRows.Length == 0)
         {
-            GlobalWatchStatusText = $"No recent Global Watch scan is available for {normalizedExeName}. Refresh and try again.";
+            GlobalWatchStatusText = FormatText("Ui_StNoRecentScanFor", normalizedExeName);
             return false;
         }
 
@@ -2009,7 +2009,7 @@ public sealed partial class MainWindowViewModel
             }
         }
 
-        GlobalWatchStatusText = $"Could not select a current Global Watch row for {normalizedExeName}. Refresh and try again.";
+        GlobalWatchStatusText = FormatText("Ui_StCannotSelectRowFor", normalizedExeName);
         return false;
     }
 

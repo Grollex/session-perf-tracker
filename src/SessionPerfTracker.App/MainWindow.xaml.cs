@@ -45,9 +45,7 @@ public partial class MainWindow : Window
 
         var summaryService = new SessionSummaryService();
         var comparisonEngine = new SessionComparisonEngine();
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SessionPerfTracker");
+        var appDataPath = App.DataDirectory;
         Directory.CreateDirectory(appDataPath);
         var exportsPath = Path.Combine(appDataPath, "exports");
         Directory.CreateDirectory(exportsPath);
@@ -278,6 +276,11 @@ public partial class MainWindow : Window
         Show();
         Activate();
 
+        if (App.VisualQaRecord)
+        {
+            await CaptureVisualQaRecordingAsync(directory);
+        }
+
         var captures = new (string FileName, int MainTab, int? GlobalTab, int? SettingsTab)[]
         {
             ("01-live.png", 0, null, null),
@@ -313,6 +316,68 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(UpdateLayout);
             await Task.Delay(250);
             SaveWindowPng(Path.Combine(directory, capture.FileName));
+        }
+    }
+
+    /// <summary>
+    /// Visual QA scenario: records a hidden PowerShell load generator that spawns a child and exits first,
+    /// so the capture shows a live session, child continuation and the saved result.
+    /// </summary>
+    private async Task CaptureVisualQaRecordingAsync(string directory)
+    {
+        var powerShell = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        const string script =
+            "$end=(Get-Date).AddSeconds(6); $a=New-Object System.Collections.ArrayList; "
+            + "while((Get-Date) -lt $end){ if($a.Count -lt 50){ [void]$a.Add((New-Object byte[] 4MB)) } else { [void][math]::Sqrt(2) } }; "
+            + "Start-Process ping -ArgumentList '-n','8','127.0.0.1' -WindowStyle Hidden";
+        using var generator = Process.Start(new ProcessStartInfo
+        {
+            FileName = powerShell,
+            Arguments = $"-NoProfile -NonInteractive -Command \"{script}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        if (generator is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _viewModel.StartRecordingProcessAsync(generator.Id);
+            await Task.Delay(4500);
+            await Dispatcher.InvokeAsync(UpdateLayout);
+            SaveWindowPng(Path.Combine(directory, "00-live-recording.png"));
+
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (_viewModel.IsRecording && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(500);
+            }
+
+            if (_viewModel.IsRecording)
+            {
+                await _viewModel.StopRecordingAsync();
+                await Task.Delay(1500);
+            }
+
+            await Dispatcher.InvokeAsync(UpdateLayout);
+            await Task.Delay(500);
+            SaveWindowPng(Path.Combine(directory, "00-live-finished.png"));
+        }
+        finally
+        {
+            try
+            {
+                generator.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
         }
     }
 

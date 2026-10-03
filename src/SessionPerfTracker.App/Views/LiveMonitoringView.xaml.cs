@@ -21,7 +21,7 @@ public partial class LiveMonitoringView : System.Windows.Controls.UserControl
             Filter = "Executable files (*.exe)|*.exe|All files (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false,
-            Title = "Select target executable"
+            Title = SessionPerfTracker.App.ViewModels.UiText.Get("Ui_StPickTargetExeTitle")
         };
 
         var parentWindow = Window.GetWindow(this);
@@ -53,6 +53,11 @@ public partial class LiveMonitoringView : System.Windows.Controls.UserControl
         {
             await ViewModel.StopRecordingAsync();
         }
+    }
+
+    private void OpenLastCompletedSession_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.OpenLastCompletedSession();
     }
 
     private async void AssignCurrentTargetProfile_Click(object sender, RoutedEventArgs e)

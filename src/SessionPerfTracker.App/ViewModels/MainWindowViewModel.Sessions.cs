@@ -33,7 +33,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSession is null)
         {
-            StorageStatusText = "Select a saved session first.";
+            StorageStatusText = GetText("Ui_SelectSavedSessionFirst");
             return;
         }
 
@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
     {
         if (CompareLeft is null || CompareRight is null || CompareLeft.Id == CompareRight.Id)
         {
-            ExportStatusText = "Select two different saved sessions to export compare.";
+            ExportStatusText = GetText("Ui_StSelectTwoSessions");
             return;
         }
 
@@ -137,12 +137,12 @@ public sealed partial class MainWindowViewModel
                 comparison,
                 format,
                 cancellationToken);
-            ExportStatusText = $"Compare {format.ToUpperInvariant()} exported: {path}";
+            ExportStatusText = FormatText("Ui_StCompareExported", format.ToUpperInvariant(), path);
             await RefreshExportFilesAsync(cancellationToken);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Compare export failed: {error.Message}";
+            ExportStatusText = FormatText("Ui_StCompareExportFailed", error.Message);
         }
     }
 
@@ -202,11 +202,11 @@ public sealed partial class MainWindowViewModel
         CompareRight = Sessions.FirstOrDefault();
         RefreshComparison();
         var profileLabel = profileFilter is null or { IsAll: true }
-            ? "all profiles"
+            ? GetText("Ui_StAllProfiles")
             : profileFilter.Label;
         StorageStatusText = string.IsNullOrWhiteSpace(query)
-            ? $"{Sessions.Count:N0} sessions shown ({profileLabel})."
-            : $"{Sessions.Count:N0} sessions match \"{query}\" ({profileLabel}).";
+            ? FormatText("Ui_StSessionsShown", Sessions.Count, profileLabel)
+            : FormatText("Ui_StSessionsMatch", Sessions.Count, query, profileLabel);
     }
 
     private bool HasActiveSessionFilter() =>
@@ -386,7 +386,7 @@ public sealed partial class MainWindowViewModel
 
         if (!string.IsNullOrWhiteSpace(session.Sampling.ThresholdSourceLabel))
         {
-            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactThresholdSource"), session.Sampling.ThresholdSourceLabel));
+            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactThresholdSource"), LocalizeThresholdSourceLabel(session.Sampling.ThresholdSourceLabel)));
         }
 
         if (session.Summary.LongStartupMs is not null)

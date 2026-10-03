@@ -230,6 +230,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _globalWatchSortDescending;
     private string _activeTargetName = string.Empty;
     private string _activeSessionProfileText = string.Empty;
+    private string? _lastCompletedSessionId;
     private string _lastCompletedSessionText = string.Empty;
     private string _lastCompletedSessionHint = string.Empty;
     private int _selectedTabIndex;
@@ -908,7 +909,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     public string SelectedExecutableDisplay =>
-        string.IsNullOrWhiteSpace(SelectedExecutablePath) ? "No executable selected" : SelectedExecutablePath;
+        string.IsNullOrWhiteSpace(SelectedExecutablePath) ? GetText("Ui_StNoExecutableSelected") : SelectedExecutablePath;
 
     public string RecordingStatusText
     {
@@ -1539,7 +1540,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsRecording ? DurationText : GetText("Ui_LiveCurrentConfig"),
         SelectedSamplingOption.Label,
         IncludeChildProcesses ? GetText("Ui_On") : GetText("Ui_Off"),
-        ActiveThresholdSourceText);
+        LocalizeThresholdSourceLabel(ActiveThresholdSourceText));
+
+    /// <summary>Threshold source labels are persisted in English (filters rely on it); translate them only for display.</summary>
+    private string LocalizeThresholdSourceLabel(string label)
+    {
+        const string prefix = "Session profile: ";
+        const string autoPrefix = "Auto -> ";
+        if (!label.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return label;
+        }
+
+        var value = label[prefix.Length..];
+        if (value.StartsWith(autoPrefix, StringComparison.Ordinal))
+        {
+            var resolved = value[autoPrefix.Length..];
+            value = $"{GetText("Ui_Auto")} → {(resolved == "Global fallback" ? GetText("Ui_GlobalFallbackSource") : resolved)}";
+        }
+
+        return $"{GetText("Ui_SessionProfile")}: {value}";
+    }
 
     public string LiveSessionHintText
     {
@@ -1561,6 +1582,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
     public bool HasLastCompletedSession => !string.IsNullOrWhiteSpace(_lastCompletedSessionText);
+    public bool ShowLastCompletedSessionInLive => !IsRecording && HasLastCompletedSession;
     public string LastCompletedSessionText => _lastCompletedSessionText;
     public string LastCompletedSessionHint => _lastCompletedSessionHint;
     public bool HasActiveLiveMetrics => IsRecording && IsLiveMonitorEnabled && _liveTilesHaveData;
@@ -1622,15 +1644,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private static string FormatPercentShort(double? value) =>
         value is null ? "—" : $"{value.Value:N0}%";
-    public string SelectedGlobalProcessPanelTitle => IsGlobalWatchGroupedMode ? "Selected Application" : "Selected Process";
+    public string SelectedGlobalProcessPanelTitle => IsGlobalWatchGroupedMode ? GetText("Ui_StSelectedApplication") : GetText("Ui_StSelectedProcess");
     public string SelectedGlobalProcessTitle => SelectedGlobalProcess is null
-        ? (IsGlobalWatchGroupedMode ? "No application selected" : "No process selected")
+        ? (IsGlobalWatchGroupedMode ? GetText("Ui_StNoApplicationSelected") : GetText("Ui_StNoProcessSelected"))
         : IsGlobalWatchGroupedMode ? SelectedGlobalProcess.AppName : SelectedGlobalProcess.DisplayName;
     public string SelectedGlobalProcessHint => SelectedGlobalProcess is null
-        ? "Select a row to inspect identity, profile health and actions."
+        ? GetText("Ui_StSelectRowHint")
         : SelectedGlobalProcess.IsGroup
-            ? "Application aggregation. Detailed monitoring attaches to the root-candidate process and follows its child tree."
-            : "Process detail mode. Identity metadata is best-effort and may be unavailable for protected processes.";
+            ? GetText("Ui_StGroupHint")
+            : GetText("Ui_StProcessHint");
     public string SelectedGlobalProcessExeText => SelectedGlobalProcess?.ExeName ?? "n/a";
     public string SelectedGlobalProcessPathText => SelectedGlobalProcess?.FullPath ?? "n/a";
     public string SelectedGlobalProcessProductText => SelectedGlobalProcess?.ProductName ?? "n/a";
@@ -1767,20 +1789,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         && _thresholdSettingsStore.Current.SuspiciousWatchlist.Items.Any(item =>
             string.Equals(item.NormalizedPath, SelectedGlobalProcess.NormalizedFullPath, StringComparison.OrdinalIgnoreCase));
     public string SelectedGlobalProcessSuspiciousText => SelectedGlobalProcess is null
-        ? "Select a row to manage watchlist status."
+        ? GetText("Ui_StSelectRowWatchlist")
         : !TryGetSelectedGlobalProcessUsablePath(out _)
-            ? "Full path unavailable; cannot add to suspicious watchlist."
+            ? GetText("Ui_StCannotMarkNoPath")
             : IsSelectedGlobalProcessSuspicious
-                ? "Marked suspicious. Launch transitions will be logged."
-                : "Not marked suspicious.";
+                ? GetText("Ui_StMarkedSuspicious")
+                : GetText("Ui_StNotMarked");
     public bool SelectedGlobalProcessHasRecommendation => SelectedGlobalProcess is not null
         && ProfileRecommendations.Any(recommendation => string.Equals(recommendation.ExeName, SelectedGlobalProcess.ExeName, StringComparison.OrdinalIgnoreCase));
     public string SelectedGlobalProcessRecommendationText => SelectedGlobalProcessHasRecommendation
         ? "A profile recommendation is ready for this exe."
         : "No active recommendation for this exe.";
     public bool HasInspectorTarget => _processInspectorTarget is not null;
-    public string InspectorTitle => _processInspectorTarget?.Title ?? "No target loaded";
-    public string InspectorModeText => _processInspectorTarget?.ModeText ?? "No target loaded";
+    public string InspectorTitle => _processInspectorTarget?.Title ?? GetText("Ui_StNoTargetLoaded");
+    public string InspectorModeText => _processInspectorTarget?.ModeText ?? GetText("Ui_StNoTargetLoaded");
     public string InspectorSourceText => _processInspectorTarget?.SourceText ?? "No source";
     public string InspectorExeText => _processInspectorTarget?.ExeName ?? "n/a";
     public string InspectorPathText => _processInspectorTarget?.FullPath ?? "n/a";
@@ -1848,7 +1870,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 .FirstOrDefault();
 
             return launch is null
-                ? "No suspicious launch logged after mark."
+                ? GetText("Ui_StNoSuspiciousLaunch")
                 : $"Last launch: {launch.Timestamp.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
                     + (launch.ParentProcessId is null
                         ? string.Empty
@@ -1911,6 +1933,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanStop));
                 OnPropertyChanged(nameof(HasCurrentMonitoring));
                 OnPropertyChanged(nameof(CurrentMonitoringStripText));
+                OnPropertyChanged(nameof(ShowLastCompletedSessionInLive));
                 NotifySessionStateProperties();
                 NotifySummaryProperties();
             }

@@ -17,6 +17,13 @@ public partial class App : System.Windows.Application
 
     internal static bool StartMinimizedToTray { get; private set; }
     internal static string? VisualQaDirectory { get; private set; }
+    internal static bool VisualQaRecord { get; private set; }
+
+    /// <summary>Optional isolated data folder (tests, visual QA) instead of %LocalAppData%\SessionPerfTracker.</summary>
+    internal static string? DataDirectoryOverride { get; private set; }
+
+    internal static string DataDirectory => DataDirectoryOverride
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SessionPerfTracker");
 
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _showWindowEvent;
@@ -45,9 +52,16 @@ public partial class App : System.Windows.Application
             || HasArg(e.Args, "/background")
             || HasArg(e.Args, "/minimized");
         VisualQaDirectory = GetArgValue(e.Args, "--visual-qa-dir");
+        VisualQaRecord = HasArg(e.Args, "--visual-qa-record");
+        var dataDirectory = GetArgValue(e.Args, "--data-dir");
+        DataDirectoryOverride = string.IsNullOrWhiteSpace(dataDirectory) ? null : Path.GetFullPath(dataDirectory);
 
-        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
-        _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName);
+        // An isolated data folder gets its own instance slot, so QA runs never collide with the real app.
+        var instanceSuffix = DataDirectoryOverride is null
+            ? string.Empty
+            : $".{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(DataDirectoryOverride.ToLowerInvariant())))[..12]}";
+        _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName + instanceSuffix, out var isFirstInstance);
+        _showWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowWindowEventName + instanceSuffix);
         _ownsSingleInstanceMutex = isFirstInstance;
 
         if (!isFirstInstance)
@@ -148,9 +162,7 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            var appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "SessionPerfTracker");
+            var appDataPath = DataDirectory;
             var dbPath = Path.Combine(appDataPath, "sessionperftracker.db");
             if (File.Exists(dbPath))
             {

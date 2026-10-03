@@ -258,6 +258,23 @@
                         <TextBlock Text="{Binding LiveSnapshotTitle}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding LiveSnapshotEmptyText}" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
                         <TextBlock Text="{Binding LiveSnapshotScopeText}" Style="{StaticResource MutedText}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                        <DockPanel Margin="0,10,0,0"
+                                   LastChildFill="True"
+                                   Visibility="{Binding ShowLastCompletedSessionInLive, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Button DockPanel.Dock="Right"
+                                    Content="{DynamicResource Ui_OpenDetails}"
+                                    Click="OpenLastCompletedSession_Click"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="12,0,0,0" />
+                            <TextBlock Text="{DynamicResource Ui_LiveLastSession}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding LastCompletedSessionText}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding LastCompletedSessionHint}" />
+                        </DockPanel>
                     </StackPanel>
                     <TextBlock Grid.Column="1"
                                Text="{Binding LiveConfigCollectorsText}"

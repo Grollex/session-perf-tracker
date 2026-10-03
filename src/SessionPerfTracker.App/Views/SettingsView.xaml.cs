@@ -158,7 +158,7 @@ public partial class SettingsView : System.Windows.Controls.UserControl
         if (ViewModel is null) return;
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Select export folder",
+            Title = SessionPerfTracker.App.ViewModels.UiText.Get("Ui_StPickExportFolderTitle"),
             InitialDirectory = Directory.Exists(ViewModel.ExportDirectoryText)
                 ? ViewModel.ExportDirectoryText
                 : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)

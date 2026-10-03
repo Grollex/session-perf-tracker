@@ -88,6 +88,35 @@ public sealed partial class LocalizationResourceTests
             + string.Join(Environment.NewLine, violations));
     }
 
+    [Fact]
+    public void Every_resource_key_referenced_by_the_app_exists()
+    {
+        var root = FindRepositoryRoot();
+        var appDirectory = Path.Combine(root, "src", "SessionPerfTracker.App");
+        var englishKeys = LoadResourceKeys(Path.Combine(appDirectory, "Localization", "Strings.en-US.xaml"));
+        var sourceFiles = Directory
+            .EnumerateFiles(appDirectory, "*.*", SearchOption.AllDirectories)
+            .Where(path => (path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".xaml", StringComparison.Ordinal))
+                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                && !path.Contains($"{Path.DirectorySeparatorChar}Localization{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+
+        var missing = sourceFiles
+            .SelectMany(path => ReferencedKeyRegex().Matches(File.ReadAllText(path))
+                .Select(match => match.Groups["key"].Value)
+                .Where(key => !englishKeys.Contains(key))
+                .Select(key => $"{Path.GetRelativePath(root, path)}: {key}"))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.True(
+            missing.Length == 0,
+            "Referenced localization keys must exist."
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, missing));
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -170,4 +199,8 @@ public sealed partial class LocalizationResourceTests
 
     [GeneratedRegex("\"[^\"]*[А-Яа-я][^\"]*\"")]
     private static partial Regex CyrillicStringLiteralRegex();
+
+    // GetText("Ui_X"), FormatText("Ui_X", ...), UiText.Get("Ui_X"), {DynamicResource Ui_X}, TryFindResource("Ui_X").
+    [GeneratedRegex(@"(?:GetText\(|FormatText\(|UiText\.Get\(|TryFindResource\(|Format\()""(?<key>Ui_[A-Za-z0-9_]+)""|DynamicResource (?<key>Ui_[A-Za-z0-9_]+)")]
+    private static partial Regex ReferencedKeyRegex();
 }

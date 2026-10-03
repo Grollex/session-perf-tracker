@@ -23,7 +23,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryReadGlobalThresholds(out var globalLimits))
         {
-            ThresholdSettingsStatusText = "Use positive numeric values for global CPU, RAM, Disk Read, and Disk Write.";
+            ThresholdSettingsStatusText = GetText("Ui_StGlobalLimitsInvalid");
             return;
         }
 
@@ -36,7 +36,7 @@ public sealed partial class MainWindowViewModel
             GpuThresholdPercent = globalLimits.EffectiveGpuThresholdPercent
         }, cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
-        ThresholdSettingsStatusText = "Global fallback saved.";
+        ThresholdSettingsStatusText = GetText("Ui_StGlobalFallbackSaved");
     }
 
     public string HealthAutostartStatusText =>
@@ -82,7 +82,7 @@ public sealed partial class MainWindowViewModel
     {
         if (!TryReadAntiNoiseSettings(out var antiNoise))
         {
-            ThresholdSettingsStatusText = "Use whole seconds for anti-noise settings.";
+            ThresholdSettingsStatusText = GetText("Ui_StAntiNoiseInvalid");
             return;
         }
 
@@ -91,7 +91,7 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
-        ThresholdSettingsStatusText = "Anti-noise settings saved.";
+        ThresholdSettingsStatusText = GetText("Ui_StAntiNoiseSaved");
     }
 
     public async Task SaveCaptureSettingsAsync(CancellationToken cancellationToken = default)
@@ -101,7 +101,7 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
-        ThresholdSettingsStatusText = "Capture scope saved. New sessions will record only enabled metrics.";
+        ThresholdSettingsStatusText = GetText("Ui_StCaptureScopeSaved");
     }
 
     public async Task SaveAppBehaviorSettingsAsync(CancellationToken cancellationToken = default)
@@ -120,8 +120,8 @@ public sealed partial class MainWindowViewModel
 
         ApplyStartupRegistration(_thresholdSettingsStore.Current.Behavior);
         ThresholdSettingsStatusText = MinimizeToTrayOnClose
-            ? "Close button will keep Session Perf Tracker running in the tray."
-            : "Close button will exit Session Perf Tracker.";
+            ? GetText("Ui_StCloseToTray")
+            : GetText("Ui_StCloseExits");
     }
 
     public async Task DismissTrustExplainerAsync(CancellationToken cancellationToken = default)
@@ -207,13 +207,13 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedThresholdProfile is null)
         {
-            ThresholdSettingsStatusText = "Select a profile first.";
+            ThresholdSettingsStatusText = GetText("Ui_StSelectProfileFirst");
             return;
         }
 
         if (!TryReadProfileThresholds(out var profileLimits))
         {
-            ThresholdSettingsStatusText = "Use positive numeric values for selected profile thresholds.";
+            ThresholdSettingsStatusText = GetText("Ui_StProfileLimitsInvalid");
             return;
         }
 
@@ -239,14 +239,14 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedAssignmentProfile is null)
         {
-            ThresholdSettingsStatusText = "Select a profile for the app assignment.";
+            ThresholdSettingsStatusText = GetText("Ui_StSelectProfileForAssignment");
             return;
         }
 
         var exeName = NormalizeExeNameForAssignment(AssignmentExeNameText);
         if (string.IsNullOrWhiteSpace(exeName))
         {
-            ThresholdSettingsStatusText = "Enter an exe name, for example opera.exe.";
+            ThresholdSettingsStatusText = GetText("Ui_StEnterExeName");
             return;
         }
 
@@ -271,7 +271,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedLiveAssignmentProfile is null)
         {
-            LiveAssignmentStatusText = "Select a profile for the current target.";
+            LiveAssignmentStatusText = GetText("Ui_StSelectProfileForTarget");
             return;
         }
 
@@ -280,7 +280,7 @@ public sealed partial class MainWindowViewModel
             var exeName = NormalizeExeNameForAssignment(await ResolveCurrentTargetExeNameAsync(cancellationToken));
             if (string.IsNullOrWhiteSpace(exeName))
             {
-                LiveAssignmentStatusText = "Cannot determine exe name for the current target.";
+                LiveAssignmentStatusText = GetText("Ui_StTargetExeUnknown");
                 return;
             }
 
@@ -309,11 +309,11 @@ public sealed partial class MainWindowViewModel
         }
         catch (ArgumentException)
         {
-            LiveAssignmentStatusText = "Cannot determine exe name for the current target.";
+            LiveAssignmentStatusText = GetText("Ui_StTargetExeUnknown");
         }
         catch (Exception error)
         {
-            LiveAssignmentStatusText = $"Assignment failed: {error.Message}";
+            LiveAssignmentStatusText = FormatText("Ui_StAssignmentFailed", error.Message);
         }
     }
 
@@ -321,7 +321,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedAppProfileAssignment is null)
         {
-            ThresholdSettingsStatusText = "Select an app assignment to remove.";
+            ThresholdSettingsStatusText = GetText("Ui_StSelectAssignmentToRemove");
             return;
         }
 
@@ -354,7 +354,7 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedThresholdProfile is null)
         {
-            ThresholdSettingsStatusText = "Select a profile first.";
+            ThresholdSettingsStatusText = GetText("Ui_StSelectProfileFirst");
             return;
         }
 
@@ -362,7 +362,7 @@ public sealed partial class MainWindowViewModel
             .FirstOrDefault(profile => string.Equals(profile.Id, SelectedThresholdProfile.Id, StringComparison.OrdinalIgnoreCase));
         if (defaultProfile is null)
         {
-            ThresholdSettingsStatusText = "No default exists for this profile.";
+            ThresholdSettingsStatusText = GetText("Ui_StProfileNoDefault");
             return;
         }
 
@@ -403,14 +403,14 @@ public sealed partial class MainWindowViewModel
             },
             cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
-        ThresholdSettingsStatusText = "All profiles, assignments, and global fallback reset to defaults.";
+        ThresholdSettingsStatusText = GetText("Ui_StAllProfilesReset");
     }
 
     public async Task SaveRetentionSettingsAsync(CancellationToken cancellationToken = default)
     {
         if (SelectedRetentionOption is null)
         {
-            StorageStatusText = "Select a retention policy first.";
+            StorageStatusText = GetText("Ui_StSelectRetentionFirst");
             return;
         }
 
@@ -430,7 +430,7 @@ public sealed partial class MainWindowViewModel
         var directory = ExportDirectoryText.Trim();
         if (string.IsNullOrWhiteSpace(directory))
         {
-            ExportStatusText = "Choose an export folder first.";
+            ExportStatusText = GetText("Ui_StChooseExportFolderFirst");
             return;
         }
 
@@ -446,12 +446,12 @@ public sealed partial class MainWindowViewModel
                 },
                 cancellationToken);
             ExportDirectoryText = directory;
-            ExportStatusText = $"Export folder saved: {directory}";
+            ExportStatusText = FormatText("Ui_StExportFolderSaved", directory);
             await RefreshExportFilesAsync(cancellationToken, updateStatus: false);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Export folder save failed: {error.Message}";
+            ExportStatusText = FormatText("Ui_StExportFolderSaveFailed", error.Message);
         }
     }
 
@@ -465,12 +465,12 @@ public sealed partial class MainWindowViewModel
                 settings => settings with { Export = new ExportSettings() },
                 cancellationToken);
             ExportDirectoryText = _defaultExportDirectory;
-            ExportStatusText = $"Export folder reset to default: {_defaultExportDirectory}";
+            ExportStatusText = FormatText("Ui_StExportFolderReset", _defaultExportDirectory);
             await RefreshExportFilesAsync(cancellationToken, updateStatus: false);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Export folder reset failed: {error.Message}";
+            ExportStatusText = FormatText("Ui_StExportFolderResetFailed", error.Message);
         }
     }
 
@@ -492,7 +492,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Could not refresh exports: {error.Message}";
+            ExportStatusText = FormatText("Ui_StExportsRefreshFailed", error.Message);
         }
     }
 
@@ -500,18 +500,18 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedExportFile is null)
         {
-            ExportStatusText = "Select an export file first.";
+            ExportStatusText = GetText("Ui_StSelectExportFileFirst");
             return;
         }
 
         try
         {
             await _exportService.OpenExportAsync(SelectedExportFile.Path, cancellationToken);
-            ExportStatusText = $"Opened export: {SelectedExportFile.FileName}";
+            ExportStatusText = FormatText("Ui_StOpenedExport", SelectedExportFile.FileName);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Could not open export: {error.Message}";
+            ExportStatusText = FormatText("Ui_StOpenExportFailed", error.Message);
         }
     }
 
@@ -520,11 +520,11 @@ public sealed partial class MainWindowViewModel
         try
         {
             await _exportService.OpenExportDirectoryAsync(cancellationToken);
-            ExportStatusText = $"Opened export folder: {_exportService.ExportDirectory}";
+            ExportStatusText = FormatText("Ui_StOpenedExportFolder", _exportService.ExportDirectory);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Could not open export folder: {error.Message}";
+            ExportStatusText = FormatText("Ui_StOpenExportFolderFailed", error.Message);
         }
     }
 
@@ -742,34 +742,34 @@ public sealed partial class MainWindowViewModel
     {
         var deleted = await _sessionStore.DeleteAllSessionsAsync(cancellationToken);
         await ReloadSessionsAsync(cancellationToken: cancellationToken);
-        StorageStatusText = $"Deleted {deleted:N0} sessions.";
+        StorageStatusText = FormatText("Ui_StDeletedSessions", deleted);
     }
 
     public async Task DeleteSessionsOlderThanAsync(int days, CancellationToken cancellationToken = default)
     {
         var deleted = await _sessionStore.DeleteSessionsOlderThanAsync(TimeSpan.FromDays(days), cancellationToken);
         await ReloadSessionsAsync(cancellationToken: cancellationToken);
-        StorageStatusText = $"Deleted {deleted:N0} sessions older than {days:N0} day{(days == 1 ? string.Empty : "s")}.";
+        StorageStatusText = FormatText("Ui_StDeletedOlderSessions", deleted, days);
     }
 
     public async Task DeleteFilteredSessionsAsync(CancellationToken cancellationToken = default)
     {
         if (!HasActiveSessionFilter())
         {
-            StorageStatusText = "Apply a Sessions filter before deleting filtered sessions.";
+            StorageStatusText = GetText("Ui_StApplyFilterFirst");
             return;
         }
 
         var ids = Sessions.Select(session => session.Id).ToArray();
         if (ids.Length == 0)
         {
-            StorageStatusText = "No filtered sessions to delete.";
+            StorageStatusText = GetText("Ui_StNoFilteredSessions");
             return;
         }
 
         var deleted = await _sessionStore.DeleteSessionsAsync(ids, cancellationToken);
         await ReloadSessionsAsync(cancellationToken: cancellationToken);
-        StorageStatusText = $"Deleted {deleted:N0} filtered sessions.";
+        StorageStatusText = FormatText("Ui_StDeletedFilteredSessions", deleted);
     }
 
     private void LoadThresholdSettingsIntoUi(CpuRamThresholdSettings settings, string? selectedProfileId = null)
@@ -874,7 +874,7 @@ public sealed partial class MainWindowViewModel
         {
             ExportDirectoryText = _defaultExportDirectory;
             _exportService.SetExportDirectory(_defaultExportDirectory);
-            ExportStatusText = "Saved export folder was unavailable. Default export folder is active.";
+            ExportStatusText = GetText("Ui_StExportFolderFallback");
         }
     }
 
@@ -926,7 +926,7 @@ public sealed partial class MainWindowViewModel
                 writable: true);
             if (key is null)
             {
-                ThresholdSettingsStatusText = "Could not open Windows startup registry key.";
+                ThresholdSettingsStatusText = GetText("Ui_StStartupKeyFailed");
                 return;
             }
 
@@ -939,7 +939,7 @@ public sealed partial class MainWindowViewModel
             var executablePath = Environment.ProcessPath;
             if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
             {
-                ThresholdSettingsStatusText = "Could not resolve executable path for Windows startup.";
+                ThresholdSettingsStatusText = GetText("Ui_StStartupPathFailed");
                 return;
             }
 
@@ -948,7 +948,7 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            ThresholdSettingsStatusText = $"Windows startup registration failed: {error.Message}";
+            ThresholdSettingsStatusText = FormatText("Ui_StStartupFailed", error.Message);
         }
     }
 
