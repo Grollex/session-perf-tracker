@@ -31,6 +31,18 @@ public partial class GlobalWatchView : System.Windows.Controls.UserControl
 
     private void SortGlobalWatchGpu_Click(object sender, RoutedEventArgs e) => ViewModel?.SortGlobalWatchByGpu();
 
+    private void SortGlobalWatchStarted_Click(object sender, RoutedEventArgs e) => ViewModel?.SortGlobalWatchByStarted();
+
+    private void ShowNewestGlobalProcesses_Click(object sender, RoutedEventArgs e) => ViewModel?.ShowNewestGlobalProcesses();
+
+    private void OpenWatchJournal_Click(object sender, RoutedEventArgs e) => ViewModel?.SelectedGlobalWatchSectionIndex = 1;
+
+    /// <summary>The overview fills the page but never shrinks below a usable height; then the page scrolls.</summary>
+    private void OverviewScroll_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        OverviewRoot.Height = Math.Max(OverviewRoot.MinHeight, OverviewScroll.ViewportHeight);
+    }
+
     private void CopyGlobalProcessPath_Click(object sender, RoutedEventArgs e) => ViewModel?.CopySelectedGlobalProcessFullPath();
 
     private async void OpenGlobalProcessLocation_Click(object sender, RoutedEventArgs e)

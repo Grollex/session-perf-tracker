@@ -21,6 +21,14 @@
 - Measurement helper: start the app with `--data-dir` on a scratch folder and compare `TotalProcessorTime` over 45-60 s windows (visible, minimized).
 - Path coverage for running processes went from about 60% to over 99% after the kernel image-name fallback.
 
+## UI Facts (v1.7.0)
+
+- Navy theme; palette and 24x24 outline icon geometries live in `Themes/MainWindowResources.xaml` (drawn by `Controls/IconGlyph`).
+- Shell: left sidebar navigation (`MainWindowViewModel.Shell.cs`), page title/subtitle per tab, native title bar painted navy through DWM attributes (no custom chrome, snap layouts keep working).
+- Live dashboard (`MainWindowViewModel.LiveDashboard.cs`): KPI tiles show the target while recording and the whole system otherwise; `Controls/TimelineChart` reads `Controls/TimelineHistory` (session and system histories, reduced to about one point per pixel, compacted after 20k points).
+- Global Watch overview (`MainWindowViewModel.GlobalWatchDashboard.cs`): heat-tinted cells (`Controls/HeatBrushConverter`), executable icons (`Controls/ExeIcon`, one background loader thread, shared cache), top consumers, recently started, watch alerts.
+- Measured 1.7.0 overhead (16 logical CPUs): Live visible idle 2.6% of one core (0.16% machine); minimized 0.5% (0.03%); recording 4.8% (0.30%). Private memory 150-160 MB.
+
 ## QA Notes
 
 - Computer-use control of the app window was declined by the user (2026-10-03); use `--visual-qa-dir` / `--visual-qa-record` with `--data-dir` for screenshots instead.

@@ -822,8 +822,8 @@ public sealed partial class MainWindowViewModel
         var previousSessionFilterWasGlobal = SelectedSessionProfileFilter?.IsGlobalFallback ?? false;
         SessionProfileFilters.ReplaceWith(new[]
             {
-                new SessionProfileFilterOptionViewModel("All profiles"),
-                new SessionProfileFilterOptionViewModel("Global fallback", isGlobalFallback: true)
+                new SessionProfileFilterOptionViewModel(GetText("Ui_AllProfilesFilter")),
+                new SessionProfileFilterOptionViewModel(GetText("Ui_GlobalFallbackSource"), isGlobalFallback: true)
             }
             .Concat(settings.Profiles.Select(profile => new SessionProfileFilterOptionViewModel(profile.Name, profile.Id))));
         SelectedSessionProfileFilter = previousSessionFilterWasGlobal

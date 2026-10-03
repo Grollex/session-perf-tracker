@@ -41,7 +41,22 @@ public static partial class GeneratedTextLocalizer
         (Rule($@"Only {Count} sample\(s\) were recorded\."), "Ui_GenOnlySamples"),
         (Rule(@"This session tracked only the root process\."), "Ui_GenRootOnly"),
         (Rule($@"{Count} not-responding event\(s\) were recorded\."), "Ui_GenHangEvents"),
-        (Rule(@"Startup readiness was delayed for (?<a>\d+(?:[.,]\d+)?)s\."), "Ui_GenStartupDelayed")
+        (Rule(@"Startup readiness was delayed for (?<a>\d+(?:[.,]\d+)?)s\."), "Ui_GenStartupDelayed"),
+        // Event titles.
+        (Rule(@"^External close / graceful exit$"), "Ui_GenEvtExternalClose"),
+        (Rule(@"^Crash-like exit$"), "Ui_GenEvtCrashLike"),
+        (Rule(@"^Unexpected exit$"), "Ui_GenEvtUnexpected"),
+        (Rule(@"^Long startup$"), "Ui_GenEvtLongStartup"),
+        (Rule(@"^Hang suspected$"), "Ui_GenEvtHang"),
+        (Rule(@"^Not responding$"), "Ui_GenEvtNotResponding"),
+        (Rule(@"^Recording interrupted$"), "Ui_GenEvtInterrupted"),
+        (Rule(@"^(?<a>.+?) threshold breach$"), "Ui_GenEvtBreach"),
+        (Rule(@"^(?<a>.+?) grouped event$"), "Ui_GenEvtGrouped"),
+        (Rule(@"^(?<a>.+?) spike$"), "Ui_GenEvtSpike"),
+        // Global Watch profile reasons such as "CPU over 85%".
+        (Rule(@"^(?<a>.+?) critical over (?<b>.+)$"), "Ui_GenCriticalOver"),
+        (Rule(@"^(?<a>.+?) over (?<b>.+)$"), "Ui_GenOver"),
+        (Rule(@"^(?<a>.+?) near (?<b>.+)$"), "Ui_GenNear")
     ];
 
     // Identity/profile values keep English sentinels because other code compares them.
@@ -57,7 +72,9 @@ public static partial class GeneratedTextLocalizer
         ["Signature invalid"] = "Ui_GenSignatureInvalid",
         ["Unsigned"] = "Ui_GenUnsigned",
         ["Application group"] = "Ui_GenApplicationGroup",
-        ["Within profile"] = "Ui_GenWithinProfile"
+        ["Within profile"] = "Ui_GenWithinProfile",
+        ["profile limit"] = "Ui_GenProfileLimit",
+        ["fallback limit"] = "Ui_GenFallbackLimit"
     };
 
     /// <summary>Translates a single stored value such as a signer status, "Unavailable" or "Global fallback (Games)".</summary>
@@ -104,11 +121,12 @@ public static partial class GeneratedTextLocalizer
                     return match.Value;
                 }
 
+                var second = match.Groups["b"].Value;
                 return string.Format(
                     CultureInfo.CurrentCulture,
                     format,
                     match.Groups["a"].Value.Trim(),
-                    match.Groups["b"].Value,
+                    second.Length == 0 ? second : LocalizeValue(second, getText),
                     match.Groups["c"].Value);
             });
         }

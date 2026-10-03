@@ -9,22 +9,31 @@ namespace SessionPerfTracker.App.ViewModels;
 public sealed class LiveMetricTileViewModel : ObservableObject
 {
     private string _valueText = "—";
+    private string _subValueText = string.Empty;
     private string _detailText = string.Empty;
+    private string _detail2Text = string.Empty;
     private string _tone = "normal";
     private bool _isAvailable = true;
     private IReadOnlyList<double> _history = [];
+    private double _scaleMaximum;
 
     public LiveMetricTileViewModel(string key, string label, double scaleMaximum, string accent)
     {
         Key = key;
         Label = label;
-        ScaleMaximum = scaleMaximum;
+        _scaleMaximum = scaleMaximum;
         Accent = accent;
     }
 
     public string Key { get; }
     public string Label { get; }
-    public double ScaleMaximum { get; }
+
+    /// <summary>Sparkline ceiling; 0 scales to the visible history.</summary>
+    public double ScaleMaximum
+    {
+        get => _scaleMaximum;
+        set => SetProperty(ref _scaleMaximum, value);
+    }
 
     /// <summary>Accent name used by the view to pick the line color (cpu, ram, gpu, disk).</summary>
     public string Accent { get; }
@@ -35,10 +44,23 @@ public sealed class LiveMetricTileViewModel : ObservableObject
         set => SetProperty(ref _valueText, value);
     }
 
+    /// <summary>Small text right after the value, e.g. "/ 32 GB".</summary>
+    public string SubValueText
+    {
+        get => _subValueText;
+        set => SetProperty(ref _subValueText, value);
+    }
+
     public string DetailText
     {
         get => _detailText;
         set => SetProperty(ref _detailText, value);
+    }
+
+    public string Detail2Text
+    {
+        get => _detail2Text;
+        set => SetProperty(ref _detail2Text, value);
     }
 
     /// <summary>normal / warning / critical relative to the active session limits.</summary>

@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -112,11 +112,51 @@ public partial class MainWindow : Window
         Closed += OnClosed;
         IsVisibleChanged += (_, _) => ReportUiVisibility();
         StateChanged += (_, _) => ReportUiVisibility();
+        SourceInitialized += (_, _) => ApplyDarkTitleBar();
     }
 
     /// <summary>Hidden to tray or minimized: background work continues, rendering pauses.</summary>
     private void ReportUiVisibility() =>
         _viewModel.SetUiVisible(IsVisible && WindowState != WindowState.Minimized);
+
+    /// <summary>
+    /// Keeps the native title bar (snap layouts, accessibility) but paints it in the app's navy.
+    /// Windows 10 gets dark mode only; older builds ignore the attributes.
+    /// </summary>
+    private void ApplyDarkTitleBar()
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var enabled = 1;
+        _ = DwmSetWindowAttribute(handle, DwmUseImmersiveDarkMode, ref enabled, sizeof(int));
+        var caption = 0x0028160D; // #0D1628 as COLORREF (0x00BBGGRR)
+        _ = DwmSetWindowAttribute(handle, DwmCaptionColor, ref caption, sizeof(int));
+        _ = DwmSetWindowAttribute(handle, DwmBorderColor, ref caption, sizeof(int));
+        var text = 0x00E5D4C9;
+        _ = DwmSetWindowAttribute(handle, DwmTextColor, ref text, sizeof(int));
+    }
+
+    private const int DwmUseImmersiveDarkMode = 20;
+    private const int DwmBorderColor = 34;
+    private const int DwmCaptionColor = 35;
+    private const int DwmTextColor = 36;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    private void NavLive_Click(object sender, RoutedEventArgs e) => _viewModel.Navigate(0);
+
+    private void NavGlobalWatch_Click(object sender, RoutedEventArgs e) => _viewModel.Navigate(1);
+
+    private void NavSessions_Click(object sender, RoutedEventArgs e) => _viewModel.Navigate(2);
+
+    private void NavCompare_Click(object sender, RoutedEventArgs e) => _viewModel.Navigate(4);
+
+    private void NavSettings_Click(object sender, RoutedEventArgs e) => _viewModel.Navigate(5);
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -271,10 +311,17 @@ public partial class MainWindow : Window
     {
         Directory.CreateDirectory(directory);
         WindowState = WindowState.Normal;
-        Width = 1420;
-        Height = 860;
+        Width = 1600;
+        Height = 940;
         Show();
         Activate();
+
+        // Let two Global Watch scans land so system-wide numbers are populated.
+        var warmupDeadline = DateTime.UtcNow.AddSeconds(12);
+        while (_viewModel.SystemCpuText == "—" && DateTime.UtcNow < warmupDeadline)
+        {
+            await Task.Delay(250);
+        }
 
         if (App.VisualQaRecord)
         {
@@ -316,7 +363,51 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(UpdateLayout);
             await Task.Delay(250);
             SaveWindowPng(Path.Combine(directory, capture.FileName));
+
+            if (capture.MainTab == 0 && capture.FileName.StartsWith("01", StringComparison.Ordinal))
+            {
+                await CaptureLiveExtrasAsync(directory);
+            }
         }
+    }
+
+    /// <summary>Visual QA: the lower half of the Live page and the target picker drawer.</summary>
+    private async Task CaptureLiveExtrasAsync(string directory)
+    {
+        var scroller = FindDescendant<System.Windows.Controls.ScrollViewer>(MainTabs);
+        if (scroller is not null)
+        {
+            scroller.ScrollToEnd();
+            await Dispatcher.InvokeAsync(UpdateLayout);
+            await Task.Delay(250);
+            SaveWindowPng(Path.Combine(directory, "01b-live-bottom.png"));
+            scroller.ScrollToHome();
+        }
+
+        _viewModel.IsTargetPickerOpen = true;
+        await Dispatcher.InvokeAsync(UpdateLayout);
+        await Task.Delay(400);
+        SaveWindowPng(Path.Combine(directory, "01c-live-target-picker.png"));
+        _viewModel.IsTargetPickerOpen = false;
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            if (FindDescendant<T>(child) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

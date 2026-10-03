@@ -83,4 +83,38 @@ public partial class LiveMonitoringView : System.Windows.Controls.UserControl
             await ViewModel.CaptureSystemContextAsync();
         }
     }
+
+    private async void OpenTargetPicker_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is null)
+        {
+            return;
+        }
+
+        ViewModel.IsTargetPickerOpen = true;
+        if (ViewModel.IsRunningProcessMode)
+        {
+            await ViewModel.RefreshRunningProcessesAsync();
+        }
+    }
+
+    private void CloseTargetPicker_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel?.IsTargetPickerOpen = false;
+    }
+
+    private void TargetPickerBackdrop_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        ViewModel?.IsTargetPickerOpen = false;
+    }
+
+    private void ZoomInTimeline_Click(object sender, RoutedEventArgs e) => ViewModel?.ZoomTimeline(zoomIn: true);
+
+    private void ZoomOutTimeline_Click(object sender, RoutedEventArgs e) => ViewModel?.ZoomTimeline(zoomIn: false);
+
+    private void ShowSessionTimeline_Click(object sender, RoutedEventArgs e) => ViewModel?.TimelineShowsSystem = false;
+
+    private void ShowSystemTimeline_Click(object sender, RoutedEventArgs e) => ViewModel?.TimelineShowsSystem = true;
+
+    private void ViewAllEvents_Click(object sender, RoutedEventArgs e) => ViewModel?.OpenLastCompletedSession();
 }

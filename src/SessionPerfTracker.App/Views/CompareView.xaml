@@ -90,7 +90,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="12,9"
-                                        Background="#151B20"
+                                        Background="#101A2D"
                                         BorderBrush="{StaticResource BorderBrushSoft}"
                                         BorderThickness="0,0,0,1">
                                     <Grid MinHeight="38">

@@ -6,7 +6,9 @@ internal sealed record SystemLoadSample(
     double? CpuPercent,
     double? MemoryUsedMb,
     double? MemoryTotalMb,
-    double? MemoryLoadPercent);
+    double? MemoryLoadPercent,
+    double? CommitUsedMb = null,
+    double? CommitLimitMb = null);
 
 /// <summary>Whole-system CPU and RAM usage from GetSystemTimes/GlobalMemoryStatusEx.</summary>
 internal sealed class SystemMetricsReader
@@ -49,6 +51,9 @@ internal sealed class SystemMetricsReader
 
         var totalMb = status.TotalPhys / 1024d / 1024d;
         var usedMb = (status.TotalPhys - status.AvailPhys) / 1024d / 1024d;
-        return new SystemLoadSample(cpuPercent, usedMb, totalMb, status.MemoryLoad);
+        // TotalPageFile/AvailPageFile describe the commit limit and what is left of it.
+        var commitLimitMb = status.TotalPageFile / 1024d / 1024d;
+        var commitUsedMb = (status.TotalPageFile - status.AvailPageFile) / 1024d / 1024d;
+        return new SystemLoadSample(cpuPercent, usedMb, totalMb, status.MemoryLoad, commitUsedMb, commitLimitMb);
     }
 }

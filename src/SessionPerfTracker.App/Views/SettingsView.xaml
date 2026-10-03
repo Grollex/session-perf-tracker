@@ -8,14 +8,10 @@
         <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
     </UserControl.Resources>
 <TabControl x:Name="SettingsTabs"
-            Margin="16,0,0,0"
-            Style="{StaticResource SubTabControl}"
+            Margin="16,0,16,0"
+            Style="{StaticResource PillTabControl}"
+            ItemContainerStyle="{StaticResource PillTabItem}"
             SelectedIndex="{Binding SelectedSettingsTabIndex, Mode=TwoWay}">
-    <TabControl.ItemContainerStyle>
-        <Style TargetType="TabItem" BasedOn="{StaticResource SubTabItem}">
-            <Setter Property="Margin" Value="0,0,14,0" />
-        </Style>
-    </TabControl.ItemContainerStyle>
     <TabItem Header="{DynamicResource Ui_Capture}">
         <ScrollViewer Style="{StaticResource PageScrollViewer}">
             <Grid>
@@ -322,7 +318,7 @@
                              DisplayMemberPath="DisplayText"
                              MinHeight="72"
                              MaxHeight="140"
-                             Background="#11151B"
+                             Background="#0C1526"
                              BorderBrush="{StaticResource BorderBrushSoft}"
                              Foreground="{StaticResource TextBrush}"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" />
@@ -431,7 +427,7 @@
                                  DisplayMemberPath="DisplayText"
                                  MinHeight="84"
                                  MaxHeight="220"
-                                 Background="#11151B"
+                                 Background="#0C1526"
                                  BorderBrush="{StaticResource BorderBrushSoft}"
                                  Foreground="{StaticResource TextBrush}"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />

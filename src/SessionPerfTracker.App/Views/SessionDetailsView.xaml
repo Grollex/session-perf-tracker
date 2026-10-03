@@ -96,7 +96,7 @@
                             <Border Padding="12"
                                     Margin="0,0,0,8"
                                     CornerRadius="6"
-                                    Background="#151B20"
+                                    Background="#101A2D"
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="1">
                                 <Grid>
@@ -141,10 +141,11 @@
         <Border Style="{StaticResource Panel}" Margin="0,0,0,14">
             <StackPanel>
                 <DockPanel Margin="0,0,0,14">
-                    <TextBlock Text="{DynamicResource Ui_MetricOverview}" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock DockPanel.Dock="Right"
                                Text="{DynamicResource Ui_RecordedMetricsOnly}"
-                               Style="{StaticResource MutedText}" />
+                               Style="{StaticResource MutedText}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="{DynamicResource Ui_MetricOverview}" FontSize="16" FontWeight="SemiBold" />
                 </DockPanel>
 
                 <ItemsControl ItemsSource="{Binding SessionDetailMetricSummaries}">
@@ -228,7 +229,7 @@
                                     <Ellipse Width="9"
                                              Height="9"
                                              Fill="{StaticResource ItemSelectedBorderBrush}"
-                                             Stroke="#0E1116"
+                                             Stroke="#0B1220"
                                              StrokeThickness="2"
                                              VerticalAlignment="Top"
                                              Margin="0,17,0,0" />
@@ -267,7 +268,7 @@
                                             Padding="8"
                                             CornerRadius="6"
                                             Background="#1B252D"
-                                            BorderBrush="#34566A"
+                                            BorderBrush="#2B4A78"
                                             BorderThickness="1"
                                             Visibility="{Binding IsGrouped, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="{Binding GroupedText}" Style="{StaticResource MutedText}" />

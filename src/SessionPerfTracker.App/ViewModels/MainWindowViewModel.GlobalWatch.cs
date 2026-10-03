@@ -1525,6 +1525,7 @@ public sealed partial class MainWindowViewModel
             .Select(group => new GlobalWatchJournalGroupViewModel(group.ToArray()))
             .OrderByDescending(group => group.Entry.Timestamp));
         OnPropertyChanged(nameof(HasGlobalWatchJournalEntries));
+        RefreshRecentWatchAlerts();
         OnPropertyChanged(nameof(HasGlobalWatchJournalGroups));
         GlobalWatchJournalStatusText = GlobalWatchJournalGroups.Count == 0
             ? GetText("Ui_StJournalEmpty")
@@ -1703,6 +1704,7 @@ public sealed partial class MainWindowViewModel
             var watchMode = _selectedGlobalWatchMode;
             var rows = scan.Processes.Select(CreateGlobalProcessRow).ToArray();
             var groups = CreateGlobalWatchGroups(rows);
+            AppendSystemTimeline(scan, rows);
 
             var pathUpdates = await _trackedExecutableCoordinator
                 .ReconcileWithRunningProcessesAsync(rows, scan.CapturedAt, cancellationToken)
@@ -1724,12 +1726,16 @@ public sealed partial class MainWindowViewModel
             {
                 ApplySystemLoad(scan.System);
                 _lastSuccessfulGlobalWatchScanAt = scan.CapturedAt;
+                OnPropertyChanged(nameof(GlobalWatchLastScanShortText));
                 if (pathUpdates.Count > 0)
                 {
                     ApplyTrackedPathUpdates(pathUpdates);
                 }
 
-                if (!IsGlobalWatchSurfaceVisible && !manual)
+                OnSystemScanAppliedForLive();
+
+                // Paused auto-refresh freezes the table; protection above keeps running.
+                if (!manual && (!IsGlobalWatchSurfaceVisible || !GlobalWatchAutoRefresh))
                 {
                     return;
                 }
@@ -1797,6 +1803,11 @@ public sealed partial class MainWindowViewModel
             filtered = filtered.Where(process => process.IsNearLimit);
         }
 
+        if (GlobalWatchOnlySuspicious)
+        {
+            filtered = FilterSuspiciousRows(filtered);
+        }
+
         filtered = SortGlobalWatchRows(filtered);
 
         var previousKey = preferredSelectionKey
@@ -1823,24 +1834,7 @@ public sealed partial class MainWindowViewModel
         SelectedGlobalProcess = nextSelection;
         _selectedGlobalProcessKey = nextSelection?.SelectionKey;
 
-        var displayRows = IsGlobalWatchGroupedMode ? groupRows : processRows;
-        TopCpuOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.CpuPercent ?? 0)
-            .ThenByDescending(process => process.MemoryMb ?? 0)
-            .Take(3));
-        TopRamOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.MemoryMb ?? 0)
-            .ThenByDescending(process => process.CpuPercent ?? 0)
-            .Take(3));
-        TopDiskOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.DiskTotalMbPerSec)
-            .ThenByDescending(process => process.MemoryMb ?? 0)
-            .Take(3));
-        TopGpuOffenders.ReplaceWith(displayRows
-            .Where(process => process.GpuPercent is > 0.05 || process.GpuDedicatedMb is > 1)
-            .OrderByDescending(process => process.GpuPercent ?? 0)
-            .ThenByDescending(process => process.GpuDedicatedMb ?? 0)
-            .Take(3));
+        RefreshGlobalWatchDashboardLists(IsGlobalWatchGroupedMode ? groupRows : processRows, processRows);
     }
 
     public string GlobalWatchRowCountText => FormatText("Ui_GlobalWatchRowCount", GlobalWatchProcesses.Count);
@@ -1889,6 +1883,13 @@ public sealed partial class MainWindowViewModel
                 : rows.OrderBy(process => process.ProfileBadgeText, StringComparer.OrdinalIgnoreCase).ThenByDescending(process => process.CpuPercent ?? 0);
         }
 
+        if (SelectedGlobalWatchSortMode == GlobalSortStarted)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.StartedAt ?? DateTimeOffset.MinValue).ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase)
+                : rows.OrderBy(process => process.StartedAt ?? DateTimeOffset.MaxValue).ThenBy(process => process.Name, StringComparer.OrdinalIgnoreCase);
+        }
+
         if (SelectedGlobalWatchSortMode == GlobalSortHealth)
         {
             return _globalWatchSortDescending
@@ -1921,6 +1922,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(GlobalWatchGpuHeaderText));
         OnPropertyChanged(nameof(GlobalWatchProfileHeaderText));
         OnPropertyChanged(nameof(GlobalWatchHealthHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchStartedHeaderText));
     }
 
     private GlobalProcessRowViewModel? GetSelectedGlobalWatchRow()
@@ -2440,6 +2442,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedGlobalProcessSuspiciousText));
         OnPropertyChanged(nameof(SelectedGlobalProcessHasRecommendation));
         OnPropertyChanged(nameof(SelectedGlobalProcessRecommendationText));
+        NotifyInspectorDashboardProperties();
     }
 
     private void NotifyInspectorTargetProperties()

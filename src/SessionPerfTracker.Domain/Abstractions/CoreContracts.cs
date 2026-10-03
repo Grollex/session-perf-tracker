@@ -247,6 +247,8 @@ public sealed record SystemLoadSnapshot
     public double? CpuPercent { get; init; }
     public double? MemoryUsedMb { get; init; }
     public double? MemoryTotalMb { get; init; }
+    public double? CommitUsedMb { get; init; }
+    public double? CommitLimitMb { get; init; }
     public int ProcessCount { get; init; }
     public bool GpuAvailable { get; init; }
     public string? GpuName { get; init; }

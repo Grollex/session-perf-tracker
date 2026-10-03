@@ -414,6 +414,21 @@ public sealed class AssignedTargetOptionViewModel
 
 public sealed class GlobalProcessRowViewModel
 {
+    public DateTimeOffset? StartedAt => Process.StartedAt;
+
+    public string StartedText => Process.StartedAt is not { } started
+        ? "—"
+        : started.ToLocalTime().Date == DateTime.Today
+            ? started.ToLocalTime().ToString("HH:mm:ss")
+            : started.ToLocalTime().ToString("dd.MM HH:mm");
+
+    /// <summary>Executable path for the row icon; null when the path is unknown.</summary>
+    public string? IconPath => NormalizedFullPath is null ? null : FullPath;
+
+    public string PublisherText => string.IsNullOrWhiteSpace(CompanyName) || CompanyName == "Unavailable" ? "—" : CompanyName;
+
+    public string TableNameText => IsGroup ? AppName : Name;
+
     private const string StateOk = "OK";
     private const string StateNear = "Near limit";
     private const string StateOver = "Over limit";
@@ -1390,7 +1405,27 @@ public sealed class GlobalWatchJournalEntryViewModel
         RecommendationText = string.IsNullOrWhiteSpace(entry.RecommendationId)
             ? string.Empty
             : "recommendation linked";
+        SeverityTag = entry.HealthState switch
+        {
+            "Critical" => "Critical",
+            "Over" or "Near" => "Warning",
+            _ => "Info"
+        };
+        var health = entry.HealthState switch
+        {
+            "Critical" => UiText.Get("Ui_HealthCritical"),
+            "Over" => UiText.Get("Ui_HealthOver"),
+            "Near" => UiText.Get("Ui_HealthNear"),
+            _ => entry.HealthState
+        };
+        AlertText = string.IsNullOrWhiteSpace(entry.Reason)
+            ? health
+            : $"{health} · {GeneratedTextLocalizer.Localize(entry.Reason, UiText.Get)}";
     }
+
+    /// <summary>Critical / Warning / Info for the alert badge.</summary>
+    public string SeverityTag { get; }
+    public string AlertText { get; }
 
     public GlobalWatchJournalEntry Entry { get; }
     public string TimestampText { get; }
@@ -1753,8 +1788,9 @@ public sealed class EventRowViewModel
 {
     public EventRowViewModel(PerformanceEvent performanceEvent)
     {
-        Title = performanceEvent.Title;
+        Title = GeneratedTextLocalizer.Localize(performanceEvent.Title, UiText.Get);
         TimestampText = performanceEvent.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        TimeText = performanceEvent.Timestamp.ToLocalTime().ToString("HH:mm:ss");
         Kind = FormatKindText(performanceEvent);
         IsGrouped = performanceEvent.GroupedKinds.Count > 1;
         GroupedText = IsGrouped
@@ -1765,7 +1801,7 @@ public sealed class EventRowViewModel
         ElapsedText = $"+{TimeSpan.FromMilliseconds(performanceEvent.ElapsedMs):mm\\:ss}";
         ObservedText = FormatObserved(performanceEvent);
         ThresholdText = FormatThreshold(performanceEvent);
-        Details = performanceEvent.Details;
+        Details = GeneratedTextLocalizer.Localize(performanceEvent.Details, UiText.Get);
         ContextSummaryText = FormatContext(performanceEvent.Context);
         HasContext = performanceEvent.Context is not null;
         ContextCapturedText = performanceEvent.Context is null
@@ -1793,6 +1829,7 @@ public sealed class EventRowViewModel
 
     public string Title { get; }
     public string TimestampText { get; }
+    public string TimeText { get; }
     public string Kind { get; }
     public bool IsGrouped { get; }
     public string GroupedText { get; }

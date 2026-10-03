@@ -18,9 +18,10 @@ Start a session for the program you care about, play or work normally, and stop 
 
 ## Main Features
 
-- **Live sessions**: record a running process, an assigned app, or launch an executable; child processes are followed by default and stay tracked after the root exits. Crash-like exits, hangs (not-responding windows), long startups, spikes, and limit breaches are detected and saved.
+- **Live dashboard**: pick a running process, an assigned app or an executable and record it; child processes are followed by default and stay tracked after the root exits. The dashboard shows KPI tiles, a performance timeline with event markers, recent events, the system's top processes, memory details and a session summary. When nothing is recorded it shows the whole system.
+- **Detection**: crash-like exits, hangs (not-responding windows), long startups, spikes and limit breaches are detected and saved with the session.
 - **GPU monitoring**: per-process GPU load (busiest engine, like Task Manager), dedicated/shared video memory, adapter totals, and GPU temperature when the driver reports it. Works with NVIDIA, AMD, and Intel through Windows' own counters; no vendor tools or drivers needed.
-- **Global Watch**: a lightweight scan of every running process with CPU, RAM, GPU, disk, profile health, and executable identity (path, signer, file description).
+- **Global Watch**: a lightweight scan of every running process with load-tinted CPU, GPU, RAM and disk cells, start time, publisher and profile health, a process inspector with actions, top consumers, recently started processes and watch alerts.
 - **Tracked executables**: the suspicious watchlist and process bans store the executable path up front, plus a fingerprint (SHA-256, signer, product, version, size). The app verifies whether each entry is present, finds it again after it moves or updates, and keeps a history of path changes.
 - **Profiles**: different limits for games, browsers, light background apps, hardcore workloads, and custom targets (including GPU limits).
 - **Recommendations**: turn repeated profile-limit warnings into suggested profile assignments.
@@ -35,7 +36,7 @@ The app is meant to stay out of the way while it watches other programs:
 - One kernel process snapshot per tick instead of per-process queries; GPU counters are read in one batch.
 - Sessions are written incrementally, so long recordings do not rewrite the database.
 - The UI only renders while it is visible; when minimized or in the tray, background work continues without drawing.
-- Measured with the 1.6.0 release build on a 16-thread desktop: about 0.1% of total CPU with the Live tab open and idle, about 0.06% minimized, and about 0.4% while recording a session at 1-second sampling (v1.5.5 used about 0.5% while idle). Memory stays around 150 MB.
+- Measured on a 16-thread desktop with the 1.7.0 dashboard: about 0.16% of total CPU with the Live tab open and idle, about 0.03% minimized, and about 0.3% while recording at 1-second sampling (v1.5.5 used about 0.5% while idle). Memory stays around 150-160 MB.
 
 ## Install
 

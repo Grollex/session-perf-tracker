@@ -149,7 +149,7 @@
                            Margin="0,0,0,12" />
                 <Border Padding="12"
                         CornerRadius="6"
-                        Background="#12171E"
+                        Background="#0F192B"
                         BorderBrush="{StaticResource BorderBrushSoft}"
                         BorderThickness="1"
                         Margin="0,0,0,10">
@@ -177,7 +177,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Padding="12,9"
-                                    Background="#151B20"
+                                    Background="#101A2D"
                                     BorderBrush="{StaticResource BorderBrushSoft}"
                                     BorderThickness="0,0,0,1">
                                 <Grid MinHeight="42">

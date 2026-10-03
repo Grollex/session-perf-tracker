@@ -27,6 +27,12 @@
 - The tag-triggered GitHub release workflow overwrote the locally signed installer and `version.json`, leaving `SHA256SUMS.txt` of 1.5.4/1.5.5 out of sync with the published installer; the workflow now leaves existing releases alone.
 - Settings writes rewrote every key; only changed keys are written.
 
+## Fixed In 1.7.0
+
+- Live events were inserted oldest-first after a burst; the newest event is on top now.
+- Finished-session events disappeared from Live immediately; they stay next to the frozen timeline until the next start.
+- The metrics overview header in session details glued its subtitle to the title.
+
 ## Open Bugs / Limitations
 
 - The system CPU/GPU strip shows `—` for the first few seconds after start until two Global Watch scans have run.

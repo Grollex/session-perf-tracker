@@ -4,196 +4,230 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:views="clr-namespace:SessionPerfTracker.App.Views"
+        xmlns:controls="clr-namespace:SessionPerfTracker.App.Controls"
         mc:Ignorable="d"
         Title="{Binding AppWindowTitle}"
         Icon="Assets/app.ico"
-        Width="1420"
-        Height="860"
-        MinWidth="1220"
+        Width="1600"
+        Height="940"
+        MinWidth="1180"
         MinHeight="720"
         WindowStartupLocation="CenterScreen"
-        Background="#0E1116"
-        FontFamily="Segoe UI">
+        Background="#0B1220"
+        FontFamily="Segoe UI"
+        FontSize="13">
     <Window.TaskbarItemInfo>
         <TaskbarItemInfo Description="{Binding AppWindowTitle}" />
     </Window.TaskbarItemInfo>
     <Window.Resources>
-        <ResourceDictionary Source="Themes/MainWindowResources.xaml" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/MainWindowResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Pages are switched by the sidebar, so the tab strip itself is not drawn. -->
+            <Style x:Key="PageHost" TargetType="TabControl">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TabControl">
+                            <ContentPresenter ContentSource="SelectedContent" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="NavIcon" TargetType="controls:IconGlyph">
+                <Setter Property="Width" Value="20" />
+                <Setter Property="Height" Value="20" />
+                <Setter Property="Margin" Value="0,0,14,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Brush" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </Style>
+
+            <Style x:Key="NavText" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+                <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+            </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="236" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <Border Grid.Row="0"
-                Padding="14,9"
-                Background="#12171E"
+        <!-- Sidebar: brand, navigation, recording state and early-version notes. -->
+        <Border Grid.Column="0"
+                Background="{StaticResource SidebarBrush}"
                 BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center">
-                    <Image Source="Assets/app.ico"
-                           Width="22"
-                           Height="22"
-                           Margin="0,0,10,0" />
-                    <StackPanel>
-                        <TextBlock Text="{Binding AppWindowTitle}"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   TextWrapping="NoWrap" />
-                        <TextBlock Text="{DynamicResource Ui_AppSubtitle}"
-                                   Style="{StaticResource MutedText}"
-                                   TextWrapping="NoWrap" />
+                BorderThickness="0,0,1,0">
+            <DockPanel Margin="14,20,14,16">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,28">
+                    <Image Source="Assets/app.ico" Width="34" Height="34" Margin="0,0,12,0" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Ui_AppName}" FontSize="15" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                        <TextBlock Text="{Binding AppVersionBadgeText}" Style="{StaticResource MutedText}" Margin="0,1,0,0" />
                     </StackPanel>
                 </StackPanel>
-                <Button Grid.Column="2"
-                        Content="{DynamicResource Ui_ReportBugQuick}"
-                        Click="ReportBug_Click"
-                        Style="{StaticResource InfoButton}"
-                        MinWidth="92" />
-            </Grid>
+
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Button Click="OpenLive_Click"
+                            Cursor="Hand"
+                            Margin="0,0,0,10"
+                            Visibility="{Binding HasCrossScreenMonitoringStrip, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Padding="12,10"
+                                        CornerRadius="10"
+                                        Background="#0F2E1E"
+                                        BorderBrush="#1F8A4C"
+                                        BorderThickness="1">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="8" Height="8" Fill="{StaticResource GoodBrush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="{DynamicResource Ui_LiveStateRecording}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding CrossScreenMonitoringStripText}"
+                                                   Style="{StaticResource MutedText}"
+                                                   TextWrapping="Wrap"
+                                                   MaxHeight="34"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+
+                    <Border Padding="12,10"
+                            Margin="0,0,0,10"
+                            CornerRadius="10"
+                            Background="#0F192B"
+                            BorderBrush="{StaticResource BorderBrushSoft}"
+                            BorderThickness="1"
+                            Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <controls:IconGlyph Data="{StaticResource IconShield}" Brush="{StaticResource AccentTextBrush}" Width="16" Height="16" Margin="0,0,8,0" />
+                                <TextBlock Text="{DynamicResource Ui_TrustExplainerTitle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_TrustExplainerBody}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       MaxHeight="58"
+                                       TextTrimming="WordEllipsis"
+                                       ToolTip="{DynamicResource Ui_TrustExplainerBody}"
+                                       Margin="0,6,0,8" />
+                            <Button Content="{DynamicResource Ui_TrustExplainerDismiss}"
+                                    Click="DismissTrustExplainer_Click"
+                                    Style="{StaticResource TertiaryButton}"
+                                    HorizontalAlignment="Left"
+                                    MinHeight="26"
+                                    Padding="12,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Padding="12,10"
+                            CornerRadius="10"
+                            Background="#1A1608"
+                            BorderBrush="#4D3E14"
+                            BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource Ui_EarlyVersionTitle}" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}" />
+                            <TextBlock Text="{DynamicResource Ui_EarlyVersionShort}"
+                                       Style="{StaticResource MutedText}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,8" />
+                            <Button Click="ReportBug_Click"
+                                    Style="{StaticResource CompactButton}"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal">
+                                    <controls:IconGlyph Data="{StaticResource IconBug}" Brush="{StaticResource TextBrush}" Width="15" Height="15" Margin="0,0,8,0" />
+                                    <TextBlock Text="{DynamicResource Ui_ReportBugQuick}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel>
+                    <Button Style="{StaticResource NavButton}" Tag="{Binding IsLiveNavSelected}" Click="NavLive_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:IconGlyph Data="{StaticResource IconPulse}" Style="{StaticResource NavIcon}" />
+                            <TextBlock Text="{DynamicResource Ui_Live}" Style="{StaticResource NavText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavButton}" Tag="{Binding IsGlobalWatchNavSelected}" Click="NavGlobalWatch_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:IconGlyph Data="{StaticResource IconBars}" Style="{StaticResource NavIcon}" />
+                            <TextBlock Text="{DynamicResource Ui_GlobalWatch}" Style="{StaticResource NavText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavButton}" Tag="{Binding IsSessionsNavSelected}" Click="NavSessions_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:IconGlyph Data="{StaticResource IconDatabase}" Style="{StaticResource NavIcon}" />
+                            <TextBlock Text="{DynamicResource Ui_Sessions}" Style="{StaticResource NavText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavButton}" Tag="{Binding IsCompareNavSelected}" Click="NavCompare_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:IconGlyph Data="{StaticResource IconCompare}" Style="{StaticResource NavIcon}" />
+                            <TextBlock Text="{DynamicResource Ui_Compare}" Style="{StaticResource NavText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource NavButton}" Tag="{Binding IsSettingsNavSelected}" Click="NavSettings_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:IconGlyph Data="{StaticResource IconSettings}" Style="{StaticResource NavIcon}" StrokeWeight="1.5" />
+                            <TextBlock Text="{DynamicResource Ui_Settings}" Style="{StaticResource NavText}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <Border Grid.Row="1"
-                Padding="14,7"
-                Background="#1B1710"
-                BorderBrush="#6C5931"
-                BorderThickness="0,0,0,1"
-                Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="4" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Border Width="4"
-                        CornerRadius="2"
-                        Background="{StaticResource WarnBrush}" />
-                <TextBlock Grid.Column="2"
-                           Text="{DynamicResource Ui_EarlyVersionTitle}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="4"
-                           Text="{DynamicResource Ui_EarlyVersionBody}"
-                           Style="{StaticResource MutedText}"
-                           TextWrapping="NoWrap"
-                           TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center" />
-            </Grid>
-        </Border>
+        <!-- Page area. -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-        <Border Grid.Row="2"
-                Padding="14,6"
-                Background="#111C24"
-                BorderBrush="#315C7A"
-                BorderThickness="0,0,0,1"
-                Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Grid Grid.Column="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="10" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Border Width="4"
-                            CornerRadius="2"
-                            Background="{StaticResource ItemSelectedBorderBrush}" />
-                    <TextBlock Grid.Column="2"
-                               Text="{DynamicResource Ui_TrustExplainerTitle}"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="{DynamicResource Ui_TrustExplainerBody}"
-                               Grid.Column="4"
-                               Style="{StaticResource MutedText}"
-                               TextWrapping="NoWrap"
-                               TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center" />
-                </Grid>
-                <Button Grid.Column="2"
-                        Content="{DynamicResource Ui_TrustExplainerDismiss}"
-                        Click="DismissTrustExplainer_Click"
-                        Style="{StaticResource TertiaryButton}"
-                        MinHeight="28"
-                        Padding="10,0" />
-            </Grid>
-        </Border>
+            <StackPanel Margin="28,18,28,14">
+                <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource PageSubtitle}" Margin="0,3,0,0" />
+            </StackPanel>
 
-        <Border Grid.Row="3"
-                Padding="12,7"
-                Background="#12171E"
-                BorderBrush="{StaticResource BorderBrushSoft}"
-                BorderThickness="0,0,0,1"
-                Visibility="{Binding HasCrossScreenMonitoringStrip, Converter={StaticResource BoolToVisibilityConverter}}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0"
-                           Text="{Binding CrossScreenMonitoringStripText}"
-                           Style="{StaticResource MutedText}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="2"
-                        Content="{DynamicResource Ui_OpenLive}"
-                        Click="OpenLive_Click"
-                        Style="{StaticResource CompactButton}" />
-            </Grid>
-        </Border>
-
-        <TabControl x:Name="MainTabs"
-                    Grid.Row="4"
-                    TabStripPlacement="Left"
-                    Padding="14,18,18,18"
-                    SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
-            <TabItem Header="{DynamicResource Ui_Live}">
-                <views:LiveMonitoringView />
-            </TabItem>
-
-            <TabItem Header="{DynamicResource Ui_GlobalWatch}">
-                <views:GlobalWatchView />
-            </TabItem>
-
-            <TabItem Header="{DynamicResource Ui_Sessions}">
-                <views:SessionsView />
-            </TabItem>
-
-            <TabItem Header="{DynamicResource Ui_Details}">
-                <views:SessionDetailsView />
-            </TabItem>
-
-            <TabItem Header="{DynamicResource Ui_Compare}">
-                <views:CompareView />
-            </TabItem>
-
-            <TabItem Header="{DynamicResource Ui_Settings}">
-                <views:SettingsView />
-            </TabItem>
-        </TabControl>
+            <TabControl x:Name="MainTabs"
+                        Grid.Row="1"
+                        Margin="12,0,12,12"
+                        Style="{StaticResource PageHost}"
+                        SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+                <TabItem>
+                    <views:LiveMonitoringView />
+                </TabItem>
+                <TabItem>
+                    <views:GlobalWatchView />
+                </TabItem>
+                <TabItem>
+                    <views:SessionsView />
+                </TabItem>
+                <TabItem>
+                    <views:SessionDetailsView />
+                </TabItem>
+                <TabItem>
+                    <views:CompareView />
+                </TabItem>
+                <TabItem>
+                    <views:SettingsView />
+                </TabItem>
+            </TabControl>
+        </Grid>
     </Grid>
 </Window>
-
-
-
-

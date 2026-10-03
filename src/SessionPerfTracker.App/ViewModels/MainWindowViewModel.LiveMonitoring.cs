@@ -49,6 +49,7 @@ public sealed partial class MainWindowViewModel
             }
 
             var sampling = CreateSamplingSettings(target);
+            ResetSessionTimeline();
 
             _activeHandle = target.LifecycleMode == TargetLifecycleMode.LaunchAndTrack
                 ? await _sessionRunner.StartAsync(target, sampling, cancellationToken)
@@ -209,6 +210,7 @@ public sealed partial class MainWindowViewModel
         _liveRootProcessId = sample.RootProcessId ?? _liveRootProcessId;
         _latestLiveSample = sample;
         _liveHistory.Add(sample);
+        AppendSessionTimeline(sample);
 
         var now = DateTimeOffset.UtcNow;
         var visibleOnLive = IsLiveSurfaceVisible;
@@ -235,8 +237,8 @@ public sealed partial class MainWindowViewModel
         }
 
         LiveTiles.Add(new LiveMetricTileViewModel("cpu", GetText("Ui_CPU"), 100, "cpu"));
-        LiveTiles.Add(new LiveMetricTileViewModel("ram", GetText("Ui_RAM"), 0, "ram"));
         LiveTiles.Add(new LiveMetricTileViewModel("gpu", "GPU", 100, "gpu"));
+        LiveTiles.Add(new LiveMetricTileViewModel("ram", GetText("Ui_RAM"), 0, "ram"));
         LiveTiles.Add(new LiveMetricTileViewModel("disk", GetText("Ui_Disk"), 0, "disk"));
         ResetLiveTiles();
     }
@@ -265,31 +267,45 @@ public sealed partial class MainWindowViewModel
             var limits = _activeSessionLimits;
             foreach (var tile in LiveTiles)
             {
+                tile.SubValueText = string.Empty;
                 switch (tile.Key)
                 {
                     case "cpu":
+                        tile.ScaleMaximum = 100;
                         UpdateTile(tile, values, MetricKey.CpuPercent, value => $"{value:N1}%", limits?.CpuThresholdPercent);
-                        tile.DetailText = FormatText("Ui_LiveTileProcesses", sample.ProcessCount);
+                        tile.DetailText = FormatText("Ui_TileSystemCpu", SystemCpuText);
+                        tile.Detail2Text = FormatText("Ui_LiveTileProcesses", sample.ProcessCount);
                         break;
                     case "ram":
+                        tile.ScaleMaximum = 0;
                         UpdateTile(tile, values, MetricKey.MemoryMb, FormatMemory, limits?.RamThresholdMb);
-                        tile.DetailText = GetText("Ui_LiveTilePrivateWorkingSet");
+                        tile.SubValueText = $"/ {FormatGigabytes(SystemMemoryTotalMb)}";
+                        tile.DetailText = values.TryGetValue(MetricKey.MemoryMb, out var memory)
+                            ? FormatText("Ui_TileRamShare", memory / SystemMemoryTotalMb * 100)
+                            : string.Empty;
+                        tile.Detail2Text = GetText("Ui_LiveTilePrivateWorkingSet");
                         break;
                     case "gpu":
+                        tile.ScaleMaximum = 100;
                         var gpuLimit = limits is null || limits.EffectiveGpuThresholdPercent >= 100 ? (double?)null : limits.EffectiveGpuThresholdPercent;
                         UpdateTile(tile, values, MetricKey.GpuPercent, value => $"{value:N1}%", gpuLimit);
                         var gpuMemory = values.TryGetValue(MetricKey.GpuMemoryMb, out var vram) ? FormatMemory(vram) : "—";
-                        tile.DetailText = values.TryGetValue(MetricKey.TemperatureC, out var temperature)
-                            ? FormatText("Ui_LiveTileGpuDetailTemp", gpuMemory, temperature)
-                            : FormatText("Ui_LiveTileGpuDetail", gpuMemory);
+                        tile.DetailText = _systemLoad?.GpuDedicatedTotalMb is double vramTotal
+                            ? FormatText("Ui_TileVram", $"{gpuMemory} / {FormatGigabytes(vramTotal)}")
+                            : FormatText("Ui_TileVram", gpuMemory);
+                        tile.Detail2Text = values.TryGetValue(MetricKey.TemperatureC, out var temperature)
+                            ? $"{temperature:N0} °C"
+                            : string.Empty;
                         break;
                     case "disk":
+                        tile.ScaleMaximum = 0;
                         values.TryGetValue(MetricKey.DiskReadMbPerSec, out var read);
                         values.TryGetValue(MetricKey.DiskWriteMbPerSec, out var write);
                         var hasDisk = values.ContainsKey(MetricKey.DiskReadMbPerSec) || values.ContainsKey(MetricKey.DiskWriteMbPerSec);
                         tile.IsAvailable = hasDisk;
                         tile.ValueText = hasDisk ? $"{read + write:N1} MB/s" : "—";
-                        tile.DetailText = hasDisk ? FormatText("Ui_LiveTileDiskDetail", read, write) : string.Empty;
+                        tile.DetailText = hasDisk ? FormatText("Ui_TileDiskRead", read) : string.Empty;
+                        tile.Detail2Text = hasDisk ? FormatText("Ui_TileDiskWrite", write) : string.Empty;
                         tile.Tone = LiveMetricTileViewModel.ResolveTone(
                             Math.Max(read / Math.Max(0.1, limits?.DiskReadThresholdMbPerSec ?? double.MaxValue),
                                 write / Math.Max(0.1, limits?.DiskWriteThresholdMbPerSec ?? double.MaxValue)),
@@ -302,9 +318,15 @@ public sealed partial class MainWindowViewModel
             _liveTilesHaveData = true;
             LiveSnapshotText = FormatText("Ui_LatestSampleAt", MainWindowViewModel.FormatDuration(TimeSpan.FromMilliseconds(sample.ElapsedMs)));
         }
+        else if (!IsRecording)
+        {
+            ApplySystemTiles();
+        }
 
+        TimelineVersion++;
         NotifyLivePanelProperties();
         NotifySummaryProperties();
+        NotifyLiveDashboardProperties();
     }
 
     private void UpdateTile(
@@ -338,14 +360,15 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
+        AppendSessionMarkers(events);
         _ = Application.Current.Dispatcher.InvokeAsync(() =>
         {
-            foreach (var performanceEvent in events.OrderByDescending(item => item.ElapsedMs))
+            foreach (var performanceEvent in events.OrderBy(item => item.ElapsedMs))
             {
                 VisibleEvents.Insert(0, new EventRowViewModel(performanceEvent));
             }
 
-            while (VisibleEvents.Count > 12)
+            while (VisibleEvents.Count > 60)
             {
                 VisibleEvents.RemoveAt(VisibleEvents.Count - 1);
             }
@@ -436,7 +459,7 @@ public sealed partial class MainWindowViewModel
                 : string.Empty;
             LiveSnapshotText = GetText("Ui_LiveNotRecording");
             CurrentMetrics.Clear();
-            VisibleEvents.Clear();
+            // Events of the finished session stay listed next to its frozen timeline until the next start.
             _latestLiveSample = null;
             _liveTilesHaveData = false;
             _liveTrackedProcessCount = 0;
@@ -450,6 +473,12 @@ public sealed partial class MainWindowViewModel
             SetLiveSessionState(nextState);
             NotifyLivePanelProperties();
             NotifyTargetSelectionProperties();
+            if (IsLiveSurfaceVisible)
+            {
+                // Tiles go back to whole-system values; the finished timeline stays visible.
+                RefreshLiveSurface();
+            }
+
             await ReloadSessionsAsync(session.Id);
         });
     }
@@ -664,6 +693,7 @@ public sealed partial class MainWindowViewModel
     {
         var item = new SessionListItemViewModel(session);
         _lastCompletedSessionId = session.Id;
+        _lastCompletedSessionRecord = session;
         _lastCompletedSessionText = $"{item.AppName} · {item.StartedFullText} · {item.DurationText} · {item.StatusText}";
         _lastCompletedSessionHint = item.ExitText;
         OnPropertyChanged(nameof(HasLastCompletedSession));

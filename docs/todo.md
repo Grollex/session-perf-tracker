@@ -103,6 +103,14 @@
 - [x] Localize ~110 status messages; Live "Last session" line; regression tests (tracking, storage, runner, matcher, localization keys).
 - [x] Overhead target met: about 0.1% of a 16-thread machine with Live open, under 0.1% minimized, about 0.4% while recording.
 
+## 1.7.0 - Dashboard Redesign
+
+- [x] Navy theme, sidebar navigation with icons, page headings, native title bar in theme colors.
+- [x] Live dashboard: target card with session settings, KPI tiles (system when idle), performance timeline with event markers and hover values, recent events, top system processes, memory panel, session summary, target picker drawer.
+- [x] Global Watch overview: toolbar (search, view, state filter, auto-refresh, suspicious only), heat-tinted table with icons, start time and publisher, process inspector, top consumers, recently started, watch alerts; pill tabs for sections.
+- [x] Event titles and Global Watch reasons translated at display time; settings tabs use the same pill style.
+- [x] Regression tests for the timeline history (window, reduction, compaction).
+
 ## Next Ideas (Not Started)
 
 - [ ] Prime the system load strip on startup so CPU/GPU show values before the second Global Watch scan.

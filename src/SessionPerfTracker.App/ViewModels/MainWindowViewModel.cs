@@ -428,10 +428,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<FeedbackDeliveryHistoryItemViewModel> FeedbackDeliveryHistory { get; } = [];
     public ObservableCollection<AssignedTargetOptionViewModel> AssignedTargets { get; } = [];
     public RangeObservableCollection<GlobalProcessRowViewModel> GlobalWatchProcesses { get; } = new();
-    public RangeObservableCollection<GlobalProcessRowViewModel> TopCpuOffenders { get; } = new();
-    public RangeObservableCollection<GlobalProcessRowViewModel> TopRamOffenders { get; } = new();
-    public RangeObservableCollection<GlobalProcessRowViewModel> TopDiskOffenders { get; } = new();
-    public RangeObservableCollection<GlobalProcessRowViewModel> TopGpuOffenders { get; } = new();
     public ObservableCollection<LiveMetricTileViewModel> LiveTiles { get; } = [];
     public ObservableCollection<ProfileRecommendationViewModel> ProfileRecommendations { get; } = [];
     public ObservableCollection<DeniedProfileRecommendationViewModel> DeniedProfileRecommendations { get; } = [];
@@ -1293,6 +1289,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedTabIndex, value))
             {
                 OnPropertyChanged(nameof(IsGlobalWatchTab));
+                NotifyShellProperties();
                 NotifySessionStateProperties();
                 OnVisibleSurfaceChanged();
             }
@@ -1594,7 +1591,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? GetText("Ui_LiveWaitingFirstRefresh")
             : GetText("Ui_LiveMonitorDisabledHint")
         : GetText("Ui_LiveNoDataHint");
-    public bool HasLiveEvents => IsRecording && VisibleEvents.Count > 0;
+    public bool HasLiveEvents => VisibleEvents.Count > 0;
     public bool ShowLiveEventEmptyState => !HasLiveEvents;
     public string LiveEventEmptyText => IsRecording
         ? GetText("Ui_LiveNoEventsYet")
@@ -1683,7 +1680,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SelectedGlobalProcessHealthText => SelectedGlobalProcess?.HealthBadgeText ?? "n/a";
     public string SelectedGlobalProcessReasonText => SelectedGlobalProcess is null
         ? GetText("Ui_SelectProcessProfileHealth")
-        : ShowValue(SelectedGlobalProcess.ProfileReason);
+        : GeneratedTextLocalizer.Localize(ShowValue(SelectedGlobalProcess.ProfileReason), GetText);
 
     private string ShowValue(string? value) => GeneratedTextLocalizer.LocalizeValue(value, GetText);
     public string SelectedGlobalProcessIncludedText => SelectedGlobalProcess?.IncludedProcessSummaryText ?? "n/a";
@@ -1938,6 +1935,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(HasCurrentMonitoring));
                 OnPropertyChanged(nameof(CurrentMonitoringStripText));
                 OnPropertyChanged(nameof(ShowLastCompletedSessionInLive));
+                NotifyLiveDashboardProperties();
                 NotifySessionStateProperties();
                 NotifySummaryProperties();
             }

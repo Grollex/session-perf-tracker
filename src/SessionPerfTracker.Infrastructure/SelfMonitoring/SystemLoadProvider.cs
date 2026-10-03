@@ -36,6 +36,8 @@ public sealed class SystemLoadProvider : ISystemLoadProvider
             CpuPercent = load.CpuPercent,
             MemoryUsedMb = load.MemoryUsedMb,
             MemoryTotalMb = load.MemoryTotalMb,
+            CommitUsedMb = load.CommitUsedMb,
+            CommitLimitMb = load.CommitLimitMb,
             ProcessCount = processCount,
             GpuAvailable = gpu.IsAvailable && adapter is not null,
             GpuName = adapter?.Name,

@@ -22,7 +22,7 @@
     <PackageDescription>Windows desktop app for recording app and game performance sessions, spotting CPU/RAM/GPU/disk spikes, and collecting useful feedback reports while the project is still early.</PackageDescription>
     <VersionFile>$(MSBuildProjectDirectory)\..\..\VERSION</VersionFile>
     <ProjectVersion Condition="Exists('$(VersionFile)')">$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</ProjectVersion>
-    <ProjectVersion Condition="'$(ProjectVersion)' == ''">1.6.0</ProjectVersion>
+    <ProjectVersion Condition="'$(ProjectVersion)' == ''">1.7.0</ProjectVersion>
     <Version>$(ProjectVersion)</Version>
     <AssemblyVersion>$(ProjectVersion).0</AssemblyVersion>
     <FileVersion>$(ProjectVersion).0</FileVersion>
