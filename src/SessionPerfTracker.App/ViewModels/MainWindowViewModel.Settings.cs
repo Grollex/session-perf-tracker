@@ -32,7 +32,8 @@ public sealed partial class MainWindowViewModel
             CpuThresholdPercent = globalLimits.CpuThresholdPercent,
             RamThresholdMb = globalLimits.RamThresholdMb,
             DiskReadThresholdMbPerSec = globalLimits.DiskReadThresholdMbPerSec,
-            DiskWriteThresholdMbPerSec = globalLimits.DiskWriteThresholdMbPerSec
+            DiskWriteThresholdMbPerSec = globalLimits.DiskWriteThresholdMbPerSec,
+            GpuThresholdPercent = globalLimits.EffectiveGpuThresholdPercent
         }, cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
         ThresholdSettingsStatusText = "Global fallback saved.";
@@ -779,6 +780,7 @@ public sealed partial class MainWindowViewModel
         RamThresholdMbText = settings.RamThresholdMb.ToString("N0", CultureInfo.CurrentCulture);
         DiskReadThresholdMbPerSecText = settings.DiskReadThresholdMbPerSec.ToString("N1", CultureInfo.CurrentCulture);
         DiskWriteThresholdMbPerSecText = settings.DiskWriteThresholdMbPerSec.ToString("N1", CultureInfo.CurrentCulture);
+        GpuThresholdPercentText = settings.GpuThresholdPercent.ToString("N0", CultureInfo.CurrentCulture);
         StartupGraceSecondsText = settings.AntiNoise.StartupGraceSeconds.ToString("N0", CultureInfo.CurrentCulture);
         EventCooldownSecondsText = settings.AntiNoise.EventCooldownSeconds.ToString("N0", CultureInfo.CurrentCulture);
         GroupingWindowSecondsText = settings.AntiNoise.GroupingWindowSeconds.ToString("N0", CultureInfo.CurrentCulture);
@@ -787,6 +789,7 @@ public sealed partial class MainWindowViewModel
         CaptureRam = settings.Capture.CaptureRam;
         CaptureDiskRead = settings.Capture.CaptureDiskRead;
         CaptureDiskWrite = settings.Capture.CaptureDiskWrite;
+        CaptureGpu = settings.Capture.CaptureGpu;
         MinimizeToTrayOnClose = settings.Behavior.MinimizeToTrayOnClose;
         StartWithWindows = settings.Behavior.StartWithWindows;
         StartMinimizedToTray = settings.Behavior.StartMinimizedToTray;
@@ -1159,6 +1162,7 @@ public sealed partial class MainWindowViewModel
         ProfileRamThresholdMbText = profile.Limits.RamThresholdMb.ToString("N0", CultureInfo.CurrentCulture);
         ProfileDiskReadThresholdMbPerSecText = profile.Limits.DiskReadThresholdMbPerSec.ToString("N1", CultureInfo.CurrentCulture);
         ProfileDiskWriteThresholdMbPerSecText = profile.Limits.DiskWriteThresholdMbPerSec.ToString("N1", CultureInfo.CurrentCulture);
+        ProfileGpuThresholdPercentText = profile.Limits.EffectiveGpuThresholdPercent.ToString("N0", CultureInfo.CurrentCulture);
     }
 
     private bool TryReadGlobalThresholds(out ThresholdLimitValues limits) =>
@@ -1167,6 +1171,7 @@ public sealed partial class MainWindowViewModel
             RamThresholdMbText,
             DiskReadThresholdMbPerSecText,
             DiskWriteThresholdMbPerSecText,
+            GpuThresholdPercentText,
             out limits);
 
     private CaptureSettings ReadCaptureSettingsFromUi() => new()
@@ -1174,7 +1179,8 @@ public sealed partial class MainWindowViewModel
         CaptureCpu = CaptureCpu,
         CaptureRam = CaptureRam,
         CaptureDiskRead = CaptureDiskRead,
-        CaptureDiskWrite = CaptureDiskWrite
+        CaptureDiskWrite = CaptureDiskWrite,
+        CaptureGpu = CaptureGpu
     };
 
     private bool TryReadProfileThresholds(out ThresholdLimitValues limits) =>
@@ -1183,6 +1189,7 @@ public sealed partial class MainWindowViewModel
             ProfileRamThresholdMbText,
             ProfileDiskReadThresholdMbPerSecText,
             ProfileDiskWriteThresholdMbPerSecText,
+            ProfileGpuThresholdPercentText,
             out limits);
 
     private bool TryReadAntiNoiseSettings(out AntiNoiseSettings antiNoise)
@@ -1211,13 +1218,15 @@ public sealed partial class MainWindowViewModel
         string ramText,
         string diskReadText,
         string diskWriteText,
+        string gpuText,
         out ThresholdLimitValues limits)
     {
         limits = new ThresholdLimitValues();
         if (!TryParsePositive(cpuText, out var cpuThreshold)
             || !TryParsePositive(ramText, out var ramThreshold)
             || !TryParsePositive(diskReadText, out var diskReadThreshold)
-            || !TryParsePositive(diskWriteText, out var diskWriteThreshold))
+            || !TryParsePositive(diskWriteText, out var diskWriteThreshold)
+            || !TryParsePositive(gpuText, out var gpuThreshold))
         {
             return false;
         }
@@ -1227,7 +1236,8 @@ public sealed partial class MainWindowViewModel
             CpuThresholdPercent = Math.Clamp(cpuThreshold, 1, 100),
             RamThresholdMb = Math.Clamp(ramThreshold, 1, 1_048_576),
             DiskReadThresholdMbPerSec = Math.Clamp(diskReadThreshold, 0.1, 1_048_576),
-            DiskWriteThresholdMbPerSec = Math.Clamp(diskWriteThreshold, 0.1, 1_048_576)
+            DiskWriteThresholdMbPerSec = Math.Clamp(diskWriteThreshold, 0.1, 1_048_576),
+            GpuThresholdPercent = Math.Clamp(gpuThreshold, 1, 100)
         };
         return true;
     }

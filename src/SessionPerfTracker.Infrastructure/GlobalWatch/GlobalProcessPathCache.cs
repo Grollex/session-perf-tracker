@@ -1,11 +1,42 @@
 namespace SessionPerfTracker.Infrastructure.GlobalWatch;
 
+/// <summary>
+/// Executable paths keyed by process identity (pid + start time). A path never changes for a
+/// running process, so it is resolved once; failed lookups are retried only occasionally.
+/// </summary>
 internal sealed class GlobalProcessPathCache
 {
     private const int MaxEntries = 4096;
     private static readonly TimeSpan MaxEntryAge = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan FailedLookupRetry = TimeSpan.FromSeconds(60);
     private readonly object _sync = new();
     private readonly Dictionary<ProcessIdentity, CacheEntry> _paths = [];
+
+    public bool TryGet(int processId, DateTimeOffset? startedAt, DateTimeOffset capturedAt, out string? path)
+    {
+        path = null;
+        if (!TryCreateIdentity(processId, startedAt, out var identity))
+        {
+            return false;
+        }
+
+        lock (_sync)
+        {
+            if (!_paths.TryGetValue(identity, out var cached))
+            {
+                return false;
+            }
+
+            if (cached.Path is null && capturedAt - cached.FirstSeenAt >= FailedLookupRetry)
+            {
+                return false;
+            }
+
+            _paths[identity] = cached with { LastSeenAt = capturedAt };
+            path = cached.Path;
+            return true;
+        }
+    }
 
     public string? Resolve(
         int processId,
@@ -23,17 +54,21 @@ internal sealed class GlobalProcessPathCache
             var normalizedObservedPath = NormalizePath(observedPath);
             if (!string.IsNullOrWhiteSpace(normalizedObservedPath))
             {
-                _paths[identity] = new CacheEntry(normalizedObservedPath, capturedAt);
+                _paths[identity] = new CacheEntry(normalizedObservedPath, capturedAt, capturedAt);
                 Prune(capturedAt);
                 return normalizedObservedPath;
             }
 
             if (_paths.TryGetValue(identity, out var cached))
             {
-                _paths[identity] = cached with { LastSeenAt = capturedAt };
+                _paths[identity] = cached.Path is null
+                    ? cached with { LastSeenAt = capturedAt, FirstSeenAt = capturedAt }
+                    : cached with { LastSeenAt = capturedAt };
                 return cached.Path;
             }
 
+            // Remember the failure so protected processes are not re-opened on every scan.
+            _paths[identity] = new CacheEntry(null, capturedAt, capturedAt);
             Prune(capturedAt);
             return null;
         }
@@ -41,7 +76,7 @@ internal sealed class GlobalProcessPathCache
 
     private void Prune(DateTimeOffset now)
     {
-        if (_paths.Count == 0)
+        if (_paths.Count < MaxEntries / 2)
         {
             return;
         }
@@ -91,5 +126,5 @@ internal sealed class GlobalProcessPathCache
             : path.Trim();
 
     private readonly record struct ProcessIdentity(int ProcessId, long StartedAtUtcTicks);
-    private sealed record CacheEntry(string Path, DateTimeOffset LastSeenAt);
+    private sealed record CacheEntry(string? Path, DateTimeOffset LastSeenAt, DateTimeOffset FirstSeenAt);
 }

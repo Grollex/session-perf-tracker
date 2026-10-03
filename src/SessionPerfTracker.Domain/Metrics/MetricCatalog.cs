@@ -16,11 +16,15 @@ public static class MetricCatalog
     [
         new(MetricKey.CpuPercent, "CPU", "%", ComparisonDirection.LowerIsBetter, 80, 35),
         new(MetricKey.MemoryMb, "RAM", "MB", ComparisonDirection.LowerIsBetter, 4096, 512),
-        new(MetricKey.GpuPercent, "GPU", "%", ComparisonDirection.LowerIsBetter, 85, 30),
+        new(MetricKey.GpuPercent, "GPU", "%", ComparisonDirection.LowerIsBetter, 85, 40),
+        new(MetricKey.GpuMemoryMb, "GPU Memory", "MB", ComparisonDirection.LowerIsBetter),
         new(MetricKey.DiskReadMbPerSec, "Disk Read", "MB/s", ComparisonDirection.LowerIsBetter, 180, 80),
         new(MetricKey.DiskWriteMbPerSec, "Disk Write", "MB/s", ComparisonDirection.LowerIsBetter, 120, 60),
-        new(MetricKey.TemperatureC, "Temp", "C", ComparisonDirection.LowerIsBetter, 88, 8)
+        new(MetricKey.TemperatureC, "GPU Temp", "°C", ComparisonDirection.LowerIsBetter, 87)
     ];
+
+    public const double DefaultGpuThresholdPercent = 85;
+    public const double GpuTemperatureWarningC = 87;
 
     public static MetricDefinition Get(MetricKey key) =>
         All.FirstOrDefault(metric => metric.Key == key)

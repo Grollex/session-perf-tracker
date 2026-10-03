@@ -50,6 +50,8 @@ public sealed partial class MainWindowViewModel
 
     public void SortGlobalWatchByDisk() => ToggleGlobalWatchSort(GlobalSortDisk);
 
+    public void SortGlobalWatchByGpu() => ToggleGlobalWatchSort(GlobalSortGpu);
+
     public void SortGlobalWatchByProfile() => ToggleGlobalWatchSort(GlobalSortProfile);
 
     public void SortGlobalWatchByHealth() => ToggleGlobalWatchSort(GlobalSortHealth);
@@ -298,7 +300,8 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
         RefreshSuspiciousWatchCollections();
         NotifyInspectorTargetProperties();
-        SuspiciousWatchStatusText = $"{target.ExeName} marked suspicious. Future launch transitions will be logged.";
+        QueueFingerprintCapture();
+        SuspiciousWatchStatusText = FormatText("Ui_MarkedSuspicious", target.ExeName);
     }
 
     public async Task RemoveInspectorSuspiciousAsync(CancellationToken cancellationToken = default)
@@ -649,7 +652,8 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
         RefreshSuspiciousWatchCollections();
         NotifySelectedGlobalProcessProperties();
-        SuspiciousWatchStatusText = $"{selected.ExeName} marked suspicious. Future launch transitions will be logged.";
+        QueueFingerprintCapture();
+        SuspiciousWatchStatusText = FormatText("Ui_MarkedSuspicious", selected.ExeName);
     }
 
     public async Task RemoveSelectedGlobalProcessSuspiciousAsync(CancellationToken cancellationToken = default)
@@ -1073,6 +1077,7 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         RefreshProcessBanCollections();
+        QueueFingerprintCapture();
         ProcessBanStatusText = FormatText("Ui_ProcessBannedForDuration", rule.ExeName, rule.DurationLabel);
 
         if (!killAfterBan)
@@ -1619,7 +1624,11 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        _runningSuspiciousPaths.Remove(normalizedPath);
+        lock (_runningSuspiciousPaths)
+        {
+            _runningSuspiciousPaths.Remove(normalizedPath);
+        }
+
         RefreshSuspiciousWatchCollections();
         NotifySelectedGlobalProcessProperties();
         SuspiciousWatchStatusText = "Suspicious mark removed. Existing launch history is kept for review.";
@@ -1636,38 +1645,53 @@ public sealed partial class MainWindowViewModel
         }
 
         _globalWatchCts = new CancellationTokenSource();
-        _ = RunGlobalWatchAsync(_globalWatchCts.Token);
+        var token = _globalWatchCts.Token;
+        // Scans, enforcement and journaling run on the thread pool; only the final render touches the UI.
+        _ = Task.Run(() => RunGlobalWatchAsync(token), token);
     }
 
     private async Task RunGlobalWatchAsync(CancellationToken cancellationToken)
     {
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            try
             {
-                await RefreshGlobalWatchCoreAsync(manual: false, cancellationToken);
-                await Task.Delay(GlobalWatchIntervalMs, cancellationToken);
+                await RefreshGlobalWatchCoreAsync(manual: false, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(ResolveGlobalWatchInterval(), cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception error)
+            {
+                // A single failed scan must not stop background protection (bans, launch logging).
+                Trace.TraceWarning("Global Watch loop error: {0}", error.Message);
+                await Task.Delay(GlobalWatchIntervalMs, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception error)
-        {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                GlobalWatchStatusText = $"Global Watch failed: {error.Message}";
-            });
-        }
+    }
+
+    /// <summary>
+    /// 3 s while someone looks at Global Watch or bans/watch rules need fast enforcement,
+    /// otherwise 6 s: journal and recommendations do not need more.
+    /// </summary>
+    private TimeSpan ResolveGlobalWatchInterval()
+    {
+        var settings = _thresholdSettingsStore.Current;
+        var needsFastScans = IsGlobalWatchSurfaceVisible
+            || settings.ProcessBans.Active.Count > 0
+            || settings.SuspiciousWatchlist.Items.Count > 0;
+        return TimeSpan.FromMilliseconds(needsFastScans ? GlobalWatchIntervalMs : GlobalWatchIntervalMs * 2);
     }
 
     private async Task RefreshGlobalWatchCoreAsync(bool manual, CancellationToken cancellationToken)
     {
-        if (!await _globalWatchScanLock.WaitAsync(0, cancellationToken))
+        if (!await _globalWatchScanLock.WaitAsync(0, cancellationToken).ConfigureAwait(false))
         {
             if (manual)
             {
-                GlobalWatchStatusText = "Global Watch scan is already running.";
+                GlobalWatchStatusText = GetText("Ui_GlobalWatchScanBusy");
             }
 
             return;
@@ -1675,28 +1699,47 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            var scan = await _globalProcessScanner.ScanAsync(cancellationToken);
+            var scan = await _globalProcessScanner.ScanAsync(cancellationToken).ConfigureAwait(false);
+            var watchMode = _selectedGlobalWatchMode;
             var rows = scan.Processes.Select(CreateGlobalProcessRow).ToArray();
-            await EnforceProcessBansAsync(rows, scan.CapturedAt, cancellationToken);
-            await UpdateSuspiciousLaunchLoggingAsync(rows, scan.CapturedAt, cancellationToken);
-            await UpdateProfileRecommendationsFromGlobalWatchAsync(rows, scan.CapturedAt, cancellationToken);
-            var journalRows = SelectedGlobalWatchMode == GlobalModeApplications
-                ? CreateGlobalWatchGroups(rows).ToArray()
-                : rows;
-            await UpdateGlobalWatchJournalAsync(journalRows, scan.CapturedAt, cancellationToken);
+            var groups = CreateGlobalWatchGroups(rows);
+
+            var pathUpdates = await _trackedExecutableCoordinator
+                .ReconcileWithRunningProcessesAsync(rows, scan.CapturedAt, cancellationToken)
+                .ConfigureAwait(false);
+            await EnforceProcessBansAsync(rows, scan.CapturedAt, cancellationToken).ConfigureAwait(false);
+            await UpdateSuspiciousLaunchLoggingAsync(rows, scan.CapturedAt, watchMode, cancellationToken).ConfigureAwait(false);
+            await UpdateProfileRecommendationsFromGlobalWatchAsync(rows, scan.CapturedAt, cancellationToken).ConfigureAwait(false);
+            await UpdateGlobalWatchJournalAsync(
+                watchMode == GlobalModeApplications ? groups : rows,
+                scan.CapturedAt,
+                watchMode,
+                cancellationToken).ConfigureAwait(false);
+
+            // Atomic reference swaps: UI-thread readers always see a complete scan.
+            _allGlobalGroupRows = groups;
+            _allGlobalProcessRows = rows;
+            _globalWatchUiDirty = true;
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var selectedKey = _selectedGlobalProcessKey ?? GetGlobalWatchSelectionKey(SelectedGlobalProcess);
-                _allGlobalProcessRows.Clear();
-                _allGlobalProcessRows.AddRange(rows);
-                ApplyGlobalWatchFilterAndSort(selectedKey);
-                GlobalWatchLastScanText = scan.ComparedToPreviousScan is null
-                    ? $"Last scan: {scan.CapturedAt.ToLocalTime():HH:mm:ss}; CPU/Disk deltas warm up on next scan"
-                    : $"Last scan: {scan.CapturedAt.ToLocalTime():HH:mm:ss}; interval {scan.ComparedToPreviousScan.Value.TotalSeconds:N1}s";
+                ApplySystemLoad(scan.System);
                 _lastSuccessfulGlobalWatchScanAt = scan.CapturedAt;
+                if (pathUpdates.Count > 0)
+                {
+                    ApplyTrackedPathUpdates(pathUpdates);
+                }
+
+                if (!IsGlobalWatchSurfaceVisible && !manual)
+                {
+                    return;
+                }
+
+                ApplyGlobalWatchFilterAndSort();
+                GlobalWatchLastScanText = scan.ComparedToPreviousScan is null
+                    ? FormatText("Ui_GlobalWatchLastScanWarmup", scan.CapturedAt.ToLocalTime())
+                    : FormatText("Ui_GlobalWatchLastScan", scan.CapturedAt.ToLocalTime(), scan.ComparedToPreviousScan.Value.TotalSeconds);
                 NotifyHealthCheckProperties();
-                GlobalWatchStatusText = $"Global Watch: profile-aware scan every {GlobalWatchIntervalMs / 1000:N0}s. Unassigned apps use Light background fallback.";
-            });
+            }, System.Windows.Threading.DispatcherPriority.Background);
         }
         catch (OperationCanceledException)
         {
@@ -1706,7 +1749,7 @@ public sealed partial class MainWindowViewModel
         {
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                GlobalWatchStatusText = $"Global Watch scan failed: {error.Message}";
+                GlobalWatchStatusText = FormatText("Ui_GlobalWatchScanFailed", error.Message);
             });
         }
         finally
@@ -1717,10 +1760,14 @@ public sealed partial class MainWindowViewModel
 
     private void ApplyGlobalWatchFilterAndSort(string? preferredSelectionKey = null)
     {
+        _globalWatchUiDirty = false;
+        var processRows = _allGlobalProcessRows;
+        var groupRows = _allGlobalGroupRows;
+
         var query = GlobalWatchFilterText.Trim();
         IEnumerable<GlobalProcessRowViewModel> filtered = IsGlobalWatchGroupedMode
-            ? CreateGlobalWatchGroups(_allGlobalProcessRows)
-            : _allGlobalProcessRows;
+            ? groupRows
+            : processRows;
         if (!string.IsNullOrWhiteSpace(query))
         {
             filtered = filtered.Where(process => process.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
@@ -1756,9 +1803,19 @@ public sealed partial class MainWindowViewModel
             ?? _selectedGlobalProcessKey
             ?? GetGlobalWatchSelectionKey(SelectedGlobalProcess);
         var filteredList = filtered.ToList();
-        GlobalWatchProcesses.ReplaceWith(filteredList);
+        _suppressGlobalSelectionSync = true;
+        try
+        {
+            GlobalWatchProcesses.ReplaceWith(filteredList);
+        }
+        finally
+        {
+            _suppressGlobalSelectionSync = false;
+        }
+
         OnPropertyChanged(nameof(HasGlobalWatchRows));
         OnPropertyChanged(nameof(GlobalWatchEmptyStateText));
+        OnPropertyChanged(nameof(GlobalWatchRowCountText));
         var nextSelection = previousKey is null
             ? GlobalWatchProcesses.FirstOrDefault()
             : GlobalWatchProcesses.FirstOrDefault(process => string.Equals(process.SelectionKey, previousKey, StringComparison.OrdinalIgnoreCase))
@@ -1766,25 +1823,27 @@ public sealed partial class MainWindowViewModel
         SelectedGlobalProcess = nextSelection;
         _selectedGlobalProcessKey = nextSelection?.SelectionKey;
 
-        var displayRows = IsGlobalWatchGroupedMode
-            ? CreateGlobalWatchGroups(_allGlobalProcessRows).ToArray()
-            : _allGlobalProcessRows.ToArray();
+        var displayRows = IsGlobalWatchGroupedMode ? groupRows : processRows;
         TopCpuOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.ProfileSeverityRank)
-            .ThenByDescending(process => process.CpuPercent ?? 0)
+            .OrderByDescending(process => process.CpuPercent ?? 0)
             .ThenByDescending(process => process.MemoryMb ?? 0)
             .Take(3));
         TopRamOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.ProfileSeverityRank)
-            .ThenByDescending(process => process.MemoryMb ?? 0)
+            .OrderByDescending(process => process.MemoryMb ?? 0)
             .ThenByDescending(process => process.CpuPercent ?? 0)
             .Take(3));
         TopDiskOffenders.ReplaceWith(displayRows
-            .OrderByDescending(process => process.ProfileSeverityRank)
-            .ThenByDescending(process => process.DiskTotalMbPerSec)
+            .OrderByDescending(process => process.DiskTotalMbPerSec)
             .ThenByDescending(process => process.MemoryMb ?? 0)
             .Take(3));
+        TopGpuOffenders.ReplaceWith(displayRows
+            .Where(process => process.GpuPercent is > 0.05 || process.GpuDedicatedMb is > 1)
+            .OrderByDescending(process => process.GpuPercent ?? 0)
+            .ThenByDescending(process => process.GpuDedicatedMb ?? 0)
+            .Take(3));
     }
+
+    public string GlobalWatchRowCountText => FormatText("Ui_GlobalWatchRowCount", GlobalWatchProcesses.Count);
 
     private IEnumerable<GlobalProcessRowViewModel> SortGlobalWatchRows(IEnumerable<GlobalProcessRowViewModel> rows)
     {
@@ -1793,6 +1852,13 @@ public sealed partial class MainWindowViewModel
             return _globalWatchSortDescending
                 ? rows.OrderByDescending(process => process.MemoryMb ?? 0).ThenByDescending(process => process.CpuPercent ?? 0)
                 : rows.OrderBy(process => process.MemoryMb ?? 0).ThenBy(process => process.CpuPercent ?? 0);
+        }
+
+        if (SelectedGlobalWatchSortMode == GlobalSortGpu)
+        {
+            return _globalWatchSortDescending
+                ? rows.OrderByDescending(process => process.GpuPercent ?? 0).ThenByDescending(process => process.GpuDedicatedMb ?? 0)
+                : rows.OrderBy(process => process.GpuPercent ?? 0).ThenBy(process => process.GpuDedicatedMb ?? 0);
         }
 
         if (SelectedGlobalWatchSortMode == GlobalSortDisk)
@@ -1852,6 +1918,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(GlobalWatchCpuHeaderText));
         OnPropertyChanged(nameof(GlobalWatchRamHeaderText));
         OnPropertyChanged(nameof(GlobalWatchDiskHeaderText));
+        OnPropertyChanged(nameof(GlobalWatchGpuHeaderText));
         OnPropertyChanged(nameof(GlobalWatchProfileHeaderText));
         OnPropertyChanged(nameof(GlobalWatchHealthHeaderText));
     }
@@ -1884,7 +1951,7 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        if (_allGlobalProcessRows.Count == 0)
+        if (_allGlobalProcessRows.Length == 0)
         {
             GlobalWatchStatusText = $"No recent Global Watch scan is available for {normalizedExeName}. Refresh and try again.";
             return false;
@@ -2127,11 +2194,12 @@ public sealed partial class MainWindowViewModel
     private async Task UpdateGlobalWatchJournalAsync(
         IReadOnlyList<GlobalProcessRowViewModel> rows,
         DateTimeOffset capturedAt,
+        string watchMode,
         CancellationToken cancellationToken)
     {
         var entriesToAdd = _globalWatchJournalCoordinator.CreateThresholdEntries(
             rows,
-            SelectedGlobalWatchMode,
+            watchMode,
             GlobalModeApplications,
             GlobalModeProcesses,
             capturedAt);
@@ -2152,94 +2220,96 @@ public sealed partial class MainWindowViewModel
                     }
                 };
             },
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             RefreshGlobalWatchJournalCollection();
-            GlobalWatchJournalStatusText = $"{entriesToAdd.Count:N0} watch journal entries added at {capturedAt.ToLocalTime():HH:mm:ss}.";
-        });
+            GlobalWatchJournalStatusText = FormatText("Ui_JournalEntriesAdded", entriesToAdd.Count, capturedAt.ToLocalTime());
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private async Task UpdateSuspiciousLaunchLoggingAsync(
         IReadOnlyList<GlobalProcessRowViewModel> rows,
         DateTimeOffset capturedAt,
+        string watchMode,
         CancellationToken cancellationToken)
     {
-        var entriesToAdd = new List<SuspiciousLaunchEntry>();
-        await _thresholdSettingsStore.UpdateAsync(
-            settings =>
+        var watchlist = _thresholdSettingsStore.Current.SuspiciousWatchlist;
+        if (watchlist.Items.Count == 0)
+        {
+            lock (_runningSuspiciousPaths)
             {
-                var watchlist = settings.SuspiciousWatchlist;
-                if (watchlist.Items.Count == 0)
+                _runningSuspiciousPaths.Clear();
+            }
+
+            return;
+        }
+
+        var rowsByPath = rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath))
+            .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.CpuPercent ?? 0).First(), StringComparer.OrdinalIgnoreCase);
+        var entriesToAdd = new List<SuspiciousLaunchEntry>();
+        lock (_runningSuspiciousPaths)
+        {
+            foreach (var item in watchlist.Items)
+            {
+                var row = TrackedExecutableMatcher.AllPaths(item)
+                    .Select(path => rowsByPath.GetValueOrDefault(path))
+                    .FirstOrDefault(match => match is not null);
+                if (row is null)
                 {
-                    _runningSuspiciousPaths.Clear();
-                    return settings;
+                    _runningSuspiciousPaths.Remove(item.NormalizedPath);
+                    continue;
                 }
 
-                var suspiciousByPath = watchlist.Items
-                    .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedPath))
-                    .ToDictionary(item => item.NormalizedPath, StringComparer.OrdinalIgnoreCase);
-                var runningByPath = rows
-                    .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath)
-                        && suspiciousByPath.ContainsKey(row.NormalizedFullPath))
-                    .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.CpuPercent ?? 0).First(), StringComparer.OrdinalIgnoreCase);
-
-                foreach (var item in suspiciousByPath.Values)
+                // Log the transition "not running -> running" once, not every scan.
+                if (!_runningSuspiciousPaths.Add(item.NormalizedPath))
                 {
-                    if (!runningByPath.TryGetValue(item.NormalizedPath, out var row))
-                    {
-                        _runningSuspiciousPaths.Remove(item.NormalizedPath);
-                        continue;
-                    }
-
-                    if (!_runningSuspiciousPaths.Add(item.NormalizedPath))
-                    {
-                        continue;
-                    }
-
-                    entriesToAdd.Add(new SuspiciousLaunchEntry
-                    {
-                        Id = $"suspicious_launch_{Guid.NewGuid():N}",
-                        Timestamp = capturedAt,
-                        NormalizedPath = item.NormalizedPath,
-                        ExeName = item.ExeName,
-                        ProductName = string.IsNullOrWhiteSpace(row.ProductName) ? item.ProductName : row.ProductName,
-                        CompanyName = string.IsNullOrWhiteSpace(row.CompanyName) ? item.CompanyName : row.CompanyName,
-                        SignerStatus = string.IsNullOrWhiteSpace(row.SignerStatus) ? item.SignerStatus : row.SignerStatus,
-                        WatchMode = SelectedGlobalWatchMode,
-                        ParentProcessId = row.Process.ParentProcessId,
-                        ParentProcessName = row.Process.ParentProcessName
-                    });
+                    continue;
                 }
 
-                return entriesToAdd.Count == 0
-                    ? settings
-                    : settings with
-                    {
-                        SuspiciousWatchlist = watchlist with
-                        {
-                            LaunchHistory = entriesToAdd
-                                .Concat(watchlist.LaunchHistory)
-                                .OrderByDescending(item => item.Timestamp)
-                                .Take(watchlist.MaxLaunchHistory)
-                                .ToList()
-                        }
-                    };
-            },
-            cancellationToken);
+                entriesToAdd.Add(new SuspiciousLaunchEntry
+                {
+                    Id = $"suspicious_launch_{Guid.NewGuid():N}",
+                    Timestamp = capturedAt,
+                    NormalizedPath = row.NormalizedFullPath,
+                    ExeName = item.ExeName,
+                    ProductName = string.IsNullOrWhiteSpace(row.ProductName) ? item.ProductName : row.ProductName,
+                    CompanyName = string.IsNullOrWhiteSpace(row.CompanyName) ? item.CompanyName : row.CompanyName,
+                    SignerStatus = string.IsNullOrWhiteSpace(row.SignerStatus) ? item.SignerStatus : row.SignerStatus,
+                    WatchMode = watchMode,
+                    ParentProcessId = row.Process.ParentProcessId,
+                    ParentProcessName = row.Process.ParentProcessName
+                });
+            }
+        }
 
         if (entriesToAdd.Count == 0)
         {
             return;
         }
 
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
+            {
+                SuspiciousWatchlist = settings.SuspiciousWatchlist with
+                {
+                    LaunchHistory = entriesToAdd
+                        .Concat(settings.SuspiciousWatchlist.LaunchHistory)
+                        .OrderByDescending(item => item.Timestamp)
+                        .Take(settings.SuspiciousWatchlist.MaxLaunchHistory)
+                        .ToList()
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             RefreshSuspiciousWatchCollections();
-            SuspiciousWatchStatusText = $"{entriesToAdd.Count:N0} suspicious launch transition{(entriesToAdd.Count == 1 ? string.Empty : "s")} logged.";
-        });
+            SuspiciousWatchStatusText = FormatText("Ui_SuspiciousLaunchesLogged", entriesToAdd.Count);
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private async Task EnforceProcessBansAsync(
@@ -2252,24 +2322,38 @@ public sealed partial class MainWindowViewModel
             settings.ProcessBans,
             rows,
             capturedAt,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         if (!result.Changed)
         {
             return;
         }
 
+        // Merge into the latest state: a ban added or removed meanwhile must not be overwritten.
         await _thresholdSettingsStore.UpdateAsync(
-            latestSettings => latestSettings with { ProcessBans = result.ProcessBans },
-            cancellationToken);
+            latest => latest with
+            {
+                ProcessBans = latest.ProcessBans with
+                {
+                    Active = latest.ProcessBans.Active
+                        .Where(rule => ProcessBanCoordinator.IsActive(rule, capturedAt))
+                        .ToList(),
+                    History = result.NewEvents
+                        .Concat(latest.ProcessBans.History)
+                        .OrderByDescending(entry => entry.Timestamp)
+                        .Take(latest.ProcessBans.MaxHistory)
+                        .ToList()
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
             RefreshProcessBanCollections();
             if (result.TotalTerminated > 0)
             {
-                ProcessBanStatusText = $"Process bans enforced at {capturedAt.ToLocalTime():HH:mm:ss}: {result.TotalTerminated:N0} process{(result.TotalTerminated == 1 ? string.Empty : "es")} terminated.";
+                ProcessBanStatusText = FormatText("Ui_BansEnforced", capturedAt.ToLocalTime(), result.TotalTerminated);
             }
-        });
+        }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
     private async Task UpdateProfileRecommendationsFromGlobalWatchAsync(

@@ -86,6 +86,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string GlobalSortCpu => "CPU";
     private string GlobalSortRam => "RAM";
     private string GlobalSortDisk => GetText("Ui_Disk");
+    private string GlobalSortGpu => "GPU";
     private string GlobalSortName => GetText("Ui_Process");
     private string GlobalSortPid => GetText("Ui_PidOrCount");
     private string GlobalSortProfile => GetText("Ui_Profile");
@@ -122,12 +123,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly SelfUninstallService _selfUninstallService;
     private readonly UpdateStatusFormatter _updateStatusFormatter;
     private readonly HealthStatusCoordinator _healthStatusCoordinator;
-    private string GetText(string key) => Application.Current.TryFindResource(key) as string ?? key;
+    private readonly ISystemLoadProvider _systemLoadProvider;
+    private readonly IExecutableIdentityProvider _identityProvider;
+    private readonly TrackedExecutableCoordinator _trackedExecutableCoordinator;
+    private readonly LiveMetricHistory _liveHistory = new();
+    private string GetText(string key) => UiText.Get(key);
     private string FormatText(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, GetText(key), args);
     private readonly string _defaultExportDirectory;
     private readonly string _updateDownloadDirectory;
     private readonly List<SelfMonitoringSample> _selfMonitoringSamples = [];
-    private readonly List<GlobalProcessRowViewModel> _allGlobalProcessRows = [];
+    private GlobalProcessRowViewModel[] _allGlobalProcessRows = [];
+    private IReadOnlyList<GlobalProcessRowViewModel> _allGlobalGroupRows = [];
+    private volatile bool _suppressGlobalSelectionSync;
     private readonly HashSet<string> _runningSuspiciousPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _globalWatchScanLock = new(1, 1);
     private SessionListItemViewModel? _selectedSession;
@@ -168,6 +175,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _ramThresholdMbText = "4096";
     private string _diskReadThresholdMbPerSecText = "180";
     private string _diskWriteThresholdMbPerSecText = "120";
+    private string _gpuThresholdPercentText = "85";
+    private string _profileGpuThresholdPercentText = "85";
     private string _profileCpuThresholdPercentText = "75";
     private string _profileRamThresholdMbText = "4000";
     private string _profileDiskReadThresholdMbPerSecText = "180";
@@ -241,6 +250,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _captureRam = true;
     private bool _captureDiskRead = true;
     private bool _captureDiskWrite = true;
+    private bool _captureGpu = true;
     private bool _automaticallyCheckForUpdates = true;
     private bool _automaticallyInstallUpdatesOnStartup;
     private bool _isCheckingForUpdates;
@@ -256,11 +266,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _globalWatchOnlyNearLimit;
     private bool _autoStopInProgress;
     private bool _manualStopInProgress;
+    private bool _isUiVisible = true;
+    private volatile bool _globalWatchUiDirty;
+    private bool _liveTilesHaveData;
+    private SystemLoadSnapshot? _systemLoad;
+    private MetricSample? _latestLiveSample;
+    private ThresholdLimitValues? _activeSessionLimits;
     private LiveSessionUiState _liveSessionState = LiveSessionUiState.ReadyToStart;
     private string _autoStopStatusText = string.Empty;
     private IRunningSessionHandle? _activeHandle;
     private CancellationTokenSource? _selfMonitoringCts;
     private CancellationTokenSource? _globalWatchCts;
+    private CancellationTokenSource? _maintenanceCts;
     private DateTimeOffset? _lastSuccessfulGlobalWatchScanAt;
     private DateTimeOffset _lastLiveUiRefresh = DateTimeOffset.MinValue;
     private MetricCapabilities _liveCapabilities = new()
@@ -293,8 +310,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IExportService exportService,
         IUpdateService updateService,
         string defaultExportDirectory,
-        string updateDownloadDirectory)
+        string updateDownloadDirectory,
+        ISystemLoadProvider systemLoadProvider,
+        IExecutableIdentityProvider identityProvider,
+        IExecutableLocator? executableLocator)
     {
+        _systemLoadProvider = systemLoadProvider;
+        _identityProvider = identityProvider;
+        _trackedExecutableCoordinator = new TrackedExecutableCoordinator(thresholdSettingsStore, identityProvider, executableLocator);
         _sessionStore = sessionStore;
         _comparisonEngine = comparisonEngine;
         _targetResolver = targetResolver;
@@ -351,7 +374,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void InitializeLocalizedDefaults()
     {
         TargetModes = [TargetModeRunningProcess, TargetModeAssignedApps, TargetModeExecutable];
-        GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortDisk, GlobalSortName, GlobalSortPid, GlobalSortProfile, GlobalSortHealth];
+        GlobalWatchSortModes = [GlobalSortCpu, GlobalSortRam, GlobalSortGpu, GlobalSortDisk, GlobalSortName, GlobalSortPid, GlobalSortProfile, GlobalSortHealth];
         GlobalWatchModes = [GlobalModeApplications, GlobalModeProcesses];
         _selectedTargetMode = TargetModeRunningProcess;
         _selectedGlobalWatchSortMode = GlobalSortName;
@@ -383,7 +406,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _selfSnapshotsBudgetStatusText = GetText("Ui_OnlyOnEvent");
     }
 
-    public ObservableCollection<SessionListItemViewModel> Sessions { get; } = [];
+    public RangeObservableCollection<SessionListItemViewModel> Sessions { get; } = new();
     public ObservableCollection<TargetOptionViewModel> RunningTargets { get; } = [];
     public ObservableCollection<MetricValueViewModel> CurrentMetrics { get; } = [];
     public ObservableCollection<MetricSummaryRowViewModel> SelectedMetricSummaries { get; } = [];
@@ -403,18 +426,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<ExportFileItemViewModel> ExportFiles { get; } = [];
     public ObservableCollection<FeedbackDeliveryHistoryItemViewModel> FeedbackDeliveryHistory { get; } = [];
     public ObservableCollection<AssignedTargetOptionViewModel> AssignedTargets { get; } = [];
-    public ObservableCollection<GlobalProcessRowViewModel> GlobalWatchProcesses { get; } = [];
-    public ObservableCollection<GlobalProcessRowViewModel> TopCpuOffenders { get; } = [];
-    public ObservableCollection<GlobalProcessRowViewModel> TopRamOffenders { get; } = [];
-    public ObservableCollection<GlobalProcessRowViewModel> TopDiskOffenders { get; } = [];
+    public RangeObservableCollection<GlobalProcessRowViewModel> GlobalWatchProcesses { get; } = new();
+    public RangeObservableCollection<GlobalProcessRowViewModel> TopCpuOffenders { get; } = new();
+    public RangeObservableCollection<GlobalProcessRowViewModel> TopRamOffenders { get; } = new();
+    public RangeObservableCollection<GlobalProcessRowViewModel> TopDiskOffenders { get; } = new();
+    public RangeObservableCollection<GlobalProcessRowViewModel> TopGpuOffenders { get; } = new();
+    public ObservableCollection<LiveMetricTileViewModel> LiveTiles { get; } = [];
     public ObservableCollection<ProfileRecommendationViewModel> ProfileRecommendations { get; } = [];
     public ObservableCollection<DeniedProfileRecommendationViewModel> DeniedProfileRecommendations { get; } = [];
-    public ObservableCollection<GlobalWatchJournalEntryViewModel> GlobalWatchJournalEntries { get; } = [];
-    public ObservableCollection<GlobalWatchJournalGroupViewModel> GlobalWatchJournalGroups { get; } = [];
-    public ObservableCollection<SuspiciousWatchItemViewModel> SuspiciousWatchItems { get; } = [];
-    public ObservableCollection<SuspiciousLaunchEntryViewModel> SuspiciousLaunchEntries { get; } = [];
-    public ObservableCollection<ProcessBanRuleViewModel> ProcessBans { get; } = [];
-    public ObservableCollection<ProcessBanEventViewModel> ProcessBanEvents { get; } = [];
+    public RangeObservableCollection<GlobalWatchJournalEntryViewModel> GlobalWatchJournalEntries { get; } = new();
+    public RangeObservableCollection<GlobalWatchJournalGroupViewModel> GlobalWatchJournalGroups { get; } = new();
+    public RangeObservableCollection<SuspiciousWatchItemViewModel> SuspiciousWatchItems { get; } = new();
+    public RangeObservableCollection<SuspiciousLaunchEntryViewModel> SuspiciousLaunchEntries { get; } = new();
+    public RangeObservableCollection<ProcessBanRuleViewModel> ProcessBans { get; } = new();
+    public RangeObservableCollection<ProcessBanEventViewModel> ProcessBanEvents { get; } = new();
     public ObservableCollection<SamplingOptionViewModel> SamplingOptions { get; }
     public ObservableCollection<ProcessBanDurationOptionViewModel> ProcessBanDurationOptions { get; }
     public ObservableCollection<RetentionOptionViewModel> RetentionOptions { get; }
@@ -428,6 +453,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string GlobalWatchCpuHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_CPU"), GlobalSortCpu);
     public string GlobalWatchRamHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_RAM"), GlobalSortRam);
     public string GlobalWatchDiskHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Disk"), GlobalSortDisk);
+    public string GlobalWatchGpuHeaderText => FormatGlobalWatchSortHeader("GPU", GlobalSortGpu);
     public string GlobalWatchProfileHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Profile"), GlobalSortProfile);
     public string GlobalWatchHealthHeaderText => FormatGlobalWatchSortHeader(GetText("Ui_Health"), GlobalSortHealth);
 
@@ -631,6 +657,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get => _selectedGlobalProcess;
         set
         {
+            if (value is null && _suppressGlobalSelectionSync)
+            {
+                // The table clears its selection while rows are swapped; keep the logical selection.
+                return;
+            }
+
             if (SetProperty(ref _selectedGlobalProcess, value))
             {
                 _selectedGlobalProcessKey = value?.SelectionKey;
@@ -778,6 +810,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    public bool CaptureGpu
+    {
+        get => _captureGpu;
+        set
+        {
+            if (SetProperty(ref _captureGpu, value))
+            {
+                StopForCaptureChange("GPU collector changed");
+                MarkReadyForConfigurationChange();
+            }
+        }
+    }
+
     public bool MinimizeToTrayOnClose
     {
         get => _minimizeToTrayOnClose;
@@ -904,6 +949,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         get => _diskWriteThresholdMbPerSecText;
         set => SetProperty(ref _diskWriteThresholdMbPerSecText, value);
+    }
+
+    public string GpuThresholdPercentText
+    {
+        get => _gpuThresholdPercentText;
+        set => SetProperty(ref _gpuThresholdPercentText, value);
+    }
+
+    public string ProfileGpuThresholdPercentText
+    {
+        get => _profileGpuThresholdPercentText;
+        set => SetProperty(ref _profileGpuThresholdPercentText, value);
     }
 
     public string ProfileCpuThresholdPercentText
@@ -1229,7 +1286,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsGlobalWatchTab));
                 NotifySessionStateProperties();
+                OnVisibleSurfaceChanged();
             }
+        }
+    }
+
+    /// <summary>
+    /// The window reports when it is hidden to the tray or minimized; background work keeps
+    /// running, but nothing is rendered while nobody can see it.
+    /// </summary>
+    public void SetUiVisible(bool isVisible)
+    {
+        if (_isUiVisible == isVisible)
+        {
+            return;
+        }
+
+        _isUiVisible = isVisible;
+        OnVisibleSurfaceChanged();
+    }
+
+    private bool IsLiveSurfaceVisible => _isUiVisible && SelectedTabIndex == LiveTabIndex;
+    private bool IsGlobalWatchSurfaceVisible => _isUiVisible && SelectedTabIndex == GlobalWatchTabIndex;
+
+    private void OnVisibleSurfaceChanged()
+    {
+        if (IsGlobalWatchSurfaceVisible && _globalWatchUiDirty)
+        {
+            ApplyGlobalWatchFilterAndSort();
+        }
+
+        if (IsLiveSurfaceVisible)
+        {
+            RefreshLiveSurface();
         }
     }
 
@@ -1387,11 +1476,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool HasSuspiciousLaunchEntries => SuspiciousLaunchEntries.Count > 0;
     public bool HasCurrentMonitoring => IsRecording;
     public string CurrentMonitoringStripText => IsRecording
-        ? $"Live monitoring: {_activeTargetName} - {SampleCountText} samples - {EventCountText} events"
-        : "Live monitoring idle";
+        ? FormatText("Ui_LiveStripRecording", _activeTargetName, DurationText, SampleCountText)
+        : GetText("Ui_LiveStateReady");
     public bool HasCrossScreenMonitoringStrip => IsRecording && SelectedTabIndex != LiveTabIndex;
     public string CrossScreenMonitoringStripText => IsRecording
-        ? $"Live monitoring active: {_activeTargetName} - {DurationText} - Recording"
+        ? FormatText("Ui_LiveStripRecording", _activeTargetName, DurationText, SampleCountText)
         : string.Empty;
     public string LiveSessionStateText
     {
@@ -1399,17 +1488,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (_liveSessionState == LiveSessionUiState.ReadyToStart && !CanStart)
             {
-                return "Ready";
+                return GetText("Ui_LiveStateReady");
             }
 
             return _liveSessionState switch
             {
-                LiveSessionUiState.Recording => "Recording",
-                LiveSessionUiState.StoppedManually => "Stopped manually",
-                LiveSessionUiState.Stopped => "Stopped",
-                LiveSessionUiState.EndedUnexpectedly => "Ended unexpectedly",
-                LiveSessionUiState.ChangesPending => "Changes pending / restart required",
-                _ => "Ready to start"
+                LiveSessionUiState.Recording => GetText("Ui_LiveStateRecording"),
+                LiveSessionUiState.StoppedManually => GetText("Ui_LiveStateStoppedManually"),
+                LiveSessionUiState.Stopped => GetText("Ui_LiveStateStopped"),
+                LiveSessionUiState.EndedUnexpectedly => GetText("Ui_LiveStateEndedUnexpectedly"),
+                LiveSessionUiState.ChangesPending => GetText("Ui_LiveStateChangesPending"),
+                _ => GetText("Ui_LiveStateReadyToStart")
             };
         }
     }
@@ -1434,14 +1523,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (mode == TargetModeRunningProcess && SelectedRunningTarget is not null) return SelectedRunningTarget.DisplayName;
             if (mode == TargetModeAssignedApps && SelectedAssignedTarget is not null) return SelectedAssignedTarget.DisplayText;
             if (mode == TargetModeExecutable && !string.IsNullOrWhiteSpace(SelectedExecutablePath)) return Path.GetFileName(SelectedExecutablePath);
-            return "No target selected";
+            return GetText("Ui_LiveNoTarget");
         }
     }
 
-    public string LiveSessionMetaText =>
-        IsRecording
-            ? $"{DurationText} - sampling {SelectedSamplingOption.Label} - child {(IncludeChildProcesses ? "ON" : "OFF")} - {ActiveThresholdSourceText}"
-            : $"Current config - sampling {SelectedSamplingOption.Label} - child {(IncludeChildProcesses ? "ON" : "OFF")} - {ActiveThresholdSourceText}";
+    public string LiveSessionMetaText => FormatText(
+        "Ui_LiveMetaFormat",
+        IsRecording ? DurationText : GetText("Ui_LiveCurrentConfig"),
+        SelectedSamplingOption.Label,
+        IncludeChildProcesses ? GetText("Ui_On") : GetText("Ui_Off"),
+        ActiveThresholdSourceText);
 
     public string LiveSessionHintText
     {
@@ -1449,36 +1540,81 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             return _liveSessionState switch
             {
-                LiveSessionUiState.Recording => "Session is being recorded. Stop to save, or change capture settings to restart cleanly.",
+                LiveSessionUiState.Recording => GetText("Ui_LiveHintRecording"),
                 LiveSessionUiState.ChangesPending => string.IsNullOrWhiteSpace(LiveWarningText)
-                    ? "Monitoring stopped. Press Start to apply changes."
+                    ? GetText("Ui_LiveHintChangesPending")
                     : LiveWarningText,
                 LiveSessionUiState.EndedUnexpectedly => string.IsNullOrWhiteSpace(_lastCompletedSessionHint)
-                    ? "Target ended unexpectedly. Open Sessions for the saved review."
+                    ? GetText("Ui_LiveHintEnded")
                     : _lastCompletedSessionHint,
-                LiveSessionUiState.StoppedManually => "Session was stopped from the utility. Press Start to record again.",
-                LiveSessionUiState.Stopped => "Session ended. Press Start to record again.",
-                _ => CanStart ? "Press Start to begin a new session." : TargetReadinessText
+                LiveSessionUiState.StoppedManually => GetText("Ui_LiveHintStoppedManually"),
+                LiveSessionUiState.Stopped => GetText("Ui_LiveHintStopped"),
+                _ => CanStart ? GetText("Ui_LiveHintPressStart") : TargetReadinessText
             };
         }
     }
     public bool HasLastCompletedSession => !string.IsNullOrWhiteSpace(_lastCompletedSessionText);
     public string LastCompletedSessionText => _lastCompletedSessionText;
     public string LastCompletedSessionHint => _lastCompletedSessionHint;
-    public bool HasActiveLiveMetrics => IsRecording && IsLiveMonitorEnabled && CurrentMetrics.Count > 0;
+    public bool HasActiveLiveMetrics => IsRecording && IsLiveMonitorEnabled && _liveTilesHaveData;
     public bool ShowLiveSnapshotEmptyState => !HasActiveLiveMetrics;
-    public string LiveSnapshotTitle => IsRecording ? "Current Snapshot" : "Live Snapshot";
-    public string LiveSnapshotStatusText => IsRecording ? LiveSnapshotText : "not recording";
+    public string LiveSnapshotTitle => IsRecording ? GetText("Ui_LiveSnapshotTitleRecording") : GetText("Ui_LiveSnapshotTitleIdle");
+    public string LiveSnapshotStatusText => IsRecording ? LiveSnapshotText : GetText("Ui_LiveNotRecording");
     public string LiveSnapshotEmptyText => IsRecording
         ? IsLiveMonitorEnabled
-            ? "Waiting for the first live UI refresh."
-            : "Live monitor is disabled. Samples are still recorded and saved."
-        : "No active live data. Start monitoring to populate this panel.";
+            ? GetText("Ui_LiveWaitingFirstRefresh")
+            : GetText("Ui_LiveMonitorDisabledHint")
+        : GetText("Ui_LiveNoDataHint");
     public bool HasLiveEvents => IsRecording && VisibleEvents.Count > 0;
     public bool ShowLiveEventEmptyState => !HasLiveEvents;
     public string LiveEventEmptyText => IsRecording
-        ? "No detector events in this active session yet."
-        : "No active live events. Saved session events are available in Sessions / Details.";
+        ? GetText("Ui_LiveNoEventsYet")
+        : GetText("Ui_LiveNoEventsIdle");
+
+    public string SystemCpuText => FormatPercentShort(_systemLoad?.CpuPercent);
+    public double SystemCpuPercent => _systemLoad?.CpuPercent ?? 0;
+    public string SystemRamText => _systemLoad?.MemoryUsedMb is double used && _systemLoad.MemoryTotalMb is double total
+        ? $"{used / 1024:N1} / {total / 1024:N0} GB"
+        : "—";
+    public double SystemRamPercent => _systemLoad?.MemoryUsedMb is double used && _systemLoad.MemoryTotalMb is double total && total > 0
+        ? used / total * 100
+        : 0;
+    public bool HasSystemGpu => _systemLoad?.GpuAvailable == true;
+    public string SystemGpuText => HasSystemGpu ? FormatPercentShort(_systemLoad!.GpuPercent) : GetText("Ui_GpuUnavailableShort");
+    public double SystemGpuPercent => _systemLoad?.GpuPercent ?? 0;
+    public string SystemGpuNameText => _systemLoad?.GpuName ?? GetText("Ui_GpuUnavailable");
+    public string SystemVramText => _systemLoad?.GpuDedicatedUsedMb is double used
+        ? _systemLoad.GpuDedicatedTotalMb is double total
+            ? $"{used / 1024:N1} / {total / 1024:N0} GB"
+            : $"{used / 1024:N1} GB"
+        : "—";
+    public double SystemVramPercent => _systemLoad?.GpuDedicatedUsedMb is double used && _systemLoad.GpuDedicatedTotalMb is double total && total > 0
+        ? used / total * 100
+        : 0;
+    public string SystemGpuTemperatureText => _systemLoad?.GpuTemperatureC is double temperature ? $"{temperature:N0} °C" : "—";
+    public bool HasSystemGpuTemperature => _systemLoad?.GpuTemperatureC is not null;
+    public string SystemProcessCountText => _systemLoad is null ? "—" : _systemLoad.ProcessCount.ToString("N0", CultureInfo.CurrentCulture);
+
+    private void ApplySystemLoad(SystemLoadSnapshot? snapshot)
+    {
+        _systemLoad = snapshot;
+        OnPropertyChanged(nameof(SystemCpuText));
+        OnPropertyChanged(nameof(SystemCpuPercent));
+        OnPropertyChanged(nameof(SystemRamText));
+        OnPropertyChanged(nameof(SystemRamPercent));
+        OnPropertyChanged(nameof(HasSystemGpu));
+        OnPropertyChanged(nameof(SystemGpuText));
+        OnPropertyChanged(nameof(SystemGpuPercent));
+        OnPropertyChanged(nameof(SystemGpuNameText));
+        OnPropertyChanged(nameof(SystemVramText));
+        OnPropertyChanged(nameof(SystemVramPercent));
+        OnPropertyChanged(nameof(SystemGpuTemperatureText));
+        OnPropertyChanged(nameof(HasSystemGpuTemperature));
+        OnPropertyChanged(nameof(SystemProcessCountText));
+    }
+
+    private static string FormatPercentShort(double? value) =>
+        value is null ? "—" : $"{value.Value:N0}%";
     public string SelectedGlobalProcessPanelTitle => IsGlobalWatchGroupedMode ? "Selected Application" : "Selected Process";
     public string SelectedGlobalProcessTitle => SelectedGlobalProcess is null
         ? (IsGlobalWatchGroupedMode ? "No application selected" : "No process selected")
@@ -1795,20 +1931,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SelectedTargetMode == TargetModeExecutable)
             {
                 return string.IsNullOrWhiteSpace(SelectedExecutablePath)
-                    ? "Choose an executable in the manual launch section."
-                    : $"Ready to launch and track {Path.GetFileName(SelectedExecutablePath)}.";
+                    ? GetText("Ui_ReadinessChooseExe")
+                    : FormatText("Ui_ReadinessLaunch", Path.GetFileName(SelectedExecutablePath));
             }
             if (SelectedTargetMode == TargetModeAssignedApps)
             {
                 return SelectedAssignedTarget is null
-                    ? "No assigned app selected."
+                    ? GetText("Ui_ReadinessNoAssigned")
                     : SelectedAssignedTarget.RunningProcessId is null
-                        ? $"{SelectedAssignedTarget.ExeName} is not running. Start it manually, then refresh."
-                        : $"Ready to attach to {SelectedAssignedTarget.ExeName} ({SelectedAssignedTarget.RunningStatus}).";
+                        ? FormatText("Ui_ReadinessAssignedNotRunning", SelectedAssignedTarget.ExeName)
+                        : FormatText("Ui_ReadinessAttach", $"{SelectedAssignedTarget.ExeName} ({SelectedAssignedTarget.RunningStatus})");
             }
             return SelectedRunningTarget is null
-                ? "Select a running process."
-                : $"Ready to attach to {SelectedRunningTarget.DisplayName}.";
+                ? GetText("Ui_ReadinessSelectProcess")
+                : FormatText("Ui_ReadinessAttach", SelectedRunningTarget.DisplayName);
         }
     }
 
@@ -1820,33 +1956,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             var enabled = new[]
                 {
-                    CaptureCpu ? "CPU" : null,
-                    CaptureRam ? "RAM" : null,
-                    CaptureDiskRead ? "Disk Read" : null,
-                    CaptureDiskWrite ? "Disk Write" : null
+                    CaptureCpu ? GetText("Ui_CPU") : null,
+                    CaptureRam ? GetText("Ui_RAM") : null,
+                    CaptureGpu ? "GPU" : null,
+                    CaptureDiskRead ? GetText("Ui_DiskRead") : null,
+                    CaptureDiskWrite ? GetText("Ui_DiskWrite") : null
                 }
                 .Where(item => !string.IsNullOrWhiteSpace(item))
                 .ToArray();
 
-            return enabled.Length == 0 ? "No collectors enabled" : string.Join(", ", enabled);
+            return enabled.Length == 0 ? GetText("Ui_NoMetricsEnabled") : string.Join(", ", enabled);
         }
     }
-    public string LiveConfigSessionProfileText => SelectedSessionProfileOption?.DisplayName ?? "Auto";
+    public string LiveConfigSessionProfileText => SelectedSessionProfileOption?.DisplayName ?? GetText("Ui_Auto");
     public string LiveConfigSamplingText => SelectedSamplingOption.Label;
-    public string LiveConfigChildScopeText => IncludeChildProcesses ? "Include child processes" : "Root process only";
-    public string LiveConfigMonitorText => IsLiveMonitorEnabled ? "Live monitor on" : "Live monitor off";
+    public string LiveConfigChildScopeText => IncludeChildProcesses ? GetText("Ui_IncludeChildProcesses") : GetText("Ui_RootProcessOnly");
+    public string LiveConfigMonitorText => IsLiveMonitorEnabled ? GetText("Ui_LiveMonitorOn") : GetText("Ui_LiveMonitorOff");
     public string TrackedProcessCountText
     {
         get
         {
             if (!IsRecording)
             {
-                return IncludeChildProcesses ? "tree" : "1";
+                return IncludeChildProcesses ? GetText("Ui_ProcessTree") : "1";
             }
 
             return _liveTrackedProcessCount > 0
-                ? _liveTrackedProcessCount.ToString("N0")
-                : "warming";
+                ? _liveTrackedProcessCount.ToString("N0", CultureInfo.CurrentCulture)
+                : "…";
         }
     }
 
@@ -1857,34 +1994,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (!IsRecording)
             {
                 return IncludeChildProcesses
-                    ? "Ready scope: selected root process + its descendant process tree."
-                    : "Ready scope: selected root process only.";
+                    ? GetText("Ui_ScopeReadyTree")
+                    : GetText("Ui_ScopeReadyRoot");
             }
 
             var rootText = _liveRootProcessId?.ToString(CultureInfo.InvariantCulture) ?? "n/a";
             if (!IncludeChildProcesses)
             {
-                return $"Live scope: root PID {rootText} only. Current snapshot and saved samples use this same scope.";
+                return FormatText("Ui_ScopeLiveRoot", rootText);
             }
 
-            if (_liveTrackedProcessCount <= 0)
-            {
-                return $"Live scope: root PID {rootText} + descendants; waiting for first aggregated sample.";
-            }
-
-            if (_liveTrackedProcessCount == 1)
-            {
-                return $"Live scope: root PID {rootText} + no live descendants found. Global Watch Applications may include sibling processes outside this tree.";
-            }
-
-            return $"Live scope: root PID {rootText} + {_liveTrackedProcessCount - 1:N0} descendants ({_liveTrackedProcessCount:N0} processes). Current snapshot and saved samples use this same aggregation.";
+            return _liveTrackedProcessCount <= 1
+                ? FormatText("Ui_ScopeLiveRootNoChildren", rootText)
+                : FormatText("Ui_ScopeLiveTree", rootText, _liveTrackedProcessCount - 1, _liveTrackedProcessCount);
         }
     }
 
     public string TargetName => IsRecording ? _activeTargetName : LiveSessionTargetText;
     public string StartedText => IsRecording && _activeStartedAt is not null
-        ? _activeStartedAt.Value.ToLocalTime().ToString("MMM dd, HH:mm")
-        : "No active session";
+        ? _activeStartedAt.Value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+        : GetText("Ui_NoActiveSession");
     public string DurationText => IsRecording && _activeStartedAt is not null
         ? FormatDuration(DateTimeOffset.UtcNow - _activeStartedAt.Value)
         : "0m 00s";
@@ -1911,12 +2040,60 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await ApplyRetentionPolicyAsync(thresholds.Retention, cancellationToken);
         ThresholdSettingsStatusText = GetText("Ui_ThresholdProfilesLoaded");
         ApplyStartupRegistration(thresholds.Behavior);
+        InitializeLiveTiles();
         await RefreshRunningProcessesAsync(cancellationToken);
+        try
+        {
+            await _sessionStore.RecoverInterruptedSessionsAsync(cancellationToken);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            Trace.TraceWarning("Interrupted session recovery failed: {0}", error.Message);
+        }
+
         await ReloadSessionsAsync(selectSessionId: null, cancellationToken);
         await RefreshExportFilesAsync(cancellationToken);
         StartSelfMonitoring();
         StartGlobalWatch();
+        StartTrackedExecutableMaintenance();
         _ = AutoInstallUpdatesOnStartupAsync(thresholds.Updates, cancellationToken);
+    }
+
+    private void StartTrackedExecutableMaintenance()
+    {
+        if (_maintenanceCts is not null)
+        {
+            return;
+        }
+
+        _maintenanceCts = new CancellationTokenSource();
+        var token = _maintenanceCts.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // Let startup settle first; this work is never urgent.
+                await Task.Delay(TimeSpan.FromSeconds(20), token).ConfigureAwait(false);
+                await _trackedExecutableCoordinator.EnsureFingerprintsAsync(token).ConfigureAwait(false);
+                while (!token.IsCancellationRequested)
+                {
+                    var result = await _trackedExecutableCoordinator.VerifyPathsAsync(forceSearch: false, token).ConfigureAwait(false);
+                    if (result.Updates.Count > 0 || result.Missing > 0)
+                    {
+                        await Application.Current.Dispatcher.InvokeAsync(() => ApplyTrackedPathResult(result, manual: false));
+                    }
+
+                    await Task.Delay(TimeSpan.FromMinutes(30), token).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception error)
+            {
+                Trace.TraceWarning("Tracked executable maintenance failed: {0}", error.Message);
+            }
+        }, token);
     }
 
     public void ReportStartupInitializationFailure(Exception error)
@@ -1936,6 +2113,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _globalWatchCts?.Cancel();
         _globalWatchCts?.Dispose();
         _globalWatchCts = null;
+        _maintenanceCts?.Cancel();
+        _maintenanceCts?.Dispose();
+        _maintenanceCts = null;
+
+        // Finalize an active recording so it is saved as "stopped" instead of being left "running".
+        var handle = _activeHandle;
+        if (handle is not null)
+        {
+            try
+            {
+                Task.Run(() => handle.StopAsync()).Wait(TimeSpan.FromSeconds(4));
+            }
+            catch
+            {
+                // The next start recovers interrupted sessions from the last saved batch.
+            }
+        }
     }
 
     private void NotifySessionDetailProperties()
@@ -1958,8 +2152,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 : normalized;
     }
 
-    private static string FormatDuration(TimeSpan duration) =>
-        $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
+    internal static string FormatDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours}h {duration.Minutes:00}m"
+            : $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
 
     private static string FormatPercent(double? value) =>
         value is null ? "n/a" : $"{value.Value:N2}%";
@@ -1982,6 +2178,12 @@ internal static class ObservableCollectionExtensions
 {
     public static void ReplaceWith<T>(this ObservableCollection<T> collection, IEnumerable<T> items)
     {
+        if (collection is RangeObservableCollection<T> range)
+        {
+            range.ResetWith(items);
+            return;
+        }
+
         collection.Clear();
         foreach (var item in items)
         {

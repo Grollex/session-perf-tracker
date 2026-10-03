@@ -71,20 +71,53 @@ public sealed partial class MainWindowViewModel
     {
         if (SelectedSession is null)
         {
-            ExportStatusText = "Select a saved session first.";
+            ExportStatusText = GetText("Ui_SelectSavedSessionFirst");
             return;
         }
 
         try
         {
-            var path = await _exportService.ExportSessionAsync(SelectedSession.Session, format, cancellationToken);
-            ExportStatusText = $"Session {format.ToUpperInvariant()} exported: {path}";
+            var session = await LoadFullSessionAsync(SelectedSession, cancellationToken) ?? SelectedSession.Session;
+            var path = await _exportService.ExportSessionAsync(session, format, cancellationToken);
+            ExportStatusText = FormatText("Ui_SessionExported", format.ToUpperInvariant(), path);
             await RefreshExportFilesAsync(cancellationToken);
         }
         catch (Exception error)
         {
-            ExportStatusText = $"Session export failed: {error.Message}";
+            ExportStatusText = FormatText("Ui_SessionExportFailed", error.Message);
         }
+    }
+
+    private const int FullSessionCacheSize = 6;
+    private readonly List<SessionRecord> _fullSessionCache = [];
+    private int _sessionDetailsLoadVersion;
+
+    /// <summary>
+    /// The list only holds headers (summary, no samples). Samples/events are loaded on demand
+    /// for details, recommendations and export, with a small cache for back-and-forth browsing.
+    /// </summary>
+    private async Task<SessionRecord?> LoadFullSessionAsync(SessionListItemViewModel item, CancellationToken cancellationToken)
+    {
+        var cached = _fullSessionCache.FirstOrDefault(session => session.Id == item.Id);
+        if (cached is not null && cached.Status == item.Session.Status && cached.EndedAt == item.Session.EndedAt)
+        {
+            return cached;
+        }
+
+        var loaded = await Task.Run(() => _sessionStore.GetSessionAsync(item.Id, cancellationToken), cancellationToken);
+        if (loaded is null)
+        {
+            return null;
+        }
+
+        _fullSessionCache.RemoveAll(session => session.Id == loaded.Id);
+        _fullSessionCache.Insert(0, loaded);
+        if (_fullSessionCache.Count > FullSessionCacheSize)
+        {
+            _fullSessionCache.RemoveRange(FullSessionCacheSize, _fullSessionCache.Count - FullSessionCacheSize);
+        }
+
+        return loaded;
     }
 
     private async Task ExportCurrentCompareAsync(string format, CancellationToken cancellationToken)
@@ -115,7 +148,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task ReloadSessionsAsync(string? selectSessionId = null, CancellationToken cancellationToken = default)
     {
-        var sessions = await _sessionStore.ListSessionsAsync(cancellationToken);
+        var sessions = await Task.Run(() => _sessionStore.ListSessionHeadersAsync(cancellationToken), cancellationToken);
+        _fullSessionCache.RemoveAll(cached => sessions.All(session => session.Id != cached.Id));
         _allSessionItems.Clear();
         _allSessionItems.AddRange(sessions
             .Select(session => new SessionListItemViewModel(session))
@@ -194,21 +228,57 @@ public sealed partial class MainWindowViewModel
 
     private void RefreshSelectedSession()
     {
+        var item = SelectedSession;
         SelectedMetricSummaries.ReplaceWith(
-            SelectedSession?.Session.Summary.Metrics.Select(metric => new MetricSummaryRowViewModel(metric))
+            item?.Session.Summary.Metrics.Select(metric => new MetricSummaryRowViewModel(metric))
             ?? []);
-        SelectedEvents.ReplaceWith(
-            SelectedSession?.Session.Events.Select(performanceEvent => new EventRowViewModel(performanceEvent))
+        SelectedEvents.Clear();
+        UnsupportedMetricNotices.ReplaceWith(CreateUnsupportedMetricNotices(item?.Session));
+        SessionDetailFacts.Clear();
+        SessionDetailRecommendations.Clear();
+        SessionDetailEvents.Clear();
+        SessionDetailMetricSummaries.ReplaceWith(
+            item?.Session.Summary.Metrics.Select(metric => new MetricSummaryRowViewModel(metric))
             ?? []);
-        UnsupportedMetricNotices.ReplaceWith(CreateUnsupportedMetricNotices(SelectedSession?.Session));
-        RefreshSessionDetails();
-
+        NotifySessionDetailProperties();
         NotifySummaryProperties();
+        _ = LoadSelectedSessionDetailsAsync(item);
     }
 
-    private void RefreshSessionDetails()
+    private async Task LoadSelectedSessionDetailsAsync(SessionListItemViewModel? item)
     {
-        var session = SelectedSession?.Session;
+        var version = ++_sessionDetailsLoadVersion;
+        if (item is null)
+        {
+            RefreshSessionDetails(null);
+            return;
+        }
+
+        SessionRecord? session;
+        try
+        {
+            session = await LoadFullSessionAsync(item, CancellationToken.None);
+        }
+        catch (Exception error)
+        {
+            StorageStatusText = FormatText("Ui_SessionLoadFailed", error.Message);
+            return;
+        }
+
+        // The user may have clicked another session while this one was loading.
+        if (version != _sessionDetailsLoadVersion || session is null)
+        {
+            return;
+        }
+
+        SelectedEvents.ReplaceWith(session.Events.Select(performanceEvent => new EventRowViewModel(performanceEvent)));
+        RefreshSessionDetails(session);
+    }
+
+    private void RefreshSessionDetails() => _ = LoadSelectedSessionDetailsAsync(SelectedSession);
+
+    private void RefreshSessionDetails(SessionRecord? session)
+    {
         if (session is null)
         {
             SessionDetailFacts.Clear();
@@ -275,12 +345,11 @@ public sealed partial class MainWindowViewModel
             .Select(metric => metric.Key)
             .ToHashSet();
 
+        // GPU temperature is optional (many drivers do not report it), so it is not listed as missing.
         return MetricCatalog.All
-            .Where(metric => metric.Key is not MetricKey.CpuPercent and not MetricKey.MemoryMb)
+            .Where(metric => metric.Key is not MetricKey.CpuPercent and not MetricKey.MemoryMb and not MetricKey.TemperatureC)
             .Where(metric => !recorded.Contains(metric.Key))
-            .Select(metric => metric.Key is MetricKey.DiskReadMbPerSec or MetricKey.DiskWriteMbPerSec
-                ? UiText.Format("Ui_MetricNotRecordedInSession", metric.Label)
-                : UiText.Format("Ui_MetricNotCollectedInBuild", metric.Label));
+            .Select(metric => UiText.Format("Ui_MetricNotRecordedInSession", metric.Label));
     }
 
     private IEnumerable<SessionDetailFactViewModel> CreateSessionDetailFacts(SessionRecord session)
@@ -327,6 +396,11 @@ public sealed partial class MainWindowViewModel
                 UiText.Format("Ui_LongStartupSeconds", TimeSpan.FromMilliseconds(session.Summary.LongStartupMs.Value).TotalSeconds)));
         }
 
+        if (!string.IsNullOrWhiteSpace(session.Notes))
+        {
+            facts.Add(new SessionDetailFactViewModel(GetText("Ui_FactNotes"), session.Notes));
+        }
+
         if (session.Summary.Overhead is { SampleCount: > 0 } overhead)
         {
             facts.Add(new SessionDetailFactViewModel(
@@ -361,6 +435,11 @@ public sealed partial class MainWindowViewModel
         if (sampling.CaptureDiskWrite)
         {
             enabled.Add(GetText("Ui_DiskWrite"));
+        }
+
+        if (sampling.CaptureGpu)
+        {
+            enabled.Add("GPU");
         }
 
         return enabled.Count == 0 ? GetText("Ui_NoMetricsEnabled") : string.Join(", ", enabled);

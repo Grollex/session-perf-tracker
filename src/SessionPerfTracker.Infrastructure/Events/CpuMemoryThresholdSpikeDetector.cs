@@ -10,8 +10,10 @@ public sealed class CpuMemoryThresholdSpikeDetector : IEventDetector
     [
         MetricKey.CpuPercent,
         MetricKey.MemoryMb,
+        MetricKey.GpuPercent,
         MetricKey.DiskReadMbPerSec,
-        MetricKey.DiskWriteMbPerSec
+        MetricKey.DiskWriteMbPerSec,
+        MetricKey.TemperatureC
     ];
     private readonly IThresholdSettingsProvider _thresholdSettingsProvider;
 
@@ -31,7 +33,7 @@ public sealed class CpuMemoryThresholdSpikeDetector : IEventDetector
         EventDetectionInput input,
         CancellationToken cancellationToken = default)
     {
-        var latest = input.Samples.LastOrDefault();
+        var latest = input.Samples.Count > 0 ? input.Samples[^1] : null;
         if (latest is null)
         {
             return Task.FromResult<IReadOnlyList<PerformanceEvent>>([]);
@@ -49,19 +51,28 @@ public sealed class CpuMemoryThresholdSpikeDetector : IEventDetector
             }
 
             var definition = MetricCatalog.Get(key);
-            AddThresholdEvent(input, latest, previous, definition, latestValue, GetConfiguredThreshold(key, thresholds), events);
+            var threshold = GetConfiguredThreshold(key, thresholds);
+            AddThresholdEvent(input, latest, previous, definition, latestValue, threshold, events);
+            if (key == MetricKey.GpuPercent && threshold is null)
+            {
+                // A profile that disables GPU limits (games) expects heavy GPU swings; spikes would be noise.
+                continue;
+            }
+
             AddSpikeEvent(input, latest, previous, definition, latestValue, events);
         }
 
         return Task.FromResult<IReadOnlyList<PerformanceEvent>>(events);
     }
 
-    private static double? GetConfiguredThreshold(MetricKey key, ThresholdLimitValues thresholds) => key switch
+    internal static double? GetConfiguredThreshold(MetricKey key, ThresholdLimitValues thresholds) => key switch
     {
         MetricKey.CpuPercent => thresholds.CpuThresholdPercent,
         MetricKey.MemoryMb => thresholds.RamThresholdMb,
         MetricKey.DiskReadMbPerSec => thresholds.DiskReadThresholdMbPerSec,
         MetricKey.DiskWriteMbPerSec => thresholds.DiskWriteThresholdMbPerSec,
+        MetricKey.GpuPercent => thresholds.EffectiveGpuThresholdPercent >= 100 ? null : thresholds.EffectiveGpuThresholdPercent,
+        MetricKey.TemperatureC => MetricCatalog.GpuTemperatureWarningC,
         _ => MetricCatalog.Get(key).WarningThreshold
     };
 
@@ -100,7 +111,7 @@ public sealed class CpuMemoryThresholdSpikeDetector : IEventDetector
             MetricKey = definition.Key,
             Timestamp = latest.Timestamp,
             ElapsedMs = latest.ElapsedMs,
-            Severity = EventSeverity.Warning,
+            Severity = definition.Key == MetricKey.TemperatureC ? EventSeverity.Critical : EventSeverity.Warning,
             Title = $"{definition.Label} threshold breach",
             Details = $"{definition.Label} crossed configured threshold {threshold.Value:N1} {definition.Unit}.",
             ObservedValue = latestValue,

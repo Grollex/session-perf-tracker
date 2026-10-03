@@ -70,9 +70,13 @@ public sealed partial class MainWindowViewModel
             _liveRootProcessId = _activeHandle.Target.ProcessId;
             _lastLiveUiRefresh = DateTimeOffset.MinValue;
             _liveCapabilities = CreateLiveCapabilities(sampling);
-            RecordingStatusText = $"Recording {_activeTargetName}";
+            _activeSessionLimits = sampling.SessionThresholds ?? _thresholdSettingsStore.ResolveThresholds(target);
+            _latestLiveSample = null;
+            _liveHistory.Clear();
+            ResetLiveTiles();
+            RecordingStatusText = FormatText("Ui_RecordingTarget", _activeTargetName);
             LiveWarningText = string.Empty;
-            LiveSnapshotText = $"sampling {SelectedSamplingOption.Label}";
+            LiveSnapshotText = FormatText("Ui_SamplingEvery", SelectedSamplingOption.Label);
             CurrentMetrics.Clear();
             VisibleEvents.Clear();
             _manualStopInProgress = false;
@@ -84,9 +88,9 @@ public sealed partial class MainWindowViewModel
         }
         catch (Exception error)
         {
-            RecordingStatusText = $"Start failed: {error.Message}";
-            LiveWarningText = $"Start failed: {error.Message}";
-            LiveSnapshotText = "not recording";
+            RecordingStatusText = FormatText("Ui_StartFailed", error.Message);
+            LiveWarningText = FormatText("Ui_StartFailed", error.Message);
+            LiveSnapshotText = GetText("Ui_LiveNotRecording");
             CurrentMetrics.Clear();
             VisibleEvents.Clear();
             IsRecording = false;
@@ -104,14 +108,14 @@ public sealed partial class MainWindowViewModel
 
         try
         {
-            RecordingStatusText = "Stopping and saving session";
+            RecordingStatusText = GetText("Ui_StoppingAndSaving");
             _manualStopInProgress = true;
             await _activeHandle.StopAsync(cancellationToken);
         }
         catch (Exception error)
         {
             _manualStopInProgress = false;
-            RecordingStatusText = $"Stop failed: {error.Message}";
+            RecordingStatusText = FormatText("Ui_StopFailed", error.Message);
         }
     }
 
@@ -186,33 +190,135 @@ public sealed partial class MainWindowViewModel
         }
     }
 
+    /// <summary>Runs on the sampling thread. Only bookkeeping here; rendering is throttled and skipped when hidden.</summary>
     private void OnSampleCollected(object? sender, MetricSample sample)
     {
-        var now = DateTimeOffset.UtcNow;
-        var liveRefreshMs = 2000;
+        Interlocked.Increment(ref _liveSampleCount);
         _liveTrackedProcessCount = sample.ProcessCount;
         _liveRootProcessId = sample.RootProcessId ?? _liveRootProcessId;
-        if ((now - _lastLiveUiRefresh).TotalMilliseconds < liveRefreshMs)
+        _latestLiveSample = sample;
+        _liveHistory.Add(sample);
+
+        var now = DateTimeOffset.UtcNow;
+        var visibleOnLive = IsLiveSurfaceVisible;
+        var refreshInterval = visibleOnLive ? LiveUiRefreshInterval : HiddenStripRefreshInterval;
+        if (!_isUiVisible || now - _lastLiveUiRefresh < refreshInterval)
         {
-            _liveSampleCount++;
             return;
         }
 
         _lastLiveUiRefresh = now;
-        _liveSampleCount++;
+        _ = Application.Current.Dispatcher.InvokeAsync(
+            visibleOnLive ? RefreshLiveSurface : NotifySummaryProperties,
+            System.Windows.Threading.DispatcherPriority.Background);
+    }
 
-        _ = Application.Current.Dispatcher.InvokeAsync(() =>
+    private static readonly TimeSpan LiveUiRefreshInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan HiddenStripRefreshInterval = TimeSpan.FromSeconds(5);
+
+    private void InitializeLiveTiles()
+    {
+        if (LiveTiles.Count > 0)
         {
-            if (IsLiveMonitorEnabled)
+            return;
+        }
+
+        LiveTiles.Add(new LiveMetricTileViewModel("cpu", GetText("Ui_CPU"), 100, "cpu"));
+        LiveTiles.Add(new LiveMetricTileViewModel("ram", GetText("Ui_RAM"), 0, "ram"));
+        LiveTiles.Add(new LiveMetricTileViewModel("gpu", "GPU", 100, "gpu"));
+        LiveTiles.Add(new LiveMetricTileViewModel("disk", GetText("Ui_Disk"), 0, "disk"));
+        ResetLiveTiles();
+    }
+
+    private void ResetLiveTiles()
+    {
+        foreach (var tile in LiveTiles)
+        {
+            tile.ValueText = "—";
+            tile.DetailText = string.Empty;
+            tile.Tone = "normal";
+            tile.History = [];
+            tile.IsAvailable = tile.Key != "gpu" || _liveCapabilities.GpuPercent != MetricReliability.Unavailable;
+        }
+
+        _liveTilesHaveData = false;
+    }
+
+    /// <summary>Pushes the latest sample and recent history into the KPI tiles (UI thread).</summary>
+    private void RefreshLiveSurface()
+    {
+        var sample = _latestLiveSample;
+        if (IsRecording && IsLiveMonitorEnabled && sample is not null)
+        {
+            var values = sample.Values;
+            var limits = _activeSessionLimits;
+            foreach (var tile in LiveTiles)
             {
-                CurrentMetrics.ReplaceWith(MetricDisplayFactory.CreateMetricRows(sample, _liveCapabilities));
+                switch (tile.Key)
+                {
+                    case "cpu":
+                        UpdateTile(tile, values, MetricKey.CpuPercent, value => $"{value:N1}%", limits?.CpuThresholdPercent);
+                        tile.DetailText = FormatText("Ui_LiveTileProcesses", sample.ProcessCount);
+                        break;
+                    case "ram":
+                        UpdateTile(tile, values, MetricKey.MemoryMb, FormatMemory, limits?.RamThresholdMb);
+                        tile.DetailText = GetText("Ui_LiveTilePrivateWorkingSet");
+                        break;
+                    case "gpu":
+                        var gpuLimit = limits is null || limits.EffectiveGpuThresholdPercent >= 100 ? (double?)null : limits.EffectiveGpuThresholdPercent;
+                        UpdateTile(tile, values, MetricKey.GpuPercent, value => $"{value:N1}%", gpuLimit);
+                        var gpuMemory = values.TryGetValue(MetricKey.GpuMemoryMb, out var vram) ? FormatMemory(vram) : "—";
+                        tile.DetailText = values.TryGetValue(MetricKey.TemperatureC, out var temperature)
+                            ? FormatText("Ui_LiveTileGpuDetailTemp", gpuMemory, temperature)
+                            : FormatText("Ui_LiveTileGpuDetail", gpuMemory);
+                        break;
+                    case "disk":
+                        values.TryGetValue(MetricKey.DiskReadMbPerSec, out var read);
+                        values.TryGetValue(MetricKey.DiskWriteMbPerSec, out var write);
+                        var hasDisk = values.ContainsKey(MetricKey.DiskReadMbPerSec) || values.ContainsKey(MetricKey.DiskWriteMbPerSec);
+                        tile.IsAvailable = hasDisk;
+                        tile.ValueText = hasDisk ? $"{read + write:N1} MB/s" : "—";
+                        tile.DetailText = hasDisk ? FormatText("Ui_LiveTileDiskDetail", read, write) : string.Empty;
+                        tile.Tone = LiveMetricTileViewModel.ResolveTone(
+                            Math.Max(read / Math.Max(0.1, limits?.DiskReadThresholdMbPerSec ?? double.MaxValue),
+                                write / Math.Max(0.1, limits?.DiskWriteThresholdMbPerSec ?? double.MaxValue)),
+                            1);
+                        tile.History = _liveHistory.Snapshot("disk");
+                        break;
+                }
             }
 
-            LiveSnapshotText = $"latest sample +{TimeSpan.FromMilliseconds(sample.ElapsedMs):mm\\:ss}";
-            NotifyLivePanelProperties();
-            NotifySummaryProperties();
-        });
+            _liveTilesHaveData = true;
+            LiveSnapshotText = FormatText("Ui_LatestSampleAt", MainWindowViewModel.FormatDuration(TimeSpan.FromMilliseconds(sample.ElapsedMs)));
+        }
+
+        NotifyLivePanelProperties();
+        NotifySummaryProperties();
     }
+
+    private void UpdateTile(
+        LiveMetricTileViewModel tile,
+        IReadOnlyDictionary<MetricKey, double> values,
+        MetricKey key,
+        Func<double, string> format,
+        double? limit)
+    {
+        if (!values.TryGetValue(key, out var value))
+        {
+            tile.IsAvailable = false;
+            tile.ValueText = "—";
+            tile.Tone = "normal";
+            return;
+        }
+
+        tile.IsAvailable = true;
+        tile.ValueText = format(value);
+        tile.Tone = LiveMetricTileViewModel.ResolveTone(value, limit);
+        tile.History = _liveHistory.Snapshot(tile.Key);
+    }
+
+    private static string FormatMemory(double megabytes) =>
+        megabytes >= 1024 ? $"{megabytes / 1024:N2} GB" : $"{megabytes:N0} MB";
 
     private void OnEventsDetected(object? sender, IReadOnlyList<PerformanceEvent> events)
     {
@@ -313,13 +419,15 @@ public sealed partial class MainWindowViewModel
             IsRecording = false;
             RecordingStatusText = wasAutoStopped
                 ? _autoStopStatusText
-                : $"Saved {session.Target.DisplayName}";
+                : FormatText("Ui_SavedSessionFor", session.Target.DisplayName);
             LiveWarningText = wasAutoStopped
                 ? _autoStopStatusText
                 : string.Empty;
-            LiveSnapshotText = "not recording";
+            LiveSnapshotText = GetText("Ui_LiveNotRecording");
             CurrentMetrics.Clear();
             VisibleEvents.Clear();
+            _latestLiveSample = null;
+            _liveTilesHaveData = false;
             _liveTrackedProcessCount = 0;
             _liveRootProcessId = null;
             _activeHandle = null;
@@ -346,9 +454,11 @@ public sealed partial class MainWindowViewModel
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 IsRecording = false;
-                RecordingStatusText = $"Recording failed: {error.Message}";
-                LiveWarningText = $"Recording failed: {error.Message}";
-                LiveSnapshotText = "failed";
+                RecordingStatusText = FormatText("Ui_RecordingFailed", error.Message);
+                LiveWarningText = FormatText("Ui_RecordingFailed", error.Message);
+                LiveSnapshotText = GetText("Ui_LiveNotRecording");
+                _latestLiveSample = null;
+                _liveTilesHaveData = false;
                 CurrentMetrics.Clear();
                 VisibleEvents.Clear();
                 _activeHandle = null;
@@ -378,7 +488,8 @@ public sealed partial class MainWindowViewModel
         }
 
         _selfMonitoringCts = new CancellationTokenSource();
-        _ = RunSelfMonitoringAsync(_selfMonitoringCts.Token);
+        var token = _selfMonitoringCts.Token;
+        _ = Task.Run(() => RunSelfMonitoringAsync(token), token);
     }
 
     private async Task RunSelfMonitoringAsync(CancellationToken cancellationToken)
@@ -387,16 +498,22 @@ public sealed partial class MainWindowViewModel
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var sample = await _selfMonitoringProvider.SampleSelfAsync(cancellationToken);
+                var sample = await _selfMonitoringProvider.SampleSelfAsync(cancellationToken).ConfigureAwait(false);
                 _selfMonitoringSamples.Add(sample);
                 if (_selfMonitoringSamples.Count > MaxSelfMonitoringSamples)
                 {
                     _selfMonitoringSamples.RemoveRange(0, _selfMonitoringSamples.Count - MaxSelfMonitoringSamples);
                 }
 
-                var summary = await _selfMonitoringProvider.SummarizeAsync(_selfMonitoringSamples, cancellationToken);
-                await Application.Current.Dispatcher.InvokeAsync(() => UpdateSelfMonitoringUi(sample, summary));
-                await Task.Delay(SelfMonitoringIntervalMs, cancellationToken);
+                var summary = await _selfMonitoringProvider.SummarizeAsync(_selfMonitoringSamples, cancellationToken).ConfigureAwait(false);
+                if (_isUiVisible && SelectedTabIndex == SettingsTabIndex)
+                {
+                    await Application.Current.Dispatcher.InvokeAsync(
+                        () => UpdateSelfMonitoringUi(sample, summary),
+                        System.Windows.Threading.DispatcherPriority.Background);
+                }
+
+                await Task.Delay(SelfMonitoringIntervalMs, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
@@ -619,12 +736,13 @@ public sealed partial class MainWindowViewModel
         var sampling = new SamplingSettings
         {
             IntervalMs = SelectedSamplingOption.IntervalMs,
-            LiveUiRefreshMs = 2000,
+            LiveUiRefreshMs = (int)LiveUiRefreshInterval.TotalMilliseconds,
             StorageBatchSize = 10,
             CaptureCpu = CaptureCpu,
             CaptureRam = CaptureRam,
             CaptureDiskRead = CaptureDiskRead,
             CaptureDiskWrite = CaptureDiskWrite,
+            CaptureGpu = CaptureGpu,
             SessionProfileMode = manualSessionProfile is not null
                 ? "Manual"
                 : assignedProfile is not null ? "ProcessAssignment" : "Auto",
@@ -726,14 +844,15 @@ public sealed partial class MainWindowViewModel
         return null;
     }
 
-    private static MetricCapabilities CreateLiveCapabilities(SamplingSettings sampling) => new()
+    private MetricCapabilities CreateLiveCapabilities(SamplingSettings sampling) => new()
     {
         CpuPercent = sampling.CaptureCpu ? MetricReliability.Stable : MetricReliability.Unavailable,
         MemoryMb = sampling.CaptureRam ? MetricReliability.Stable : MetricReliability.Unavailable,
         DiskReadMbPerSec = sampling.CaptureDiskRead ? MetricReliability.BestEffort : MetricReliability.Unavailable,
         DiskWriteMbPerSec = sampling.CaptureDiskWrite ? MetricReliability.BestEffort : MetricReliability.Unavailable,
-        GpuPercent = MetricReliability.Unavailable,
-        TemperatureC = MetricReliability.Unavailable
+        GpuPercent = sampling.CaptureGpu && HasSystemGpu ? MetricReliability.BestEffort : MetricReliability.Unavailable,
+        GpuMemoryMb = sampling.CaptureGpu && HasSystemGpu ? MetricReliability.BestEffort : MetricReliability.Unavailable,
+        TemperatureC = sampling.CaptureGpu && HasSystemGpu ? MetricReliability.BestEffort : MetricReliability.Unavailable
     };
 
     private string FormatThresholdSource(string? exeName)

@@ -12,6 +12,7 @@ using SessionPerfTracker.Infrastructure.Collectors;
 using SessionPerfTracker.Infrastructure.Events;
 using SessionPerfTracker.Infrastructure.Export;
 using SessionPerfTracker.Infrastructure.GlobalWatch;
+using SessionPerfTracker.Infrastructure.Identity;
 using SessionPerfTracker.Infrastructure.Runner;
 using SessionPerfTracker.Infrastructure.Settings;
 using SessionPerfTracker.Infrastructure.SelfMonitoring;
@@ -63,7 +64,10 @@ public partial class MainWindow : Window
         var metricCollector = new ProcessCpuMemoryCollector();
         var spikeContextProvider = new LightweightSystemContextProvider();
         var selfMonitoringProvider = new SelfMonitoringProvider();
-        var globalProcessScanner = new LightweightGlobalProcessScanner();
+        var systemLoadProvider = new SystemLoadProvider();
+        var identityProvider = ExecutableIdentityProvider.Shared;
+        var executableLocator = new ExecutableLocator();
+        var globalProcessScanner = new LightweightGlobalProcessScanner(() => thresholdSettingsStore.Current.Capture.CaptureGpu);
         var processControlService = new WindowsProcessControlService();
         var exportService = new HtmlCsvExportService(exportsPath);
         var updateService = new HttpUpdateService();
@@ -93,7 +97,10 @@ public partial class MainWindow : Window
             exportService,
             updateService,
             exportsPath,
-            updatesPath);
+            updatesPath,
+            systemLoadProvider,
+            identityProvider,
+            executableLocator);
         _viewModel.UpdateAvailablePromptRequested += OnUpdateAvailablePromptRequested;
         _viewModel.DestructiveProcessActionConfirmationRequested += OnDestructiveProcessActionConfirmationRequested;
         _viewModel.SelfUninstallConfirmationRequested += OnSelfUninstallConfirmationRequested;
@@ -105,7 +112,13 @@ public partial class MainWindow : Window
         Loaded += OnLoaded;
         Closing += OnClosing;
         Closed += OnClosed;
+        IsVisibleChanged += (_, _) => ReportUiVisibility();
+        StateChanged += (_, _) => ReportUiVisibility();
     }
+
+    /// <summary>Hidden to tray or minimized: background work continues, rendering pauses.</summary>
+    private void ReportUiVisibility() =>
+        _viewModel.SetUiVisible(IsVisible && WindowState != WindowState.Minimized);
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {

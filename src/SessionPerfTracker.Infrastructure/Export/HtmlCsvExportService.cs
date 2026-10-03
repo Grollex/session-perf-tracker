@@ -16,8 +16,20 @@ public sealed class HtmlCsvExportService : IExportService
     [
         MetricKey.CpuPercent,
         MetricKey.MemoryMb,
+        MetricKey.GpuPercent,
+        MetricKey.GpuMemoryMb,
         MetricKey.DiskReadMbPerSec,
-        MetricKey.DiskWriteMbPerSec
+        MetricKey.DiskWriteMbPerSec,
+        MetricKey.TemperatureC
+    ];
+
+    private static readonly (MetricKey Key, string Color)[] ChartMetrics =
+    [
+        (MetricKey.CpuPercent, "#4fa0d8"),
+        (MetricKey.MemoryMb, "#a78bfa"),
+        (MetricKey.GpuPercent, "#3ee079"),
+        (MetricKey.DiskReadMbPerSec, "#f4c542"),
+        (MetricKey.DiskWriteMbPerSec, "#f08a5d")
     ];
 
     private string _exportDirectory = string.Empty;
@@ -198,9 +210,17 @@ public sealed class HtmlCsvExportService : IExportService
         AddKeyValue(builder, "Threshold source", session.Sampling.ThresholdSourceLabel ?? FormatSessionProfile(session));
         AddKeyValue(builder, "Sampling", $"{session.Sampling.IntervalMs} ms");
         AddKeyValue(builder, "Child processes", session.Target.IncludeChildProcesses ? "ON" : "OFF");
-        builder.AppendLine("</div></section>");
+        AddKeyValue(builder, "Samples", session.Summary.SampleCount.ToString("N0", CultureInfo.InvariantCulture));
+        builder.AppendLine("</div>");
+        if (!string.IsNullOrWhiteSpace(session.Notes))
+        {
+            builder.AppendLine($"<p class=\"muted\">{Html(session.Notes)}</p>");
+        }
+
+        builder.AppendLine("</section>");
 
         AddMetricSummary(builder, session);
+        AddCharts(builder, session);
         AddEvents(builder, session.Events);
         AddOverhead(builder, session.Summary.Overhead);
         AddUnsupported(builder, session);
@@ -315,7 +335,7 @@ public sealed class HtmlCsvExportService : IExportService
     private static string BuildSessionSamplesCsv(SessionRecord session)
     {
         var builder = new StringBuilder();
-        builder.AppendLine(Csv("session_id", "timestamp", "elapsed_ms", "root_process_id", "process_count", "cpu_percent", "ram_mb", "disk_read_mb_per_sec", "disk_write_mb_per_sec"));
+        builder.AppendLine(Csv("session_id", "timestamp", "elapsed_ms", "root_process_id", "process_count", "cpu_percent", "ram_mb", "gpu_percent", "gpu_memory_mb", "disk_read_mb_per_sec", "disk_write_mb_per_sec", "gpu_temperature_c"));
         foreach (var sample in session.Samples.OrderBy(item => item.ElapsedMs))
         {
             builder.AppendLine(Csv(
@@ -326,8 +346,11 @@ public sealed class HtmlCsvExportService : IExportService
                 sample.ProcessCount,
                 GetMetricValue(sample, MetricKey.CpuPercent),
                 GetMetricValue(sample, MetricKey.MemoryMb),
+                GetMetricValue(sample, MetricKey.GpuPercent),
+                GetMetricValue(sample, MetricKey.GpuMemoryMb),
                 GetMetricValue(sample, MetricKey.DiskReadMbPerSec),
-                GetMetricValue(sample, MetricKey.DiskWriteMbPerSec)));
+                GetMetricValue(sample, MetricKey.DiskWriteMbPerSec),
+                GetMetricValue(sample, MetricKey.TemperatureC)));
         }
 
         return builder.ToString();
@@ -416,6 +439,76 @@ public sealed class HtmlCsvExportService : IExportService
         builder.AppendLine("</tbody></table></section>");
     }
 
+    /// <summary>Small inline SVG line charts (downsampled), so exported reports show the shape of the run.</summary>
+    private static void AddCharts(StringBuilder builder, SessionRecord session)
+    {
+        if (session.Samples.Count < 2)
+        {
+            return;
+        }
+
+        var ordered = session.Samples.OrderBy(sample => sample.ElapsedMs).ToArray();
+        var charts = new List<string>();
+        foreach (var (key, color) in ChartMetrics)
+        {
+            var points = ordered
+                .Where(sample => sample.Values.ContainsKey(key))
+                .Select(sample => (sample.ElapsedMs, Value: sample.Values[key]))
+                .Where(point => double.IsFinite(point.Value))
+                .ToArray();
+            if (points.Length < 2)
+            {
+                continue;
+            }
+
+            charts.Add(BuildChartSvg(MetricCatalog.Get(key), points, color));
+        }
+
+        if (charts.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine("<section class=\"panel\"><h2>Timeline</h2><div class=\"charts\">");
+        foreach (var chart in charts)
+        {
+            builder.AppendLine(chart);
+        }
+
+        builder.AppendLine("</div></section>");
+    }
+
+    private static string BuildChartSvg(MetricDefinition definition, IReadOnlyList<(long ElapsedMs, double Value)> points, string color)
+    {
+        const int width = 520;
+        const int height = 120;
+        const int maxPoints = 520;
+        var step = Math.Max(1, points.Count / maxPoints);
+        var sampled = new List<(long ElapsedMs, double Value)>();
+        for (var index = 0; index < points.Count; index += step)
+        {
+            // Keep the peak of each bucket so short spikes stay visible after downsampling.
+            var bucket = points.Skip(index).Take(step).ToArray();
+            sampled.Add(bucket.MaxBy(point => point.Value));
+        }
+
+        var start = sampled[0].ElapsedMs;
+        var span = Math.Max(1, sampled[^1].ElapsedMs - start);
+        var max = definition.Unit == "%" ? 100 : Math.Max(1, sampled.Max(point => point.Value) * 1.1);
+        var coordinates = string.Join(" ", sampled.Select(point =>
+        {
+            var x = (point.ElapsedMs - start) / (double)span * width;
+            var y = height - Math.Clamp(point.Value / max, 0, 1) * (height - 4) - 2;
+            return $"{x.ToString("0.#", CultureInfo.InvariantCulture)},{y.ToString("0.#", CultureInfo.InvariantCulture)}";
+        }));
+        var peak = points.Max(point => point.Value);
+        var average = points.Average(point => point.Value);
+        return $"""
+            <figure class="chart"><figcaption><strong>{Html(definition.Label)}</strong> <span class="muted">avg {FormatMetric(average, definition.Unit)} · peak {FormatMetric(peak, definition.Unit)}</span></figcaption>
+            <svg viewBox="0 0 {width} {height}" preserveAspectRatio="none" role="img" aria-label="{Html(definition.Label)} over time"><polyline fill="none" stroke="{color}" stroke-width="1.6" points="{coordinates}" /></svg></figure>
+            """;
+    }
+
     private static void AddEvents(StringBuilder builder, IReadOnlyList<PerformanceEvent> events)
     {
         builder.AppendLine("<section class=\"panel\"><h2>Events</h2>");
@@ -493,6 +586,12 @@ public sealed class HtmlCsvExportService : IExportService
             var write = process.DiskWriteMbPerSec ?? 0;
             return read <= 0 && write <= 0 ? null : $"{process.Name} ({process.ProcessId}) - R {read:N1} / W {write:N1} MB/s";
         });
+        if (context.TopProcessesByGpu.Count > 0)
+        {
+            AddContextList(builder, "Top GPU", context.TopProcessesByGpu, process =>
+                process.GpuPercent is null ? null : $"{process.Name} ({process.ProcessId}) - {process.GpuPercent.Value:N1}%");
+        }
+
         builder.AppendLine("</div>");
         if (context.NewProcessNames.Count > 0)
         {
@@ -598,6 +697,10 @@ public sealed class HtmlCsvExportService : IExportService
             .context { background: #11171c; border: 1px solid #303941; border-radius: 8px; padding: 10px; }
             .context-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
             ul { margin: 0; padding-left: 18px; }
+            .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+            .chart { margin: 0; background: #11171c; border: 1px solid #303941; border-radius: 8px; padding: 10px; }
+            .chart figcaption { margin-bottom: 6px; }
+            .chart svg { width: 100%; height: 120px; display: block; background: linear-gradient(#1b232a 1px, transparent 1px) 0 0 / 100% 25%; }
             </style>
             """);
         builder.AppendLine("</head><body>");
@@ -638,14 +741,7 @@ public sealed class HtmlCsvExportService : IExportService
             return "n/a";
         }
 
-        var unit = key switch
-        {
-            MetricKey.CpuPercent => "%",
-            MetricKey.MemoryMb => "MB",
-            MetricKey.DiskReadMbPerSec => "MB/s",
-            MetricKey.DiskWriteMbPerSec => "MB/s",
-            _ => string.Empty
-        };
+        var unit = key is null ? string.Empty : MetricCatalog.Get(key.Value).Unit;
 
         return string.IsNullOrWhiteSpace(unit)
             ? FormatNumber(value)
@@ -665,7 +761,9 @@ public sealed class HtmlCsvExportService : IExportService
         value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
 
     private static string FormatDuration(TimeSpan duration) =>
-        $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
+        duration.TotalHours >= 1
+            ? $"{(int)duration.TotalHours}h {duration.Minutes:00}m {duration.Seconds:00}s"
+            : $"{(int)duration.TotalMinutes}m {duration.Seconds:00}s";
 
     private static string FormatReliability(MetricReliability reliability) => reliability switch
     {
@@ -686,14 +784,8 @@ public sealed class HtmlCsvExportService : IExportService
         _ => "Unknown"
     };
 
-    private static string FormatMetricKey(MetricKey? key) => key switch
-    {
-        MetricKey.CpuPercent => "CPU",
-        MetricKey.MemoryMb => "RAM",
-        MetricKey.DiskReadMbPerSec => "Disk Read",
-        MetricKey.DiskWriteMbPerSec => "Disk Write",
-        _ => key?.ToString() ?? "Session"
-    };
+    private static string FormatMetricKey(MetricKey? key) =>
+        key is null ? "Session" : MetricCatalog.Get(key.Value).Label;
 
     private static string FormatKinds(PerformanceEvent performanceEvent) =>
         performanceEvent.GroupedKinds.Count > 1

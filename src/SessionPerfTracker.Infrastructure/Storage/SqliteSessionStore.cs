@@ -25,6 +25,9 @@ public sealed class SqliteSessionStore : ISessionStore
     private readonly ISessionSummaryService _summaryService;
     private readonly string? _legacyJsonPath;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    // What has already been written for sessions saved repeatedly while recording.
+    private readonly Dictionary<string, PersistedSessionState> _persisted = new(StringComparer.Ordinal);
     private bool _initialized;
 
     public SqliteSessionStore(string dbPath, ISessionSummaryService summaryService, string? legacyJsonPath = null)
@@ -62,20 +65,149 @@ public sealed class SqliteSessionStore : ISessionStore
         return sessions;
     }
 
+    public async Task<IReadOnlyList<SessionRecord>> ListSessionHeadersAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, target_json, status, started_at, ended_at, sampling_json, capabilities_json, summary_json, notes, schema_version
+            FROM sessions
+            ORDER BY started_at DESC;
+            """;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var sessions = new List<SessionRecord>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            try
+            {
+                sessions.Add(new SessionRecord
+                {
+                    Id = reader.GetString(0),
+                    Target = DeserializeRequired<TargetDescriptor>(reader.GetString(1)),
+                    Status = Enum.Parse<SessionStatus>(reader.GetString(2)),
+                    StartedAt = ParseTimestamp(reader.GetString(3)),
+                    EndedAt = reader.IsDBNull(4) ? null : ParseTimestamp(reader.GetString(4)),
+                    Sampling = DeserializeRequired<SamplingSettings>(reader.GetString(5)),
+                    Capabilities = DeserializeRequired<MetricCapabilities>(reader.GetString(6)),
+                    Summary = DeserializeRequired<SessionSummary>(reader.GetString(7)),
+                    Notes = reader.IsDBNull(8) ? null : reader.GetString(8),
+                    SchemaVersion = reader.GetInt32(9)
+                });
+            }
+            catch (Exception error) when (error is JsonException or ArgumentException or FormatException or InvalidDataException)
+            {
+                // One damaged row must not hide every other session.
+                Trace.TraceWarning("Skipping unreadable session header: {0}", error.Message);
+            }
+        }
+
+        return sessions;
+    }
+
+    public async Task<int> RecoverInterruptedSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var ids = new List<string>();
+        await using (var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT id FROM sessions WHERE status = $status;";
+            command.Parameters.AddWithValue("$status", SessionStatus.Running.ToString());
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(reader.GetString(0));
+            }
+        }
+
+        var recovered = 0;
+        foreach (var id in ids)
+        {
+            var session = await GetSessionAsync(id, cancellationToken).ConfigureAwait(false);
+            if (session is null)
+            {
+                continue;
+            }
+
+            var lastSample = session.Samples.LastOrDefault();
+            var endedAt = lastSample?.Timestamp ?? session.StartedAt;
+            var interruption = new PerformanceEvent
+            {
+                Id = $"{session.Id}_stability_interrupted",
+                SessionId = session.Id,
+                Kind = EventKind.UnexpectedExit,
+                Timestamp = endedAt,
+                ElapsedMs = lastSample?.ElapsedMs ?? 0,
+                Severity = EventSeverity.Warning,
+                Title = "Recording interrupted",
+                Details = "Session Perf Tracker closed or crashed before this session was finalized. Data up to the last saved sample is kept.",
+                DetectionProvider = "storage-recovery"
+            };
+            var withoutSummary = new SessionRecordWithoutSummary
+            {
+                Id = session.Id,
+                Target = session.Target,
+                Status = SessionStatus.UnexpectedExit,
+                StartedAt = session.StartedAt,
+                EndedAt = endedAt,
+                Sampling = session.Sampling,
+                Capabilities = session.Capabilities,
+                Samples = session.Samples,
+                Events = session.Events.Where(item => item.Id != interruption.Id).Append(interruption).ToArray(),
+                Notes = session.Notes,
+                SchemaVersion = session.SchemaVersion
+            };
+            await SaveSessionAsync(withoutSummary.WithSummary(_summaryService.Summarize(withoutSummary)), cancellationToken).ConfigureAwait(false);
+            recovered++;
+        }
+
+        return recovered;
+    }
+
     public async Task<SessionRecord?> GetSessionAsync(string id, CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        await using var connection = await OpenConnectionAsync(cancellationToken);
-        return await LoadSessionAsync(connection, id, cancellationToken);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return await LoadSessionAsync(connection, id, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SaveSessionAsync(SessionRecord session, CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        await using var connection = await OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await SaveSessionCoreAsync(connection, transaction, session, cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+            _persisted.TryGetValue(session.Id, out var persisted);
+            var incremental = persisted is not null
+                && persisted.SampleCount <= session.Samples.Count
+                && persisted.EventIds.IsSubsetOf(session.Events.Select(item => item.Id));
+            var state = incremental
+                ? await AppendSessionCoreAsync(connection, transaction, session, persisted!, cancellationToken).ConfigureAwait(false)
+                : await SaveSessionCoreAsync(connection, transaction, session, cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (session.Status == SessionStatus.Running)
+            {
+                _persisted[session.Id] = state;
+            }
+            else
+            {
+                _persisted.Remove(session.Id);
+            }
+        }
+        catch
+        {
+            // Force a full rewrite next time; the in-memory bookkeeping may not match the database.
+            _persisted.Remove(session.Id);
+            throw;
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
     }
 
     public async Task DeleteSessionAsync(string id, CancellationToken cancellationToken = default)
@@ -382,90 +514,153 @@ public sealed class SqliteSessionStore : ISessionStore
         return events;
     }
 
-    private static async Task SaveSessionCoreAsync(
+    private static async Task<PersistedSessionState> SaveSessionCoreAsync(
         SqliteConnection connection,
         System.Data.Common.DbTransaction transaction,
         SessionRecord session,
         CancellationToken cancellationToken)
     {
-        await using (var command = connection.CreateCommand())
+        await UpsertHeaderAsync(connection, transaction, session, cancellationToken).ConfigureAwait(false);
+        await DeleteChildrenAsync(connection, transaction, session.Id, cancellationToken).ConfigureAwait(false);
+        await InsertSamplesAsync(connection, transaction, session, startIndex: 0, cancellationToken).ConfigureAwait(false);
+        await InsertEventsAsync(connection, transaction, session.Id, session.Events, cancellationToken).ConfigureAwait(false);
+        return new PersistedSessionState(
+            session.Samples.Count,
+            session.Events.Select(item => item.Id).ToHashSet(StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// Running sessions are saved every few seconds; only rows added since the previous save are
+    /// written, so long recordings stay cheap instead of rewriting every sample each time.
+    /// </summary>
+    private static async Task<PersistedSessionState> AppendSessionCoreAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        SessionRecord session,
+        PersistedSessionState persisted,
+        CancellationToken cancellationToken)
+    {
+        await UpsertHeaderAsync(connection, transaction, session, cancellationToken).ConfigureAwait(false);
+        await InsertSamplesAsync(connection, transaction, session, persisted.SampleCount, cancellationToken).ConfigureAwait(false);
+        var newEvents = session.Events.Where(item => !persisted.EventIds.Contains(item.Id)).ToArray();
+        await InsertEventsAsync(connection, transaction, session.Id, newEvents, cancellationToken).ConfigureAwait(false);
+        var eventIds = new HashSet<string>(persisted.EventIds, StringComparer.Ordinal);
+        eventIds.UnionWith(newEvents.Select(item => item.Id));
+        return new PersistedSessionState(session.Samples.Count, eventIds);
+    }
+
+    private static async Task UpsertHeaderAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        SessionRecord session,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = """
+            INSERT INTO sessions (
+                id, target_display_name, target_exe_name, status, started_at, ended_at,
+                target_json, sampling_json, capabilities_json, summary_json, notes, schema_version, session_profile_name
+            )
+            VALUES (
+                $id, $target_display_name, $target_exe_name, $status, $started_at, $ended_at,
+                $target_json, $sampling_json, $capabilities_json, $summary_json, $notes, $schema_version, $session_profile_name
+            )
+            ON CONFLICT(id) DO UPDATE SET
+                target_display_name = excluded.target_display_name,
+                target_exe_name = excluded.target_exe_name,
+                status = excluded.status,
+                started_at = excluded.started_at,
+                ended_at = excluded.ended_at,
+                target_json = excluded.target_json,
+                sampling_json = excluded.sampling_json,
+                capabilities_json = excluded.capabilities_json,
+                summary_json = excluded.summary_json,
+                notes = excluded.notes,
+                schema_version = excluded.schema_version,
+                session_profile_name = excluded.session_profile_name;
+            """;
+        command.Parameters.AddWithValue("$id", session.Id);
+        command.Parameters.AddWithValue("$target_display_name", session.Target.DisplayName);
+        command.Parameters.AddWithValue("$target_exe_name", GetExecutableName(session.Target) ?? string.Empty);
+        command.Parameters.AddWithValue("$status", session.Status.ToString());
+        command.Parameters.AddWithValue("$started_at", ToDbTimestamp(session.StartedAt));
+        command.Parameters.AddWithValue("$ended_at", session.EndedAt is null ? DBNull.Value : ToDbTimestamp(session.EndedAt.Value));
+        command.Parameters.AddWithValue("$target_json", Serialize(session.Target));
+        command.Parameters.AddWithValue("$sampling_json", Serialize(session.Sampling));
+        command.Parameters.AddWithValue("$capabilities_json", Serialize(session.Capabilities));
+        command.Parameters.AddWithValue("$summary_json", Serialize(session.Summary));
+        command.Parameters.AddWithValue("$notes", (object?)session.Notes ?? DBNull.Value);
+        command.Parameters.AddWithValue("$schema_version", session.SchemaVersion);
+        command.Parameters.AddWithValue("$session_profile_name", (object?)session.Sampling.SessionProfileName ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task InsertSamplesAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        SessionRecord session,
+        int startIndex,
+        CancellationToken cancellationToken)
+    {
+        if (startIndex >= session.Samples.Count)
         {
-            command.Transaction = (SqliteTransaction)transaction;
-            command.CommandText = """
-                INSERT INTO sessions (
-                    id, target_display_name, target_exe_name, status, started_at, ended_at,
-                    target_json, sampling_json, capabilities_json, summary_json, notes, schema_version, session_profile_name
-                )
-                VALUES (
-                    $id, $target_display_name, $target_exe_name, $status, $started_at, $ended_at,
-                    $target_json, $sampling_json, $capabilities_json, $summary_json, $notes, $schema_version, $session_profile_name
-                )
-                ON CONFLICT(id) DO UPDATE SET
-                    target_display_name = excluded.target_display_name,
-                    target_exe_name = excluded.target_exe_name,
-                    status = excluded.status,
-                    started_at = excluded.started_at,
-                    ended_at = excluded.ended_at,
-                    target_json = excluded.target_json,
-                    sampling_json = excluded.sampling_json,
-                    capabilities_json = excluded.capabilities_json,
-                    summary_json = excluded.summary_json,
-                    notes = excluded.notes,
-                    schema_version = excluded.schema_version,
-                    session_profile_name = excluded.session_profile_name;
-                """;
-            command.Parameters.AddWithValue("$id", session.Id);
-            command.Parameters.AddWithValue("$target_display_name", session.Target.DisplayName);
-            command.Parameters.AddWithValue("$target_exe_name", GetExecutableName(session.Target) ?? string.Empty);
-            command.Parameters.AddWithValue("$status", session.Status.ToString());
-            command.Parameters.AddWithValue("$started_at", ToDbTimestamp(session.StartedAt));
-            command.Parameters.AddWithValue("$ended_at", session.EndedAt is null ? DBNull.Value : ToDbTimestamp(session.EndedAt.Value));
-            command.Parameters.AddWithValue("$target_json", Serialize(session.Target));
-            command.Parameters.AddWithValue("$sampling_json", Serialize(session.Sampling));
-            command.Parameters.AddWithValue("$capabilities_json", Serialize(session.Capabilities));
-            command.Parameters.AddWithValue("$summary_json", Serialize(session.Summary));
-            command.Parameters.AddWithValue("$notes", (object?)session.Notes ?? DBNull.Value);
-            command.Parameters.AddWithValue("$schema_version", session.SchemaVersion);
-            command.Parameters.AddWithValue("$session_profile_name", (object?)session.Sampling.SessionProfileName ?? DBNull.Value);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            return;
         }
 
-        await DeleteChildrenAsync(connection, transaction, session.Id, cancellationToken);
-        for (var index = 0; index < session.Samples.Count; index++)
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = """
+            INSERT OR REPLACE INTO metric_samples (
+                id, session_id, sample_index, timestamp, elapsed_ms, root_process_id,
+                process_count, values_json, reliability_json, sample_json
+            )
+            VALUES (
+                $id, $session_id, $sample_index, $timestamp, $elapsed_ms, $root_process_id,
+                $process_count, $values_json, $reliability_json, $sample_json
+            );
+            """;
+        var id = command.Parameters.Add("$id", SqliteType.Text);
+        command.Parameters.AddWithValue("$session_id", session.Id);
+        var sampleIndex = command.Parameters.Add("$sample_index", SqliteType.Integer);
+        var timestamp = command.Parameters.Add("$timestamp", SqliteType.Text);
+        var elapsedMs = command.Parameters.Add("$elapsed_ms", SqliteType.Integer);
+        var rootProcessId = command.Parameters.Add("$root_process_id", SqliteType.Integer);
+        var processCount = command.Parameters.Add("$process_count", SqliteType.Integer);
+        var valuesJson = command.Parameters.Add("$values_json", SqliteType.Text);
+        var reliabilityJson = command.Parameters.Add("$reliability_json", SqliteType.Text);
+        var sampleJson = command.Parameters.Add("$sample_json", SqliteType.Text);
+
+        for (var index = startIndex; index < session.Samples.Count; index++)
         {
             var sample = session.Samples[index];
-            await using var command = connection.CreateCommand();
-            command.Transaction = (SqliteTransaction)transaction;
-            command.CommandText = """
-                INSERT INTO metric_samples (
-                    id, session_id, sample_index, timestamp, elapsed_ms, root_process_id,
-                    process_count, values_json, reliability_json, sample_json
-                )
-                VALUES (
-                    $id, $session_id, $sample_index, $timestamp, $elapsed_ms, $root_process_id,
-                    $process_count, $values_json, $reliability_json, $sample_json
-                );
-                """;
-            command.Parameters.AddWithValue("$id", sample.Id);
-            command.Parameters.AddWithValue("$session_id", session.Id);
-            command.Parameters.AddWithValue("$sample_index", index);
-            command.Parameters.AddWithValue("$timestamp", ToDbTimestamp(sample.Timestamp));
-            command.Parameters.AddWithValue("$elapsed_ms", sample.ElapsedMs);
-            command.Parameters.AddWithValue("$root_process_id", sample.RootProcessId is null ? DBNull.Value : sample.RootProcessId);
-            command.Parameters.AddWithValue("$process_count", sample.ProcessCount);
-            command.Parameters.AddWithValue("$values_json", Serialize(sample.Values));
-            command.Parameters.AddWithValue("$reliability_json", Serialize(sample.SourceReliability));
-            command.Parameters.AddWithValue("$sample_json", Serialize(sample));
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            id.Value = sample.Id;
+            sampleIndex.Value = index;
+            timestamp.Value = ToDbTimestamp(sample.Timestamp);
+            elapsedMs.Value = sample.ElapsedMs;
+            rootProcessId.Value = sample.RootProcessId is null ? DBNull.Value : sample.RootProcessId;
+            processCount.Value = sample.ProcessCount;
+            valuesJson.Value = Serialize(sample.Values);
+            reliabilityJson.Value = Serialize(sample.SourceReliability);
+            sampleJson.Value = Serialize(sample);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+    }
 
-        foreach (var performanceEvent in session.Events)
+    private static async Task InsertEventsAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        string sessionId,
+        IReadOnlyList<PerformanceEvent> events,
+        CancellationToken cancellationToken)
+    {
+        foreach (var performanceEvent in events)
         {
             await using (var command = connection.CreateCommand())
             {
                 command.Transaction = (SqliteTransaction)transaction;
                 command.CommandText = """
-                    INSERT INTO events (
+                    INSERT OR REPLACE INTO events (
                         id, session_id, kind, metric_key, timestamp, elapsed_ms, severity,
                         title, details, observed_value, threshold_value, detection_provider,
                         grouped_kinds_json, noise_policy, event_json
@@ -477,7 +672,7 @@ public sealed class SqliteSessionStore : ISessionStore
                     );
                     """;
                 command.Parameters.AddWithValue("$id", performanceEvent.Id);
-                command.Parameters.AddWithValue("$session_id", session.Id);
+                command.Parameters.AddWithValue("$session_id", sessionId);
                 command.Parameters.AddWithValue("$kind", performanceEvent.Kind.ToString());
                 command.Parameters.AddWithValue("$metric_key", performanceEvent.MetricKey?.ToString() ?? string.Empty);
                 command.Parameters.AddWithValue("$timestamp", ToDbTimestamp(performanceEvent.Timestamp));
@@ -491,7 +686,7 @@ public sealed class SqliteSessionStore : ISessionStore
                 command.Parameters.AddWithValue("$grouped_kinds_json", Serialize(performanceEvent.GroupedKinds));
                 command.Parameters.AddWithValue("$noise_policy", (object?)performanceEvent.NoisePolicy ?? DBNull.Value);
                 command.Parameters.AddWithValue("$event_json", Serialize(performanceEvent with { Context = null }));
-                await command.ExecuteNonQueryAsync(cancellationToken);
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
             if (performanceEvent.Context is not null)
@@ -499,16 +694,18 @@ public sealed class SqliteSessionStore : ISessionStore
                 await using var contextCommand = connection.CreateCommand();
                 contextCommand.Transaction = (SqliteTransaction)transaction;
                 contextCommand.CommandText = """
-                    INSERT INTO event_context_snapshots (event_id, session_id, context_json)
+                    INSERT OR REPLACE INTO event_context_snapshots (event_id, session_id, context_json)
                     VALUES ($event_id, $session_id, $context_json);
                     """;
                 contextCommand.Parameters.AddWithValue("$event_id", performanceEvent.Id);
-                contextCommand.Parameters.AddWithValue("$session_id", session.Id);
+                contextCommand.Parameters.AddWithValue("$session_id", sessionId);
                 contextCommand.Parameters.AddWithValue("$context_json", Serialize(performanceEvent.Context));
-                await contextCommand.ExecuteNonQueryAsync(cancellationToken);
+                await contextCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
     }
+
+    private sealed record PersistedSessionState(int SampleCount, HashSet<string> EventIds);
 
     private static async Task DeleteChildrenAsync(
         SqliteConnection connection,
@@ -651,6 +848,9 @@ public sealed class SqliteSessionStore : ISessionStore
 
     private static string ToDbTimestamp(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O");
+
+    private static DateTimeOffset ParseTimestamp(string value) =>
+        DateTimeOffset.Parse(value, null, System.Globalization.DateTimeStyles.RoundtripKind);
 
     private static string? GetExecutableName(TargetDescriptor target)
     {

@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
 
@@ -6,9 +8,7 @@ namespace SessionPerfTracker.Infrastructure.Runner;
 
 public sealed class ProcessSessionRunner : ITargetSessionRunner
 {
-    private const long LongStartupThresholdMs = 15_000;
-    private const int HangConsecutiveUnresponsiveSamples = 3;
-
+    private const int ErrorElevationRequired = 740;
     private readonly IMetricCollector _metricCollector;
     private readonly ISessionStore _sessionStore;
     private readonly ISessionSummaryService _summaryService;
@@ -45,23 +45,17 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             throw new InvalidOperationException("Executable target requires a path.");
         }
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = target.ExecutablePath,
-            WorkingDirectory = Path.GetDirectoryName(target.ExecutablePath) ?? Environment.CurrentDirectory,
-            UseShellExecute = false
-        };
-
-        var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start target process.");
-
+        using var process = LaunchProcess(target.ExecutablePath);
         var trackedTarget = target with
         {
             ProcessId = process.Id,
             DisplayName = $"{target.DisplayName} ({process.Id})"
         };
 
-        return Task.FromResult<IRunningSessionHandle>(CreateHandle(process, trackedTarget, sampling));
+        // Register while the launch handle is still open, so a process that exits instantly
+        // keeps its pid and exit code readable for the tracker.
+        var handle = CreateHandle(trackedTarget, sampling);
+        return Task.FromResult<IRunningSessionHandle>(handle);
     }
 
     public Task<IRunningSessionHandle> AttachAsync(
@@ -74,14 +68,41 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             throw new InvalidOperationException("Attach target requires a process id.");
         }
 
-        var process = Process.GetProcessById(target.ProcessId.Value);
-        return Task.FromResult<IRunningSessionHandle>(CreateHandle(process, target, sampling));
+        // Throws ArgumentException when the process is already gone, which the UI reports as a start failure.
+        using (Process.GetProcessById(target.ProcessId.Value))
+        {
+        }
+
+        return Task.FromResult<IRunningSessionHandle>(CreateHandle(target, sampling));
     }
 
-    private RunningProcessSessionHandle CreateHandle(Process process, TargetDescriptor target, SamplingSettings sampling)
+    private static Process LaunchProcess(string executablePath)
+    {
+        var workingDirectory = Path.GetDirectoryName(executablePath) ?? Environment.CurrentDirectory;
+        try
+        {
+            return Process.Start(new ProcessStartInfo
+            {
+                FileName = executablePath,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false
+            }) ?? throw new InvalidOperationException("Failed to start target process.");
+        }
+        catch (Win32Exception error) when (error.NativeErrorCode == ErrorElevationRequired)
+        {
+            // The target's manifest requires administrator rights: let Windows show the UAC prompt.
+            return Process.Start(new ProcessStartInfo
+            {
+                FileName = executablePath,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = true
+            }) ?? throw new InvalidOperationException("Failed to start target process with elevation.");
+        }
+    }
+
+    private RunningProcessSessionHandle CreateHandle(TargetDescriptor target, SamplingSettings sampling)
     {
         var handle = new RunningProcessSessionHandle(
-            process,
             target,
             sampling,
             _metricCollector,
@@ -91,13 +112,89 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             _spikeContextProvider,
             _eventNoiseFilter,
             _settingsProvider);
+        _metricCollector.RegisterSession(handle.SessionId, target, sampling);
         handle.Start();
         return handle;
     }
 
+    internal static ExitClassification ClassifyExit(int? exitCode, bool hungAtExit)
+    {
+        if (hungAtExit)
+        {
+            return new ExitClassification(
+                SessionExitKind.CrashLikeExit,
+                exitCode,
+                "The target exited while it was not responding.");
+        }
+
+        if (exitCode is null)
+        {
+            return new ExitClassification(
+                SessionExitKind.UnexpectedExit,
+                null,
+                "The target process disappeared while monitoring was active, and no exit code was available.");
+        }
+
+        var code = exitCode.Value;
+        var status = unchecked((uint)code);
+        if (code == 0 || status == 0xC000013A)
+        {
+            return new ExitClassification(
+                SessionExitKind.ExternalClose,
+                code,
+                "The target process closed outside SessionPerfTracker normally.");
+        }
+
+        var crashName = DescribeCrashStatus(status);
+        if (crashName is not null)
+        {
+            return new ExitClassification(
+                SessionExitKind.CrashLikeExit,
+                code,
+                $"The target process terminated with crash status 0x{status:X8} ({crashName}).");
+        }
+
+        return new ExitClassification(
+            SessionExitKind.UnexpectedExit,
+            code,
+            $"The target process exited with non-zero exit code {FormatExitCode(code)}.");
+    }
+
+    private static string? DescribeCrashStatus(uint status) => status switch
+    {
+        0xC0000005 => "access violation",
+        0xC00000FD => "stack overflow",
+        0xC0000409 => "fail-fast / stack buffer overrun",
+        0xC0000374 => "heap corruption",
+        0xC000001D => "illegal instruction",
+        0xC0000094 => "integer divide by zero",
+        0xC0000135 => "required DLL not found",
+        0xC0000142 => "DLL initialization failed",
+        0xC0000417 => "invalid C runtime parameter",
+        0xC000041D => "unhandled exception in a callback",
+        0xC06D007E => "delay-loaded module not found",
+        0xE0434352 => "unhandled .NET exception",
+        0xE06D7363 => "unhandled C++ exception",
+        >= 0xC0000000 and <= 0xCFFFFFFF => "Windows error status",
+        _ => null
+    };
+
+    private static string FormatExitCode(int code) =>
+        code < 0 || code > 0xFFFF
+            ? $"{code} (0x{unchecked((uint)code):X8})"
+            : code.ToString(CultureInfo.InvariantCulture);
+
+    internal sealed record ExitClassification(SessionExitKind Kind, int? ExitCode, string Reason);
+
     private sealed class RunningProcessSessionHandle : IRunningSessionHandle
     {
-        private readonly Process _process;
+        private const long LongStartupThresholdMs = 15_000;
+        private const int HangConsecutiveUnresponsiveSamples = 3;
+        private const int MaxHangEvents = 10;
+        private const int DetectorSampleWindow = 120;
+        private const int MaxConsecutiveCollectionFailures = 5;
+        private static readonly TimeSpan MaxTimeBetweenSaves = TimeSpan.FromSeconds(15);
+
         private readonly SamplingSettings _sampling;
         private readonly IMetricCollector _metricCollector;
         private readonly ISessionStore _sessionStore;
@@ -110,20 +207,26 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
         private readonly TaskCompletionSource<SessionRecord> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly List<MetricSample> _samples = [];
         private readonly List<PerformanceEvent> _events = [];
+        private readonly HashSet<string> _eventIds = new(StringComparer.Ordinal);
+        private readonly List<string> _notes = [];
         private readonly DateTimeOffset _startedAt = DateTimeOffset.UtcNow;
         private readonly object _sync = new();
-        private bool _stopRequested;
-        private int _lastBufferedSampleCount;
+        private Task _runTask = Task.CompletedTask;
+        private volatile bool _stopRequested;
+        private int _lastSavedSampleCount;
+        private DateTimeOffset _lastSavedAt = DateTimeOffset.UtcNow;
         private DateTimeOffset? _suppressDetectorNoiseUntilUtc;
         private string? _noiseSuppressionReason;
         private MetricCapabilities _capabilities = new();
         private bool _startupReadyRecorded;
         private bool _longStartupEventRaised;
-        private bool _hangEventRaised;
+        private bool _rootExitNoted;
+        private int _hangEventCount;
+        private bool _hangActive;
         private int _consecutiveUnresponsiveSamples;
+        private int _consecutiveRespondingSamples;
 
         public RunningProcessSessionHandle(
-            Process process,
             TargetDescriptor target,
             SamplingSettings sampling,
             IMetricCollector metricCollector,
@@ -134,7 +237,6 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             IEventNoiseFilter? eventNoiseFilter,
             IThresholdSettingsProvider? settingsProvider)
         {
-            _process = process;
             Target = target;
             _sampling = sampling;
             _metricCollector = metricCollector;
@@ -174,74 +276,137 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
 
         public void Start()
         {
-            _ = RunAsync();
+            // Sampling must never run on the UI thread's synchronization context.
+            _runTask = Task.Run(RunAsync);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken = default)
         {
             _stopRequested = true;
-            await _stopCts.CancelAsync();
-            await Completion.WaitAsync(cancellationToken);
+            await _stopCts.CancelAsync().ConfigureAwait(false);
+            await Completion.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public async ValueTask DisposeAsync()
         {
-            await _stopCts.CancelAsync();
-            _process.Dispose();
+            _stopRequested = true;
+            await _stopCts.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await _runTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+
             _stopCts.Dispose();
         }
 
         private async Task RunAsync()
         {
+            var token = _stopCts.Token;
+            var allProcessesExited = false;
+            string? failureReason = null;
+            var stopwatch = Stopwatch.StartNew();
+
             try
             {
-                _capabilities = ApplyCaptureScope(await _metricCollector.GetCapabilitiesAsync(Target, _stopCts.Token));
-                var stopwatch = Stopwatch.StartNew();
+                _capabilities = ApplyCaptureScope(
+                    await _metricCollector.GetCapabilitiesAsync(Target, token).ConfigureAwait(false));
+                var consecutiveFailures = 0;
+                var interval = Math.Max(500, _sampling.IntervalMs);
 
-                while (!_stopCts.IsCancellationRequested && !HasExited())
+                while (!token.IsCancellationRequested)
                 {
+                    var tickStartedMs = stopwatch.ElapsedMilliseconds;
+                    MetricSample sample;
                     try
                     {
-                        var sample = ApplyCaptureScope(await _metricCollector.CollectAsync(Target, SessionId, stopwatch.ElapsedMilliseconds, _stopCts.Token));
-                        lock (_sync)
-                        {
-                            _samples.Add(sample);
-                        }
-
-                        await DetectEventsAsync(sample, _stopCts.Token);
-                        await EvaluateStabilityAsync(sample, _stopCts.Token);
-                        await SaveBufferedSnapshotIfNeededAsync(_stopCts.Token);
-                        SampleCollected?.Invoke(this, sample);
+                        sample = ApplyCaptureScope(await _metricCollector
+                            .CollectAsync(Target, SessionId, tickStartedMs, token)
+                            .ConfigureAwait(false));
+                        consecutiveFailures = 0;
                     }
-                    catch (InvalidOperationException) when (HasExited())
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
                         break;
                     }
+                    catch (Exception error)
+                    {
+                        consecutiveFailures++;
+                        if (consecutiveFailures >= MaxConsecutiveCollectionFailures)
+                        {
+                            failureReason = $"Metric collection kept failing: {error.Message}";
+                            break;
+                        }
 
-                    await WaitForNextSampleOrExitAsync(_stopCts.Token);
+                        await Task.Delay(interval, token).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    var treeStatus = _metricCollector.GetTreeStatus(SessionId);
+                    if (sample.ProcessCount == 0)
+                    {
+                        allProcessesExited = true;
+                        break;
+                    }
+
+                    lock (_sync)
+                    {
+                        _samples.Add(sample);
+                    }
+
+                    NoteRootExitIfNeeded(treeStatus, sample);
+                    await DetectEventsAsync(sample, token).ConfigureAwait(false);
+                    await EvaluateStabilityAsync(sample, treeStatus, token).ConfigureAwait(false);
+                    await SaveBufferedSnapshotIfNeededAsync(token).ConfigureAwait(false);
+                    SafeInvoke(() => SampleCollected?.Invoke(this, sample));
+
+                    var remaining = interval - (stopwatch.ElapsedMilliseconds - tickStartedMs);
+                    await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(50, remaining)), token).ConfigureAwait(false);
                 }
-
-                stopwatch.Stop();
-                var externalExit = !_stopRequested && HasExited();
-                var externalExitClassification = externalExit
-                    ? ClassifyExternalExit()
-                    : ExternalExitClassification.Completed;
-                if (externalExit)
-                {
-                    await AddFinalStabilityEventsAsync(stopwatch.ElapsedMilliseconds, externalExitClassification);
-                }
-
-                var session = await FinalizeSessionAsync(externalExit
-                    ? ToSessionStatus(externalExitClassification.Kind)
-                    : _stopRequested ? SessionStatus.Stopped : SessionStatus.Completed);
-                _completion.TrySetResult(session);
-                Completed?.Invoke(this, session);
             }
             catch (OperationCanceledException)
             {
-                var session = await FinalizeSessionAsync(SessionStatus.Stopped);
+            }
+            catch (Exception error)
+            {
+                failureReason = $"Monitoring stopped after an internal error: {error.Message}";
+            }
+
+            await CompleteAsync(stopwatch.ElapsedMilliseconds, allProcessesExited, failureReason).ConfigureAwait(false);
+        }
+
+        private async Task CompleteAsync(long elapsedMs, bool allProcessesExited, string? failureReason)
+        {
+            try
+            {
+                SessionStatus status;
+                if (allProcessesExited && !_stopRequested)
+                {
+                    var treeStatus = _metricCollector.GetTreeStatus(SessionId);
+                    var classification = ClassifyExit(
+                        treeStatus?.LastExitCode ?? treeStatus?.RootExitCode,
+                        _hangActive);
+                    await AddFinalStabilityEventsAsync(elapsedMs, classification).ConfigureAwait(false);
+                    status = ToSessionStatus(classification.Kind);
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(failureReason))
+                    {
+                        lock (_sync)
+                        {
+                            _notes.Add(failureReason);
+                        }
+                    }
+
+                    status = SessionStatus.Stopped;
+                }
+
+                var session = await FinalizeSessionAsync(status).ConfigureAwait(false);
                 _completion.TrySetResult(session);
-                Completed?.Invoke(this, session);
+                SafeInvoke(() => Completed?.Invoke(this, session));
             }
             catch (Exception error)
             {
@@ -249,14 +414,25 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             }
             finally
             {
-                _process.Dispose();
+                _metricCollector.ReleaseSession(SessionId);
             }
         }
 
-        private async Task WaitForNextSampleOrExitAsync(CancellationToken cancellationToken)
+        private void NoteRootExitIfNeeded(ProcessTreeStatus? status, MetricSample sample)
         {
-            var interval = Math.Max(500, _sampling.IntervalMs);
-            await Task.Delay(interval, cancellationToken);
+            if (_rootExitNoted || status is null || status.RootAlive)
+            {
+                return;
+            }
+
+            _rootExitNoted = true;
+            var code = status.RootExitCode is null ? "unknown" : FormatExitCode(status.RootExitCode.Value);
+            lock (_sync)
+            {
+                _notes.Add(
+                    $"Root process exited at +{TimeSpan.FromMilliseconds(sample.ElapsedMs):hh\\:mm\\:ss} (exit code {code}); "
+                    + $"recording continued for {sample.ProcessCount:N0} child process(es).");
+            }
         }
 
         private MetricCapabilities ApplyCaptureScope(MetricCapabilities capabilities) => capabilities with
@@ -264,22 +440,27 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             CpuPercent = _sampling.CaptureCpu ? capabilities.CpuPercent : MetricReliability.Unavailable,
             MemoryMb = _sampling.CaptureRam ? capabilities.MemoryMb : MetricReliability.Unavailable,
             DiskReadMbPerSec = _sampling.CaptureDiskRead ? capabilities.DiskReadMbPerSec : MetricReliability.Unavailable,
-            DiskWriteMbPerSec = _sampling.CaptureDiskWrite ? capabilities.DiskWriteMbPerSec : MetricReliability.Unavailable
+            DiskWriteMbPerSec = _sampling.CaptureDiskWrite ? capabilities.DiskWriteMbPerSec : MetricReliability.Unavailable,
+            GpuPercent = _sampling.CaptureGpu ? capabilities.GpuPercent : MetricReliability.Unavailable,
+            GpuMemoryMb = _sampling.CaptureGpu ? capabilities.GpuMemoryMb : MetricReliability.Unavailable,
+            TemperatureC = _sampling.CaptureGpu ? capabilities.TemperatureC : MetricReliability.Unavailable
         };
 
         private MetricSample ApplyCaptureScope(MetricSample sample)
         {
-            var values = sample.Values
-                .Where(item => IsMetricEnabled(item.Key))
-                .ToDictionary(item => item.Key, item => item.Value);
-            var reliability = sample.SourceReliability
-                .Where(item => IsMetricEnabled(item.Key))
-                .ToDictionary(item => item.Key, item => item.Value);
+            if (sample.Values.Keys.All(IsMetricEnabled))
+            {
+                return sample;
+            }
 
             return sample with
             {
-                Values = values,
-                SourceReliability = reliability
+                Values = sample.Values
+                    .Where(item => IsMetricEnabled(item.Key))
+                    .ToDictionary(item => item.Key, item => item.Value),
+                SourceReliability = sample.SourceReliability
+                    .Where(item => IsMetricEnabled(item.Key))
+                    .ToDictionary(item => item.Key, item => item.Value)
             };
         }
 
@@ -289,31 +470,35 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             MetricKey.MemoryMb => _sampling.CaptureRam,
             MetricKey.DiskReadMbPerSec => _sampling.CaptureDiskRead,
             MetricKey.DiskWriteMbPerSec => _sampling.CaptureDiskWrite,
+            MetricKey.GpuPercent or MetricKey.GpuMemoryMb or MetricKey.TemperatureC => _sampling.CaptureGpu,
             _ => true
         };
 
-        private async Task EvaluateStabilityAsync(MetricSample sample, CancellationToken cancellationToken)
+        private async Task EvaluateStabilityAsync(
+            MetricSample sample,
+            ProcessTreeStatus? status,
+            CancellationToken cancellationToken)
         {
             var events = new List<PerformanceEvent>();
-            EvaluateStartup(sample, events);
-            EvaluateHang(sample, events);
+            EvaluateStartup(sample, status, events);
+            EvaluateHang(sample, status, events);
 
             if (events.Count > 0)
             {
-                await AddAcceptedEventsAsync(events, cancellationToken);
+                await AddAcceptedEventsAsync(events, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private void EvaluateStartup(MetricSample sample, List<PerformanceEvent> events)
+        private void EvaluateStartup(MetricSample sample, ProcessTreeStatus? status, List<PerformanceEvent> events)
         {
             if (_startupReadyRecorded)
             {
                 return;
             }
 
-            var windowState = TryReadWindowState();
-            var isReady = windowState.HasWindow
-                ? windowState.IsResponding
+            var hasWindow = status?.HasWindow == true;
+            var isReady = hasWindow
+                ? status!.IsResponding
                 : sample.ElapsedMs >= Math.Max(500, _sampling.IntervalMs);
 
             if (!isReady)
@@ -335,40 +520,45 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
                 _longStartupEventRaised = true;
                 events.Add(CreateLongStartupEvent(
                     sample.ElapsedMs,
-                    windowState.HasWindow
+                    hasWindow
                         ? "The target reached a responding window state later than expected."
                         : "No window ready-state was available; startup duration is based on first recorded sample."));
             }
         }
 
-        private void EvaluateHang(MetricSample sample, List<PerformanceEvent> events)
+        private void EvaluateHang(MetricSample sample, ProcessTreeStatus? status, List<PerformanceEvent> events)
         {
-            if (_hangEventRaised || !_startupReadyRecorded)
-            {
-                return;
-            }
-
-            var windowState = TryReadWindowState();
-            if (!windowState.HasWindow)
+            if (!_startupReadyRecorded || status is null || !status.HasWindow)
             {
                 _consecutiveUnresponsiveSamples = 0;
                 return;
             }
 
-            if (windowState.IsResponding)
+            if (status.IsResponding)
             {
                 _consecutiveUnresponsiveSamples = 0;
+                if (_hangActive && ++_consecutiveRespondingSamples >= HangConsecutiveUnresponsiveSamples)
+                {
+                    _hangActive = false;
+                }
+
                 return;
             }
 
+            _consecutiveRespondingSamples = 0;
             _consecutiveUnresponsiveSamples++;
-            if (_consecutiveUnresponsiveSamples < HangConsecutiveUnresponsiveSamples)
+            if (_hangActive
+                || _hangEventCount >= MaxHangEvents
+                || _consecutiveUnresponsiveSamples < HangConsecutiveUnresponsiveSamples)
             {
                 return;
             }
 
-            _hangEventRaised = true;
-            var observedMs = HangConsecutiveUnresponsiveSamples * Math.Max(500, _sampling.IntervalMs);
+            _hangActive = true;
+            _hangEventCount++;
+            // IsHungAppWindow reports a hang after ~5 s without message processing.
+            var observedMs = 5000 + HangConsecutiveUnresponsiveSamples * Math.Max(500, _sampling.IntervalMs);
+            var windowOwner = string.IsNullOrWhiteSpace(status.WindowProcessName) ? "The target window" : status.WindowProcessName;
             events.Add(new PerformanceEvent
             {
                 Id = $"{SessionId}_stability_hang_{sample.ElapsedMs}",
@@ -377,17 +567,15 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
                 Timestamp = sample.Timestamp,
                 ElapsedMs = sample.ElapsedMs,
                 Severity = EventSeverity.Warning,
-                Title = "Best-effort not responding",
-                Details = $"The root window reported not responding for about {observedMs / 1000d:N1}s. This is a lightweight Windows Process.Responding check, not a reliable hang proof.",
+                Title = "Not responding",
+                Details = $"{windowOwner} stopped processing window messages for about {observedMs / 1000d:N0}s (Windows hung-window check).",
                 ObservedValue = observedMs,
                 ThresholdValue = observedMs,
                 DetectionProvider = "stability-layer-best-effort"
             });
         }
 
-        private async Task AddFinalStabilityEventsAsync(
-            long elapsedMs,
-            ExternalExitClassification classification)
+        private async Task AddFinalStabilityEventsAsync(long elapsedMs, ExitClassification classification)
         {
             var events = new List<PerformanceEvent>();
             if (!_startupReadyRecorded && elapsedMs >= LongStartupThresholdMs && !_longStartupEventRaised)
@@ -399,56 +587,21 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             }
 
             events.Add(CreateExitEvent(elapsedMs, classification));
-
-            await AddAcceptedEventsAsync(events, CancellationToken.None);
+            await AddAcceptedEventsAsync(events, CancellationToken.None).ConfigureAwait(false);
         }
 
-        private ExternalExitClassification ClassifyExternalExit()
-        {
-            var exitCode = TryReadExitCode();
-            if (_hangEventRaised)
-            {
-                return new ExternalExitClassification(
-                    SessionExitKind.CrashLikeExit,
-                    exitCode,
-                    "The target exited after a best-effort not responding event.");
-            }
-
-            if (exitCode is 0)
-            {
-                return new ExternalExitClassification(
-                    SessionExitKind.ExternalClose,
-                    exitCode,
-                    "The target process closed outside SessionPerfTracker with exit code 0.");
-            }
-
-            if (exitCode is not null)
-            {
-                return new ExternalExitClassification(
-                    SessionExitKind.CrashLikeExit,
-                    exitCode,
-                    $"The target process exited with non-zero exit code {exitCode.Value}.");
-            }
-
-            return new ExternalExitClassification(
-                SessionExitKind.UnexpectedExit,
-                exitCode,
-                "The target process disappeared while monitoring was active, and no exit code was available.");
-        }
-
-        private PerformanceEvent CreateExitEvent(long elapsedMs, ExternalExitClassification classification)
+        private PerformanceEvent CreateExitEvent(long elapsedMs, ExitClassification classification)
         {
             var (kind, severity, title) = classification.Kind switch
             {
                 SessionExitKind.ExternalClose => (EventKind.ExternalExit, EventSeverity.Info, "External close / graceful exit"),
                 SessionExitKind.CrashLikeExit => (EventKind.CrashLikeExit, EventSeverity.Critical, "Crash-like exit"),
-                SessionExitKind.UnexpectedExit => (EventKind.UnexpectedExit, EventSeverity.Warning, "Unexpected exit"),
                 _ => (EventKind.UnexpectedExit, EventSeverity.Warning, "Unexpected exit")
             };
 
             var exitCodeText = classification.ExitCode is null
                 ? "Exit code: unavailable."
-                : $"Exit code: {classification.ExitCode.Value}.";
+                : $"Exit code: {FormatExitCode(classification.ExitCode.Value)}.";
 
             return new PerformanceEvent
             {
@@ -480,74 +633,21 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             DetectionProvider = "stability-layer-best-effort"
         };
 
-        private (bool HasWindow, bool IsResponding) TryReadWindowState()
-        {
-            try
-            {
-                if (_process.HasExited)
-                {
-                    return (false, false);
-                }
-
-                _process.Refresh();
-                if (_process.MainWindowHandle == IntPtr.Zero)
-                {
-                    return (false, true);
-                }
-
-                return (true, _process.Responding);
-            }
-            catch
-            {
-                return (false, true);
-            }
-        }
-
-        private int? TryReadExitCode()
-        {
-            try
-            {
-                return _process.HasExited ? _process.ExitCode : null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
         private static SessionStatus ToSessionStatus(SessionExitKind kind) => kind switch
         {
             SessionExitKind.ExternalClose => SessionStatus.ExternalExit,
             SessionExitKind.CrashLikeExit => SessionStatus.CrashLikeExit,
-            SessionExitKind.UnexpectedExit => SessionStatus.UnexpectedExit,
             _ => SessionStatus.UnexpectedExit
         };
-
-        private sealed record ExternalExitClassification(
-            SessionExitKind Kind,
-            int? ExitCode,
-            string Reason)
-        {
-            public static ExternalExitClassification Completed { get; } = new(
-                SessionExitKind.Completed,
-                null,
-                "Target completed normally.");
-        }
 
         private async Task AddAcceptedEventsAsync(
             IReadOnlyList<PerformanceEvent> events,
             CancellationToken cancellationToken)
         {
-            if (events.Count == 0)
-            {
-                return;
-            }
-
             PerformanceEvent[] newEvents;
             lock (_sync)
             {
-                var existingIds = _events.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-                newEvents = events.Where(item => existingIds.Add(item.Id)).ToArray();
+                newEvents = events.Where(item => _eventIds.Add(item.Id)).ToArray();
                 _events.AddRange(newEvents);
             }
 
@@ -555,7 +655,7 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             {
                 await Task.Yield();
                 cancellationToken.ThrowIfCancellationRequested();
-                EventsDetected?.Invoke(this, newEvents);
+                SafeInvoke(() => EventsDetected?.Invoke(this, newEvents));
             }
         }
 
@@ -572,14 +672,16 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             string? noiseSuppressionReason;
             lock (_sync)
             {
-                samples = _samples.ToArray();
+                // Detectors only look at recent history; never copy the whole session every tick.
+                var start = Math.Max(0, _samples.Count - DetectorSampleWindow);
+                samples = _samples.GetRange(start, _samples.Count - start).ToArray();
                 previousEvents = _events.ToArray();
                 suppressDetectorNoiseUntilUtc = _suppressDetectorNoiseUntilUtc;
                 noiseSuppressionReason = _noiseSuppressionReason;
             }
 
             var input = new EventDetectionInput(SessionId, Target, samples, previousEvents, _sampling);
-            var batches = await Task.WhenAll(_eventDetectors.Select(detector => detector.DetectAsync(input, cancellationToken)));
+            var batches = await Task.WhenAll(_eventDetectors.Select(detector => detector.DetectAsync(input, cancellationToken))).ConfigureAwait(false);
             var detectedEvents = batches.SelectMany(batch => batch).ToArray();
             if (detectedEvents.Length == 0)
             {
@@ -599,28 +701,27 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
                     noiseSuppressionReason)).ToArray();
             }
 
-            if (detectedEvents.Length == 0)
+            PerformanceEvent[] newEvents;
+            lock (_sync)
+            {
+                newEvents = detectedEvents.Where(item => !_eventIds.Contains(item.Id)).ToArray();
+            }
+
+            if (newEvents.Length == 0)
             {
                 return;
             }
 
-            PerformanceEvent[] newEvents;
+            newEvents = await AttachContextIfNeededAsync(newEvents, cancellationToken).ConfigureAwait(false);
             lock (_sync)
             {
-                var existingIds = _events.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-                newEvents = detectedEvents.Where(item => existingIds.Add(item.Id)).ToArray();
-            }
-
-            newEvents = await AttachContextIfNeededAsync(newEvents, cancellationToken);
-
-            lock (_sync)
-            {
+                newEvents = newEvents.Where(item => _eventIds.Add(item.Id)).ToArray();
                 _events.AddRange(newEvents);
             }
 
             if (newEvents.Length > 0)
             {
-                EventsDetected?.Invoke(this, newEvents);
+                SafeInvoke(() => EventsDetected?.Invoke(this, newEvents));
             }
         }
 
@@ -643,7 +744,7 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
             {
                 var context = await _spikeContextProvider.CaptureAsync(
                     new SpikeContextInput(SessionId, Target, triggerEvent, LookbackMs: 5000, LookaheadMs: 0),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
                 if (context is null)
                 {
@@ -684,35 +785,69 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
 
         private async Task SaveBufferedSnapshotIfNeededAsync(CancellationToken cancellationToken)
         {
+            int sampleCount;
+            lock (_sync)
+            {
+                sampleCount = _samples.Count;
+            }
+
             var batchSize = Math.Max(1, _sampling.StorageBatchSize);
-            var sampleCount = _samples.Count;
-            if (sampleCount - _lastBufferedSampleCount < batchSize)
+            if (sampleCount - _lastSavedSampleCount < batchSize
+                && DateTimeOffset.UtcNow - _lastSavedAt < MaxTimeBetweenSaves)
             {
                 return;
             }
 
-            var session = BuildSession(SessionStatus.Running, endedAt: null);
-            await _sessionStore.SaveSessionAsync(session, cancellationToken);
-            _lastBufferedSampleCount = sampleCount;
+            try
+            {
+                var session = BuildSession(SessionStatus.Running, endedAt: null);
+                await _sessionStore.SaveSessionAsync(session, cancellationToken).ConfigureAwait(false);
+                _lastSavedSampleCount = sampleCount;
+                _lastSavedAt = DateTimeOffset.UtcNow;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // A transient storage error must not stop recording; the final save retries everything.
+                _lastSavedAt = DateTimeOffset.UtcNow;
+            }
         }
 
         private async Task<SessionRecord> FinalizeSessionAsync(SessionStatus status)
         {
-            var endedAt = DateTimeOffset.UtcNow;
-            var session = BuildSession(status, endedAt);
-            await _sessionStore.SaveSessionAsync(session);
-            return session;
+            var session = BuildSession(status, DateTimeOffset.UtcNow);
+            Exception? lastError = null;
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    await _sessionStore.SaveSessionAsync(session).ConfigureAwait(false);
+                    return session;
+                }
+                catch (Exception error)
+                {
+                    lastError = error;
+                    await Task.Delay(250 * (attempt + 1)).ConfigureAwait(false);
+                }
+            }
+
+            throw new InvalidOperationException($"Session could not be saved: {lastError?.Message}", lastError);
         }
 
         private SessionRecord BuildSession(SessionStatus status, DateTimeOffset? endedAt)
         {
             MetricSample[] samples;
             PerformanceEvent[] events;
+            string? notes;
 
             lock (_sync)
             {
                 samples = _samples.ToArray();
                 events = _events.ToArray();
+                notes = _notes.Count == 0 ? null : string.Join(" ", _notes);
             }
 
             var withoutSummary = new SessionRecordWithoutSummary
@@ -726,20 +861,20 @@ public sealed class ProcessSessionRunner : ITargetSessionRunner
                 Capabilities = _capabilities,
                 Samples = samples,
                 Events = events,
-                Notes = "Recorded by WPF CPU/RAM/Disk target analysis with lightweight event context."
+                Notes = notes
             };
             return withoutSummary.WithSummary(_summaryService.Summarize(withoutSummary));
         }
 
-        private bool HasExited()
+        private static void SafeInvoke(Action action)
         {
             try
             {
-                return _process.HasExited;
+                action();
             }
-            catch (InvalidOperationException)
+            catch
             {
-                return true;
+                // UI subscribers must never break the recording loop.
             }
         }
     }

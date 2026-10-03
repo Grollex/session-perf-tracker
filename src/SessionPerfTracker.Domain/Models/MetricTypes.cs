@@ -56,7 +56,8 @@ public enum MetricKey
     GpuPercent,
     DiskReadMbPerSec,
     DiskWriteMbPerSec,
-    TemperatureC
+    TemperatureC,
+    GpuMemoryMb
 }
 
 public enum MetricReliability

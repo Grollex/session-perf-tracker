@@ -1,38 +1,57 @@
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
-using SessionPerfTracker.Infrastructure.Collectors;
+using SessionPerfTracker.Infrastructure.Gpu;
+using SessionPerfTracker.Infrastructure.Native;
 
 namespace SessionPerfTracker.Infrastructure.Context;
 
+/// <summary>
+/// Captures "who else was busy" around an event: two system snapshots 250 ms apart give per-process
+/// CPU and disk rates without opening any process handles.
+/// </summary>
 public sealed class LightweightSystemContextProvider : ISpikeContextProvider
 {
     private const int ProbeDelayMs = 250;
     private const int TopProcessCount = 6;
+    private readonly SystemProcessSnapshotReader _reader;
+    private readonly GpuMonitor _gpu;
+
+    public LightweightSystemContextProvider()
+        : this(SystemProcessSnapshotReader.Shared, GpuMonitor.Shared)
+    {
+    }
+
+    internal LightweightSystemContextProvider(SystemProcessSnapshotReader reader, GpuMonitor gpu)
+    {
+        _reader = reader;
+        _gpu = gpu;
+    }
 
     public async Task<SpikeContextSnapshot?> CaptureAsync(
         SpikeContextInput input,
         CancellationToken cancellationToken = default)
     {
-        var first = CaptureProcessProbe();
-        await Task.Delay(ProbeDelayMs, cancellationToken);
-        var second = CaptureProcessProbe();
+        var first = await Task.Run(_reader.Capture, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(ProbeDelayMs, cancellationToken).ConfigureAwait(false);
+        var second = await Task.Run(_reader.Capture, cancellationToken).ConfigureAwait(false);
+        var gpu = _gpu.GetSample(TimeSpan.FromSeconds(2));
 
-        if (second.Count == 0)
+        if (second.Processes.Count == 0)
         {
             return null;
         }
 
-        var firstByProcessId = first.ToDictionary(process => process.ProcessId);
-        var processes = second
-            .Select(process => BuildContextProcess(process, firstByProcessId.GetValueOrDefault(process.ProcessId)))
+        var elapsed = SystemProcessSnapshot.ElapsedSeconds(first, second);
+        var processes = second.Processes.Values
+            .Where(process => process.ProcessId != 0)
+            .Select(process => BuildContextProcess(process, first, elapsed, gpu))
             .ToArray();
 
-        var capturedAt = DateTimeOffset.UtcNow;
-        var newProcesses = second
-            .Where(process => IsNewNearEvent(process, input.Event.Timestamp, input.LookbackMs, capturedAt))
-            .OrderByDescending(process => process.StartedAt)
+        var capturedAt = second.CapturedAt;
+        var windowStart = input.Event.Timestamp.ToUniversalTime().AddMilliseconds(-Math.Max(0, input.LookbackMs));
+        var newProcesses = second.Processes.Values
+            .Where(process => process.StartedAtUtc is { } started && started >= windowStart && started <= capturedAt)
+            .OrderByDescending(process => process.CreateTimeTicks)
             .Take(12)
             .Select(process => $"{process.Name} ({process.ProcessId})")
             .ToArray();
@@ -65,240 +84,44 @@ public sealed class LightweightSystemContextProvider : ISpikeContextProvider
                 .ThenByDescending(process => process.MemoryMb)
                 .Take(TopProcessCount)
                 .ToArray(),
+            TopProcessesByGpu = processes
+                .Where(process => process.GpuPercent is >= 0.5)
+                .OrderByDescending(process => process.GpuPercent)
+                .Take(TopProcessCount)
+                .ToArray(),
             NewProcessNames = newProcesses,
             CaptureProvider = "lightweight-system-context-provider",
             Note = "Best-effort process snapshot captured after a detected event; not a continuous system trace."
         };
     }
 
-    private static IReadOnlyList<ProcessProbe> CaptureProcessProbe()
-    {
-        var capturedAt = DateTimeOffset.UtcNow;
-        var probes = new List<ProcessProbe>();
-
-        foreach (var process in Process.GetProcesses())
-        {
-            using (process)
-            {
-                try
-                {
-                    if (process.HasExited)
-                    {
-                        continue;
-                    }
-
-                    var processId = process.Id;
-                    var processName = SafeGetProcessName(process);
-                    var totalProcessorTime = SafeGetTotalProcessorTime(process);
-                    var memoryMb = SafeGetMemoryMb(process);
-                    var ioCounters = WindowsProcessIoCounters.TryGet(process);
-                    var startedAt = SafeGetStartTime(process);
-
-                    probes.Add(new ProcessProbe(
-                        processId,
-                        processName,
-                        capturedAt,
-                        totalProcessorTime,
-                        memoryMb,
-                        ioCounters,
-                        startedAt));
-                }
-                catch (InvalidOperationException)
-                {
-                    continue;
-                }
-                catch (System.ComponentModel.Win32Exception)
-                {
-                    continue;
-                }
-            }
-        }
-
-        return probes;
-    }
-
-    private static ContextProcessSnapshot BuildContextProcess(ProcessProbe current, ProcessProbe? previous)
+    private static ContextProcessSnapshot BuildContextProcess(
+        ProcessRawInfo current,
+        SystemProcessSnapshot first,
+        double elapsedSeconds,
+        GpuSample gpu)
     {
         var cpuPercent = 0d;
-        var diskReadMbPerSec = 0d;
-        var diskWriteMbPerSec = 0d;
-
-        if (previous is not null)
+        var diskRead = 0d;
+        var diskWrite = 0d;
+        if (first.TryGet(current.ProcessId, out var previous) && previous.CreateTimeTicks == current.CreateTimeTicks)
         {
-            var wallMs = Math.Max(1, (current.CapturedAt - previous.CapturedAt).TotalMilliseconds);
-            if (current.TotalProcessorTime is not null && previous.TotalProcessorTime is not null)
-            {
-                var cpuDeltaMs = Math.Max(0, (current.TotalProcessorTime.Value - previous.TotalProcessorTime.Value).TotalMilliseconds);
-                cpuPercent = Math.Clamp(cpuDeltaMs / wallMs / Environment.ProcessorCount * 100, 0, 100);
-            }
-
-            if (current.IoCounters is not null && previous.IoCounters is not null)
-            {
-                var seconds = wallMs / 1000d;
-                diskReadMbPerSec = BytesToMegabytesPerSecond(
-                    current.IoCounters.ReadTransferCount,
-                    previous.IoCounters.ReadTransferCount,
-                    seconds);
-                diskWriteMbPerSec = BytesToMegabytesPerSecond(
-                    current.IoCounters.WriteTransferCount,
-                    previous.IoCounters.WriteTransferCount,
-                    seconds);
-            }
+            cpuPercent = SystemProcessSnapshot.CpuPercent(previous.CpuTime100Ns, current.CpuTime100Ns, elapsedSeconds);
+            diskRead = SystemProcessSnapshot.MegabytesPerSecond(previous.ReadTransferBytes, current.ReadTransferBytes, elapsedSeconds);
+            diskWrite = SystemProcessSnapshot.MegabytesPerSecond(previous.WriteTransferBytes, current.WriteTransferBytes, elapsedSeconds);
         }
 
+        gpu.Processes.TryGetValue(current.ProcessId, out var gpuUsage);
         return new ContextProcessSnapshot
         {
             ProcessId = current.ProcessId,
-            Name = current.Name,
+            Name = current.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? current.Name[..^4] : current.Name,
             CpuPercent = cpuPercent,
-            MemoryMb = current.MemoryMb,
-            DiskReadMbPerSec = diskReadMbPerSec,
-            DiskWriteMbPerSec = diskWriteMbPerSec,
-            DiskMbPerSec = diskReadMbPerSec + diskWriteMbPerSec
+            MemoryMb = current.PrivateWorkingSetMb,
+            DiskReadMbPerSec = diskRead,
+            DiskWriteMbPerSec = diskWrite,
+            DiskMbPerSec = diskRead + diskWrite,
+            GpuPercent = gpu.HasUtilization ? gpuUsage?.UtilizationPercent : null
         };
-    }
-
-    private static bool IsNewNearEvent(
-        ProcessProbe process,
-        DateTimeOffset eventTimestamp,
-        int lookbackMs,
-        DateTimeOffset capturedAt)
-    {
-        if (process.StartedAt is null)
-        {
-            return false;
-        }
-
-        var start = process.StartedAt.Value.ToUniversalTime();
-        var windowStart = eventTimestamp.ToUniversalTime().AddMilliseconds(-Math.Max(0, lookbackMs));
-        return start >= windowStart && start <= capturedAt.ToUniversalTime();
-    }
-
-    private static string SafeGetProcessName(Process process)
-    {
-        try
-        {
-            return string.IsNullOrWhiteSpace(process.ProcessName) ? $"Process {process.Id}" : process.ProcessName;
-        }
-        catch (InvalidOperationException)
-        {
-            return $"Process {process.Id}";
-        }
-    }
-
-    private static TimeSpan? SafeGetTotalProcessorTime(Process process)
-    {
-        try
-        {
-            return process.TotalProcessorTime;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return null;
-        }
-    }
-
-    private static double? SafeGetMemoryMb(Process process)
-    {
-        try
-        {
-            return WindowsProcessMemoryCounters.GetRamForAggregation(process).Megabytes;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    private static DateTimeOffset? SafeGetStartTime(Process process)
-    {
-        try
-        {
-            return new DateTimeOffset(process.StartTime);
-        }
-        catch (InvalidOperationException)
-        {
-            return null;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return null;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
-
-    private static double BytesToMegabytesPerSecond(ulong current, ulong previous, double seconds)
-    {
-        if (current < previous || seconds <= 0)
-        {
-            return 0;
-        }
-
-        return (current - previous) / 1024d / 1024d / seconds;
-    }
-
-    private sealed record ProcessProbe(
-        int ProcessId,
-        string Name,
-        DateTimeOffset CapturedAt,
-        TimeSpan? TotalProcessorTime,
-        double? MemoryMb,
-        IoCounterSnapshot? IoCounters,
-        DateTimeOffset? StartedAt);
-
-    private sealed record IoCounterSnapshot(ulong ReadTransferCount, ulong WriteTransferCount);
-
-    private static class WindowsProcessIoCounters
-    {
-        public static IoCounterSnapshot? TryGet(Process process)
-        {
-            try
-            {
-                return GetProcessIoCounters(process.Handle, out var counters)
-                    ? new IoCounterSnapshot(counters.ReadTransferCount, counters.WriteTransferCount)
-                    : null;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                return null;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return null;
-            }
-        }
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool GetProcessIoCounters(IntPtr processHandle, out IoCounters ioCounters);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct IoCounters
-        {
-            public ulong ReadOperationCount;
-            public ulong WriteOperationCount;
-            public ulong OtherOperationCount;
-            public ulong ReadTransferCount;
-            public ulong WriteTransferCount;
-            public ulong OtherTransferCount;
-        }
     }
 }

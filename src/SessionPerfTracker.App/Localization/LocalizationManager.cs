@@ -38,6 +38,9 @@ public static class LocalizationManager
         var culture = CultureInfo.GetCultureInfo(normalized);
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
+        // Background scans format numbers too; keep them consistent with the UI language.
+        CultureInfo.DefaultThreadCurrentCulture = culture;
+        CultureInfo.DefaultThreadCurrentUICulture = culture;
 
         var dictionaries = WpfApplication.Current.Resources.MergedDictionaries;
         for (var index = dictionaries.Count - 1; index >= 0; index--)
@@ -49,9 +52,11 @@ public static class LocalizationManager
             }
         }
 
-        dictionaries.Add(new ResourceDictionary
+        var strings = new ResourceDictionary
         {
             Source = new Uri($"/Localization/Strings.{normalized}.xaml", UriKind.Relative)
-        });
+        };
+        dictionaries.Add(strings);
+        ViewModels.UiText.Warm(strings);
     }
 }

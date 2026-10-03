@@ -33,6 +33,32 @@ public interface IMetricCollector
     string Label { get; }
     Task<MetricCapabilities> GetCapabilitiesAsync(TargetDescriptor target, CancellationToken cancellationToken = default);
     Task<MetricSample> CollectAsync(TargetDescriptor target, string sessionId, long elapsedMs, CancellationToken cancellationToken = default);
+
+    /// <summary>Prepares per-session tracking (e.g. opens the root handle right after launch).</summary>
+    void RegisterSession(string sessionId, TargetDescriptor target, SamplingSettings sampling)
+    {
+    }
+
+    /// <summary>Process-tree facts from the latest sample: exits, exit codes and window responsiveness.</summary>
+    ProcessTreeStatus? GetTreeStatus(string sessionId) => null;
+
+    /// <summary>Releases handles and cached state when a session ends.</summary>
+    void ReleaseSession(string sessionId)
+    {
+    }
+}
+
+public sealed record ProcessTreeStatus
+{
+    public bool RootAlive { get; init; } = true;
+    public int AliveCount { get; init; }
+    public int? RootExitCode { get; init; }
+    public DateTimeOffset? RootExitedAt { get; init; }
+    public int? LastExitCode { get; init; }
+    public string? LastExitedProcessName { get; init; }
+    public bool HasWindow { get; init; }
+    public bool IsResponding { get; init; } = true;
+    public string? WindowProcessName { get; init; }
 }
 
 public sealed record EventDetectionInput(
@@ -85,6 +111,17 @@ public interface ISpikeContextProvider
 public interface ISessionStore
 {
     Task<IReadOnlyList<SessionRecord>> ListSessionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists sessions with their stored summaries but without samples/events, so the list view stays
+    /// cheap no matter how long the recordings are. Use <see cref="GetSessionAsync"/> for full data.
+    /// </summary>
+    Task<IReadOnlyList<SessionRecord>> ListSessionHeadersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finalizes sessions left in the Running state by a crash or forced shutdown.
+    /// </summary>
+    Task<int> RecoverInterruptedSessionsAsync(CancellationToken cancellationToken = default);
     Task<SessionRecord?> GetSessionAsync(string id, CancellationToken cancellationToken = default);
     Task SaveSessionAsync(SessionRecord session, CancellationToken cancellationToken = default);
     Task DeleteSessionAsync(string id, CancellationToken cancellationToken = default);
@@ -198,7 +235,52 @@ public sealed record ProcessControlResult(
 public sealed record GlobalProcessScan(
     DateTimeOffset CapturedAt,
     TimeSpan? ComparedToPreviousScan,
-    IReadOnlyList<GlobalProcessSnapshot> Processes);
+    IReadOnlyList<GlobalProcessSnapshot> Processes)
+{
+    public SystemLoadSnapshot? System { get; init; }
+}
+
+/// <summary>Whole-machine load shown above the Global Watch table and next to Live sessions.</summary>
+public sealed record SystemLoadSnapshot
+{
+    public DateTimeOffset CapturedAt { get; init; }
+    public double? CpuPercent { get; init; }
+    public double? MemoryUsedMb { get; init; }
+    public double? MemoryTotalMb { get; init; }
+    public int ProcessCount { get; init; }
+    public bool GpuAvailable { get; init; }
+    public string? GpuName { get; init; }
+    public double? GpuPercent { get; init; }
+    public double? GpuDedicatedUsedMb { get; init; }
+    public double? GpuDedicatedTotalMb { get; init; }
+    public double? GpuTemperatureC { get; init; }
+}
+
+public interface ISystemLoadProvider
+{
+    SystemLoadSnapshot Sample();
+}
+
+/// <summary>Reads version/publisher/signature facts for an executable. Results are cached per file.</summary>
+public interface IExecutableIdentityProvider
+{
+    Task<ExecutableFingerprint?> DescribeAsync(
+        string path,
+        bool includeSignature,
+        bool includeHash,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Searches likely install locations for an executable whose saved path disappeared.</summary>
+public interface IExecutableLocator
+{
+    Task<IReadOnlyList<string>> FindCandidatePathsAsync(
+        string missingPath,
+        string exeName,
+        string? productName,
+        int maxResults,
+        CancellationToken cancellationToken = default);
+}
 
 public sealed record GlobalProcessSnapshot
 {
@@ -223,6 +305,8 @@ public sealed record GlobalProcessSnapshot
     public double? MemoryDeltaMb { get; init; }
     public double? DiskReadMbPerSec { get; init; }
     public double? DiskWriteMbPerSec { get; init; }
+    public double? GpuPercent { get; init; }
+    public double? GpuDedicatedMb { get; init; }
 }
 
 public interface IRamAccountingDiagnosticProvider

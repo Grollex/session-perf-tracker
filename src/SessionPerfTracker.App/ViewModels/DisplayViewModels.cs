@@ -8,12 +8,52 @@ using SessionPerfTracker.Domain.Models;
 
 namespace SessionPerfTracker.App.ViewModels;
 
+/// <summary>
+/// Localized strings for view models. Values are cached so background scans can format rows
+/// without touching WPF resources off the UI thread (the language only changes on restart).
+/// </summary>
 internal static class UiText
 {
-    public static string Get(string key) => Application.Current?.TryFindResource(key) as string ?? key;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> Cache = new(StringComparer.Ordinal);
+
+    public static void Warm(ResourceDictionary strings)
+    {
+        Cache.Clear();
+        foreach (var key in strings.Keys)
+        {
+            if (key is string textKey && strings[key] is string value)
+            {
+                Cache[textKey] = value;
+            }
+        }
+    }
+
+    public static string Get(string key)
+    {
+        if (Cache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var application = Application.Current;
+        if (application is null)
+        {
+            return key;
+        }
+
+        if (!application.Dispatcher.CheckAccess())
+        {
+            // Keys outside the warmed localization dictionary are not resolved off the UI thread.
+            return key;
+        }
+
+        var value = application.TryFindResource(key) as string ?? key;
+        Cache[key] = value;
+        return value;
+    }
 
     public static string Format(string key, params object[] args) =>
-        string.Format(Get(key), args);
+        string.Format(System.Globalization.CultureInfo.CurrentCulture, Get(key), args);
 
     public static string ProfileName(string profileId, string fallbackName) => profileId switch
     {
@@ -420,10 +460,14 @@ public sealed class GlobalProcessRowViewModel
         DiskReadMbPerSec = process.DiskReadMbPerSec;
         DiskWriteMbPerSec = process.DiskWriteMbPerSec;
         DiskTotalMbPerSec = (process.DiskReadMbPerSec ?? 0) + (process.DiskWriteMbPerSec ?? 0);
+        GpuPercent = process.GpuPercent;
+        GpuDedicatedMb = process.GpuDedicatedMb;
         CpuText = FormatPercent(process.CpuPercent);
         MemoryText = FormatMb(process.MemoryMb);
         DiskReadText = FormatMbPerSec(process.DiskReadMbPerSec);
         DiskWriteText = FormatMbPerSec(process.DiskWriteMbPerSec);
+        GpuText = FormatGpu(process.GpuPercent);
+        GpuMemoryText = FormatGpuMemory(process.GpuDedicatedMb);
         MemoryDeltaText = FormatSignedMb(process.MemoryDeltaMb);
         StateText = process.IsNewSincePreviousScan
             ? "new"
@@ -453,6 +497,7 @@ public sealed class GlobalProcessRowViewModel
         TopCpuText = $"{Name} - {CpuText}";
         TopRamText = $"{Name} - {MemoryText}";
         TopDiskText = $"{Name} - {DiskTotalText}";
+        TopGpuText = $"{Name} - {GpuText}";
         IncludedProcessSummaryText = $"{Name} ({ProcessIdText})";
     }
 
@@ -510,10 +555,18 @@ public sealed class GlobalProcessRowViewModel
         DiskReadMbPerSec = orderedRows.Sum(row => row.DiskReadMbPerSec ?? 0);
         DiskWriteMbPerSec = orderedRows.Sum(row => row.DiskWriteMbPerSec ?? 0);
         DiskTotalMbPerSec = (DiskReadMbPerSec ?? 0) + (DiskWriteMbPerSec ?? 0);
+        GpuPercent = orderedRows.Any(row => row.GpuPercent is not null)
+            ? Math.Min(100, orderedRows.Sum(row => row.GpuPercent ?? 0))
+            : null;
+        GpuDedicatedMb = orderedRows.Any(row => row.GpuDedicatedMb is not null)
+            ? orderedRows.Sum(row => row.GpuDedicatedMb ?? 0)
+            : null;
         CpuText = FormatPercent(CpuPercent);
         MemoryText = FormatMb(MemoryMb);
         DiskReadText = FormatMbPerSec(DiskReadMbPerSec);
         DiskWriteText = FormatMbPerSec(DiskWriteMbPerSec);
+        GpuText = FormatGpu(GpuPercent);
+        GpuMemoryText = FormatGpuMemory(GpuDedicatedMb);
         MemoryDeltaText = FormatSignedMb(orderedRows.Sum(row => row.Process.MemoryDeltaMb ?? 0));
         StateText = orderedRows.Any(row => row.Process.IsNewSincePreviousScan)
             ? "new"
@@ -538,7 +591,9 @@ public sealed class GlobalProcessRowViewModel
             MemoryMb = MemoryMb,
             MemoryDeltaMb = orderedRows.Sum(row => row.Process.MemoryDeltaMb ?? 0),
             DiskReadMbPerSec = DiskReadMbPerSec,
-            DiskWriteMbPerSec = DiskWriteMbPerSec
+            DiskWriteMbPerSec = DiskWriteMbPerSec,
+            GpuPercent = GpuPercent,
+            GpuDedicatedMb = GpuDedicatedMb
         };
         var evaluation = EvaluateProfileState(aggregateSnapshot, profileLimits, isAssignedProfile);
         ProfileState = evaluation.State;
@@ -556,6 +611,7 @@ public sealed class GlobalProcessRowViewModel
         TopCpuText = $"{Name} - {CpuText}";
         TopRamText = $"{Name} - {MemoryText}";
         TopDiskText = $"{Name} - {DiskTotalText}";
+        TopGpuText = $"{Name} - {GpuText}";
         IncludedProcessSummaryText = $"Live root candidate: {primary.Name} ({primary.ProcessId}); "
             + string.Join("; ", orderedRows.Take(5).Select(row => $"{row.Name} ({row.ProcessId})"));
         if (orderedRows.Length > 5)
@@ -611,6 +667,10 @@ public sealed class GlobalProcessRowViewModel
     public double? DiskReadMbPerSec { get; }
     public double? DiskWriteMbPerSec { get; }
     public double DiskTotalMbPerSec { get; }
+    public double? GpuPercent { get; }
+    public double? GpuDedicatedMb { get; }
+    public string GpuText { get; }
+    public string GpuMemoryText { get; }
     public string CpuText { get; }
     public string MemoryText { get; }
     public string MemoryDeltaText { get; }
@@ -632,6 +692,7 @@ public sealed class GlobalProcessRowViewModel
     public string TopCpuText { get; }
     public string TopRamText { get; }
     public string TopDiskText { get; }
+    public string TopGpuText { get; }
     public string IncludedProcessSummaryText { get; }
 
     public override string ToString() => DisplayName;
@@ -646,7 +707,10 @@ public sealed class GlobalProcessRowViewModel
                 CreateMetricRatio("CPU", process.CpuPercent, limits.CpuThresholdPercent),
                 CreateMetricRatio("RAM", process.MemoryMb, limits.RamThresholdMb),
                 CreateMetricRatio("Disk Read", process.DiskReadMbPerSec, limits.DiskReadThresholdMbPerSec),
-                CreateMetricRatio("Disk Write", process.DiskWriteMbPerSec, limits.DiskWriteThresholdMbPerSec)
+                CreateMetricRatio("Disk Write", process.DiskWriteMbPerSec, limits.DiskWriteThresholdMbPerSec),
+                limits.EffectiveGpuThresholdPercent >= 100
+                    ? null
+                    : CreateMetricRatio("GPU", process.GpuPercent, limits.EffectiveGpuThresholdPercent)
             }
             .Where(item => item is not null)
             .Cast<MetricRatio>()
@@ -739,6 +803,12 @@ public sealed class GlobalProcessRowViewModel
 
     private static string FormatMbPerSec(double? value) =>
         value is null ? "warming" : $"{value.Value:N1} MB/s";
+
+    private static string FormatGpu(double? value) =>
+        value is null ? "—" : value.Value < 0.05 ? "0%" : $"{value.Value:N1}%";
+
+    private static string FormatGpuMemory(double? value) =>
+        value is null or < 0.5 ? "—" : value.Value >= 1024 ? $"{value.Value / 1024:N1} GB" : $"{value.Value:N0} MB";
 
     private static string FormatSignedMb(double? value)
     {

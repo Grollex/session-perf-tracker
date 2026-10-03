@@ -28,6 +28,7 @@ public sealed record SamplingSettings
     public bool CaptureRam { get; init; } = true;
     public bool CaptureDiskRead { get; init; } = true;
     public bool CaptureDiskWrite { get; init; } = true;
+    public bool CaptureGpu { get; init; } = true;
 }
 
 public sealed record MetricCapabilities
@@ -35,6 +36,7 @@ public sealed record MetricCapabilities
     public MetricReliability CpuPercent { get; init; } = MetricReliability.Unavailable;
     public MetricReliability MemoryMb { get; init; } = MetricReliability.Unavailable;
     public MetricReliability GpuPercent { get; init; } = MetricReliability.Unavailable;
+    public MetricReliability GpuMemoryMb { get; init; } = MetricReliability.Unavailable;
     public MetricReliability DiskReadMbPerSec { get; init; } = MetricReliability.Unavailable;
     public MetricReliability DiskWriteMbPerSec { get; init; } = MetricReliability.Unavailable;
     public MetricReliability TemperatureC { get; init; } = MetricReliability.Unavailable;
@@ -44,6 +46,7 @@ public sealed record MetricCapabilities
         MetricKey.CpuPercent => CpuPercent,
         MetricKey.MemoryMb => MemoryMb,
         MetricKey.GpuPercent => GpuPercent,
+        MetricKey.GpuMemoryMb => GpuMemoryMb,
         MetricKey.DiskReadMbPerSec => DiskReadMbPerSec,
         MetricKey.DiskWriteMbPerSec => DiskWriteMbPerSec,
         MetricKey.TemperatureC => TemperatureC,

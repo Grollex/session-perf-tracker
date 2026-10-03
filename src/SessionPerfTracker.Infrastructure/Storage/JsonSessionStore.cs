@@ -33,6 +33,12 @@ public sealed class JsonSessionStore : ISessionStore
             .ToArray();
     }
 
+    public Task<IReadOnlyList<SessionRecord>> ListSessionHeadersAsync(CancellationToken cancellationToken = default) =>
+        ListSessionsAsync(cancellationToken);
+
+    public Task<int> RecoverInterruptedSessionsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(0);
+
     public async Task<SessionRecord?> GetSessionAsync(string id, CancellationToken cancellationToken = default)
     {
         var data = await LoadAsync(cancellationToken);

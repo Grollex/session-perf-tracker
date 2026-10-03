@@ -1,6 +1,7 @@
 using SessionPerfTracker.App.ViewModels;
 using SessionPerfTracker.Domain.Abstractions;
 using SessionPerfTracker.Domain.Models;
+using SessionPerfTracker.Domain.Services;
 
 namespace SessionPerfTracker.App.Services;
 
@@ -28,7 +29,7 @@ public sealed class ProcessBanCoordinator
         if (processBans.Active.Count == 0)
         {
             _runningBannedPaths.Clear();
-            return new ProcessBanEnforcementResult(false, processBans, 0);
+            return new ProcessBanEnforcementResult(false, processBans, 0, []);
         }
 
         var active = processBans.Active
@@ -39,20 +40,28 @@ public sealed class ProcessBanCoordinator
                 .First())
             .ToList();
         var changed = active.Count != processBans.Active.Count;
-        var activeByPath = active
-            .Where(rule => !string.IsNullOrWhiteSpace(rule.NormalizedPath))
-            .ToDictionary(rule => rule.NormalizedPath, StringComparer.OrdinalIgnoreCase);
-        var runningByPath = rows
+        // A rule matches its primary path and any confirmed copies of the same binary.
+        var ruleByPath = new Dictionary<string, ProcessBanRule>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in active)
+        {
+            foreach (var path in TrackedExecutableMatcher.AllPaths(rule))
+            {
+                ruleByPath.TryAdd(path, rule);
+            }
+        }
+
+        var rowsByRule = rows
             .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath)
-                && activeByPath.ContainsKey(row.NormalizedFullPath))
-            .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
+                && ruleByPath.ContainsKey(row.NormalizedFullPath))
+            .GroupBy(row => ruleByPath[row.NormalizedFullPath].Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
         var history = processBans.History.ToList();
+        var newEvents = new List<ProcessBanEvent>();
         var totalTerminated = 0;
 
         foreach (var rule in active)
         {
-            if (!runningByPath.TryGetValue(rule.NormalizedPath, out var matchingRows))
+            if (!rowsByRule.TryGetValue(rule.Id, out var matchingRows))
             {
                 _runningBannedPaths.Remove(rule.NormalizedPath);
                 continue;
@@ -82,21 +91,23 @@ public sealed class ProcessBanCoordinator
                     .First();
                 var enforcementWasBlocked = result.TerminatedCount == 0
                     && result.Messages.Any(message => message.StartsWith("Skipped ", StringComparison.OrdinalIgnoreCase));
-                history.Insert(0, CreateEvent(
+                var enforcementEvent = CreateEvent(
                     rule,
                     enforcementWasBlocked ? "ban_blocked" : "ban_enforced",
                     representative,
                     result.TerminatedCount,
                     result.Messages.Count == 0
                         ? "Active process ban matched a running process."
-                        : string.Join(" ", result.Messages.Take(3))));
+                        : string.Join(" ", result.Messages.Take(3)));
+                history.Insert(0, enforcementEvent);
+                newEvents.Add(enforcementEvent);
                 changed = true;
             }
         }
 
         if (!changed)
         {
-            return new ProcessBanEnforcementResult(false, processBans, totalTerminated);
+            return new ProcessBanEnforcementResult(false, processBans, totalTerminated, []);
         }
 
         return new ProcessBanEnforcementResult(
@@ -109,7 +120,8 @@ public sealed class ProcessBanCoordinator
                     .Take(processBans.MaxHistory)
                     .ToList()
             },
-            totalTerminated);
+            totalTerminated,
+            newEvents);
     }
 
     public static bool IsActive(ProcessBanRule rule, DateTimeOffset now) =>
@@ -145,4 +157,5 @@ public sealed class ProcessBanCoordinator
 public sealed record ProcessBanEnforcementResult(
     bool Changed,
     ProcessBanSettings ProcessBans,
-    int TotalTerminated);
+    int TotalTerminated,
+    IReadOnlyList<ProcessBanEvent> NewEvents);

@@ -72,7 +72,14 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             var current = File.Exists(_filePath)
                 ? await ReadCoreAsync(cancellationToken)
                 : Normalize(Current);
-            Current = Normalize(update(current));
+            var updated = update(current);
+            if (ReferenceEquals(updated, current))
+            {
+                Current = current;
+                return Current;
+            }
+
+            Current = Normalize(updated);
             await WriteCoreAsync(Current, cancellationToken);
             return Current;
         }
@@ -123,6 +130,12 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             RamThresholdMb = Math.Clamp(settings.RamThresholdMb, 1, 1_048_576),
             DiskReadThresholdMbPerSec = Math.Clamp(settings.DiskReadThresholdMbPerSec, 0.1, 1_048_576),
             DiskWriteThresholdMbPerSec = Math.Clamp(settings.DiskWriteThresholdMbPerSec, 0.1, 1_048_576),
+            GpuThresholdPercent = Math.Clamp(
+                double.IsFinite(settings.GpuThresholdPercent) && settings.GpuThresholdPercent > 0
+                    ? settings.GpuThresholdPercent
+                    : ThresholdProfileDefaults.DefaultGpuThresholdPercent,
+                1,
+                100),
             SelectedProfileId = selectedProfileId,
             Profiles = normalizedProfiles.ToList(),
             AppProfileAssignments = NormalizeAssignments(settings.AppProfileAssignments),
@@ -159,7 +172,9 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
                 Id = profile.Id,
                 Name = string.IsNullOrWhiteSpace(profile.Name) ? fallback?.Name ?? profile.Id : profile.Name,
                 IsPreset = fallback?.IsPreset ?? profile.IsPreset,
-                Limits = NormalizeLimits(profile.Limits)
+                Limits = NormalizeLimits(
+                    profile.Limits,
+                    fallback?.Limits.GpuThresholdPercent ?? ThresholdProfileDefaults.DefaultGpuThresholdPercent)
             };
         }
 
@@ -182,15 +197,19 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
         return normalized;
     }
 
-    private static ThresholdLimitValues NormalizeLimits(ThresholdLimitValues? limits)
+    internal static ThresholdLimitValues NormalizeLimits(ThresholdLimitValues? limits, double defaultGpuThresholdPercent)
     {
         limits ??= new ThresholdLimitValues();
+        var gpu = limits.GpuThresholdPercent is double value && double.IsFinite(value) && value > 0
+            ? value
+            : defaultGpuThresholdPercent;
         return limits with
         {
             CpuThresholdPercent = Math.Clamp(limits.CpuThresholdPercent, 1, 100),
             RamThresholdMb = Math.Clamp(limits.RamThresholdMb, 1, 1_048_576),
             DiskReadThresholdMbPerSec = Math.Clamp(limits.DiskReadThresholdMbPerSec, 0.1, 1_048_576),
-            DiskWriteThresholdMbPerSec = Math.Clamp(limits.DiskWriteThresholdMbPerSec, 0.1, 1_048_576)
+            DiskWriteThresholdMbPerSec = Math.Clamp(limits.DiskWriteThresholdMbPerSec, 0.1, 1_048_576),
+            GpuThresholdPercent = Math.Clamp(gpu, 1, 100)
         };
     }
 
@@ -359,12 +378,18 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             MaxLaunchHistory = maxLaunchHistory,
             Items = settings.Items
                 .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedPath))
-                .Select(item => item with
+                .Select(item =>
                 {
-                    NormalizedPath = NormalizeFullPath(item.NormalizedPath),
-                    ExeName = NormalizeExeName(string.IsNullOrWhiteSpace(item.ExeName)
-                        ? Path.GetFileName(item.NormalizedPath)
-                        : item.ExeName)
+                    var normalizedPath = NormalizeFullPath(item.NormalizedPath);
+                    return item with
+                    {
+                        NormalizedPath = normalizedPath,
+                        ExeName = NormalizeExeName(string.IsNullOrWhiteSpace(item.ExeName)
+                            ? Path.GetFileName(item.NormalizedPath)
+                            : item.ExeName),
+                        AlternatePaths = NormalizeAlternatePaths(item.AlternatePaths, normalizedPath),
+                        PathHistory = NormalizePathHistory(item.PathHistory)
+                    };
                 })
                 .GroupBy(item => item.NormalizedPath, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.OrderByDescending(item => item.MarkedAt).First())
@@ -396,16 +421,22 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             Active = settings.Active
                 .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedPath)
                     && (item.ExpiresAt is null || item.ExpiresAt > now))
-                .Select(item => item with
+                .Select(item =>
                 {
-                    Id = string.IsNullOrWhiteSpace(item.Id) ? $"ban_{Guid.NewGuid():N}" : item.Id,
-                    NormalizedPath = NormalizeFullPath(item.NormalizedPath),
-                    ExeName = NormalizeExeName(string.IsNullOrWhiteSpace(item.ExeName)
-                        ? Path.GetFileName(item.NormalizedPath)
-                        : item.ExeName),
-                    DurationLabel = string.IsNullOrWhiteSpace(item.DurationLabel)
-                        ? item.ExpiresAt is null ? "Permanent" : "Timed"
-                        : item.DurationLabel
+                    var normalizedPath = NormalizeFullPath(item.NormalizedPath);
+                    return item with
+                    {
+                        Id = string.IsNullOrWhiteSpace(item.Id) ? $"ban_{Guid.NewGuid():N}" : item.Id,
+                        NormalizedPath = normalizedPath,
+                        ExeName = NormalizeExeName(string.IsNullOrWhiteSpace(item.ExeName)
+                            ? Path.GetFileName(item.NormalizedPath)
+                            : item.ExeName),
+                        DurationLabel = string.IsNullOrWhiteSpace(item.DurationLabel)
+                            ? item.ExpiresAt is null ? "Permanent" : "Timed"
+                            : item.DurationLabel,
+                        AlternatePaths = NormalizeAlternatePaths(item.AlternatePaths, normalizedPath),
+                        PathHistory = NormalizePathHistory(item.PathHistory)
+                    };
                 })
                 .GroupBy(item => item.NormalizedPath, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.OrderByDescending(item => item.CreatedAt).First())
@@ -428,6 +459,22 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
                 .ToList()
         };
     }
+
+    private static List<string> NormalizeAlternatePaths(IEnumerable<string>? paths, string primaryPath) =>
+        (paths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(NormalizeFullPath)
+            .Where(path => !string.Equals(path, primaryPath, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToList();
+
+    private static List<TrackedPathChange> NormalizePathHistory(IEnumerable<TrackedPathChange>? history) =>
+        (history ?? [])
+            .Where(change => !string.IsNullOrWhiteSpace(change.NewPath))
+            .OrderByDescending(change => change.ChangedAt)
+            .Take(20)
+            .ToList();
 
     private static string? GetExecutableName(TargetDescriptor target)
     {

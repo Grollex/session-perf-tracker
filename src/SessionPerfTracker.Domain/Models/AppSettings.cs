@@ -6,6 +6,7 @@ public sealed record CpuRamThresholdSettings
     public double RamThresholdMb { get; init; } = 4096;
     public double DiskReadThresholdMbPerSec { get; init; } = 180;
     public double DiskWriteThresholdMbPerSec { get; init; } = 120;
+    public double GpuThresholdPercent { get; init; } = ThresholdProfileDefaults.DefaultGpuThresholdPercent;
     public string SelectedProfileId { get; init; } = ThresholdProfileDefaults.BrowsersChatsId;
     public List<ThresholdProfile> Profiles { get; init; } = ThresholdProfileDefaults.CreateProfiles();
     public Dictionary<string, string> AppProfileAssignments { get; init; } = ThresholdProfileDefaults.CreateDefaultAssignments();
@@ -27,7 +28,8 @@ public sealed record CpuRamThresholdSettings
         CpuThresholdPercent = CpuThresholdPercent,
         RamThresholdMb = RamThresholdMb,
         DiskReadThresholdMbPerSec = DiskReadThresholdMbPerSec,
-        DiskWriteThresholdMbPerSec = DiskWriteThresholdMbPerSec
+        DiskWriteThresholdMbPerSec = DiskWriteThresholdMbPerSec,
+        GpuThresholdPercent = GpuThresholdPercent
     };
 }
 
@@ -45,6 +47,14 @@ public sealed record ThresholdLimitValues
     public double RamThresholdMb { get; init; } = 4096;
     public double DiskReadThresholdMbPerSec { get; init; } = 180;
     public double DiskWriteThresholdMbPerSec { get; init; } = 120;
+
+    /// <summary>
+    /// Null in settings written before GPU support; normalization fills the profile default.
+    /// 100 effectively disables GPU limit warnings (games are expected to max the GPU).
+    /// </summary>
+    public double? GpuThresholdPercent { get; init; }
+
+    public double EffectiveGpuThresholdPercent => GpuThresholdPercent ?? ThresholdProfileDefaults.DefaultGpuThresholdPercent;
 }
 
 public sealed record AntiNoiseSettings
@@ -61,6 +71,7 @@ public sealed record CaptureSettings
     public bool CaptureRam { get; init; } = true;
     public bool CaptureDiskRead { get; init; } = true;
     public bool CaptureDiskWrite { get; init; } = true;
+    public bool CaptureGpu { get; init; } = true;
 }
 
 public sealed record RetentionSettings
@@ -165,7 +176,7 @@ public sealed record SuspiciousWatchlistSettings
     public List<SuspiciousLaunchEntry> LaunchHistory { get; init; } = [];
 }
 
-public sealed record SuspiciousWatchItem
+public sealed record SuspiciousWatchItem : ITrackedExecutable
 {
     public required string NormalizedPath { get; init; }
     public required string ExeName { get; init; }
@@ -174,6 +185,12 @@ public sealed record SuspiciousWatchItem
     public string? SignerStatus { get; init; }
     public DateTimeOffset MarkedAt { get; init; }
     public string? Note { get; init; }
+    public ExecutableFingerprint? Fingerprint { get; init; }
+    public List<string> AlternatePaths { get; init; } = [];
+    public List<TrackedPathChange> PathHistory { get; init; } = [];
+    public string? PathStatus { get; init; }
+    public DateTimeOffset? PathCheckedAt { get; init; }
+    public DateTimeOffset? LastSeenRunningAt { get; init; }
 }
 
 public sealed record SuspiciousLaunchEntry
@@ -197,7 +214,7 @@ public sealed record ProcessBanSettings
     public List<ProcessBanEvent> History { get; init; } = [];
 }
 
-public sealed record ProcessBanRule
+public sealed record ProcessBanRule : ITrackedExecutable
 {
     public required string Id { get; init; }
     public required string NormalizedPath { get; init; }
@@ -209,6 +226,12 @@ public sealed record ProcessBanRule
     public DateTimeOffset? ExpiresAt { get; init; }
     public required string DurationLabel { get; init; }
     public string? Reason { get; init; }
+    public ExecutableFingerprint? Fingerprint { get; init; }
+    public List<string> AlternatePaths { get; init; } = [];
+    public List<TrackedPathChange> PathHistory { get; init; } = [];
+    public string? PathStatus { get; init; }
+    public DateTimeOffset? PathCheckedAt { get; init; }
+    public DateTimeOffset? LastSeenRunningAt { get; init; }
 }
 
 public sealed record ProcessBanEvent
@@ -271,6 +294,7 @@ public static class ThresholdProfileDefaults
     public const string GamesId = "games";
     public const string HardcoreId = "hardcore";
     public const string CustomId = "custom";
+    public const double DefaultGpuThresholdPercent = 85;
 
     public static CpuRamThresholdSettings CreateSettings() => new()
     {
@@ -280,12 +304,17 @@ public static class ThresholdProfileDefaults
 
     public static List<ThresholdProfile> CreateProfiles() =>
     [
-        CreateProfile(LightBackgroundId, "Light background", 60, 2500, 60, 40),
-        CreateProfile(BrowsersChatsId, "Browsers / chats", 75, 4000, 180, 120),
-        CreateProfile(GamesId, "Games", 85, 7000, 400, 250),
-        CreateProfile(HardcoreId, "Hardcore", 90, 10000, 700, 400),
-        CreateProfile(CustomId, "Custom", 80, 4096, 180, 120, isPreset: false)
+        CreateProfile(LightBackgroundId, "Light background", 60, 2500, 60, 40, 30),
+        CreateProfile(BrowsersChatsId, "Browsers / chats", 75, 4000, 180, 120, 70),
+        CreateProfile(GamesId, "Games", 85, 7000, 400, 250, 100),
+        CreateProfile(HardcoreId, "Hardcore", 90, 10000, 700, 400, 100),
+        CreateProfile(CustomId, "Custom", 80, 4096, 180, 120, DefaultGpuThresholdPercent, isPreset: false)
     ];
+
+    public static double GetDefaultGpuThreshold(string? profileId) =>
+        CreateProfiles().FirstOrDefault(profile => string.Equals(profile.Id, profileId, StringComparison.OrdinalIgnoreCase))
+            ?.Limits.GpuThresholdPercent
+        ?? DefaultGpuThresholdPercent;
 
     public static Dictionary<string, string> CreateDefaultAssignments() =>
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -300,6 +329,7 @@ public static class ThresholdProfileDefaults
         double ram,
         double diskRead,
         double diskWrite,
+        double gpu,
         bool isPreset = true) => new()
         {
             Id = id,
@@ -310,7 +340,8 @@ public static class ThresholdProfileDefaults
                 CpuThresholdPercent = cpu,
                 RamThresholdMb = ram,
                 DiskReadThresholdMbPerSec = diskRead,
-                DiskWriteThresholdMbPerSec = diskWrite
+                DiskWriteThresholdMbPerSec = diskWrite,
+                GpuThresholdPercent = gpu
             }
         };
 }
