@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Net;
 using SessionPerfTracker.Domain.Models;
 using SessionPerfTracker.Infrastructure.Updates;
 
@@ -6,6 +7,28 @@ namespace SessionPerfTracker.UnitTests;
 
 public sealed class HttpUpdateServiceTests
 {
+    [Fact]
+    public async Task Remote_manifest_check_uses_injected_http_client()
+    {
+        var handler = new StubHttpMessageHandler("""
+            {
+              "version": "99.0.0",
+              "installerUrl": "SessionPerfTracker-99.0.0-win-x64-setup.exe",
+              "sha256": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+            }
+            """);
+        var httpClient = new HttpClient(handler);
+        var service = new HttpUpdateService(httpClient);
+
+        var result = await service.CheckAsync("https://updates.example.test/session-perf-tracker/version.json");
+
+        Assert.True(result.IsUpdateAvailable);
+        Assert.Equal("https://updates.example.test/session-perf-tracker/version.json", handler.RequestedUri?.ToString());
+        Assert.Equal(
+            "https://updates.example.test/session-perf-tracker/SessionPerfTracker-99.0.0-win-x64-setup.exe",
+            result.Manifest?.InstallerUrl);
+    }
+
     [Fact]
     public async Task Remote_installer_download_requires_sha256()
     {
@@ -74,5 +97,28 @@ public sealed class HttpUpdateServiceTests
         await using var stream = File.OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream);
         return Convert.ToHexString(hash);
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly string _content;
+
+        public StubHttpMessageHandler(string content)
+        {
+            _content = content;
+        }
+
+        public Uri? RequestedUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestedUri = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(_content)
+            });
+        }
     }
 }

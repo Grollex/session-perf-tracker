@@ -27,15 +27,13 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(settings => settings with
         {
             CpuThresholdPercent = globalLimits.CpuThresholdPercent,
             RamThresholdMb = globalLimits.RamThresholdMb,
             DiskReadThresholdMbPerSec = globalLimits.DiskReadThresholdMbPerSec,
             DiskWriteThresholdMbPerSec = globalLimits.DiskWriteThresholdMbPerSec
-        };
-
-        await _thresholdSettingsStore.SaveAsync(settings, cancellationToken);
+        }, cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
         ThresholdSettingsStatusText = "Global fallback saved.";
     }
@@ -87,8 +85,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { AntiNoise = antiNoise },
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with { AntiNoise = antiNoise },
             cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
@@ -97,8 +95,8 @@ public sealed partial class MainWindowViewModel
 
     public async Task SaveCaptureSettingsAsync(CancellationToken cancellationToken = default)
     {
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { Capture = ReadCaptureSettingsFromUi() },
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with { Capture = ReadCaptureSettingsFromUi() },
             cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
@@ -107,10 +105,10 @@ public sealed partial class MainWindowViewModel
 
     public async Task SaveAppBehaviorSettingsAsync(CancellationToken cancellationToken = default)
     {
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
-                Behavior = _thresholdSettingsStore.Current.Behavior with
+                Behavior = settings.Behavior with
                 {
                     MinimizeToTrayOnClose = MinimizeToTrayOnClose,
                     StartWithWindows = StartWithWindows,
@@ -127,10 +125,10 @@ public sealed partial class MainWindowViewModel
 
     public async Task DismissTrustExplainerAsync(CancellationToken cancellationToken = default)
     {
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
-                Behavior = _thresholdSettingsStore.Current.Behavior with
+                Behavior = settings.Behavior with
                 {
                     TrustExplainerDismissed = true
                 }
@@ -145,10 +143,10 @@ public sealed partial class MainWindowViewModel
         var languageCode = SelectedLanguageOption?.LanguageCode ?? AppLanguageSettings.DefaultLanguageCode;
         languageCode = LocalizationManager.NormalizeLanguageCode(languageCode);
         var previousLanguageCode = LocalizationManager.NormalizeLanguageCode(_thresholdSettingsStore.Current.Language.LanguageCode);
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
-                Language = _thresholdSettingsStore.Current.Language with { LanguageCode = languageCode }
+                Language = settings.Language with { LanguageCode = languageCode }
             },
             cancellationToken);
 
@@ -218,21 +216,21 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var profiles = _thresholdSettingsStore.Current.Profiles
-            .Select(profile => string.Equals(profile.Id, SelectedThresholdProfile.Id, StringComparison.OrdinalIgnoreCase)
-                ? profile with { Limits = profileLimits }
-                : profile)
-            .ToList();
+        var selectedProfileId = SelectedThresholdProfile.Id;
 
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
-                SelectedProfileId = SelectedThresholdProfile.Id,
-                Profiles = profiles
+                SelectedProfileId = selectedProfileId,
+                Profiles = settings.Profiles
+                    .Select(profile => string.Equals(profile.Id, selectedProfileId, StringComparison.OrdinalIgnoreCase)
+                        ? profile with { Limits = profileLimits }
+                        : profile)
+                    .ToList()
             },
             cancellationToken);
 
-        LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile.Id);
+        LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, selectedProfileId);
         ThresholdSettingsStatusText = $"{SelectedThresholdProfile.Name} profile saved.";
     }
 
@@ -251,13 +249,16 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var assignments = new Dictionary<string, string>(_thresholdSettingsStore.Current.AppProfileAssignments, StringComparer.OrdinalIgnoreCase)
-        {
-            [exeName] = SelectedAssignmentProfile.Id
-        };
-
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { AppProfileAssignments = assignments },
+        var profileId = SelectedAssignmentProfile.Id;
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
+            {
+                var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase)
+                {
+                    [exeName] = profileId
+                };
+                return settings with { AppProfileAssignments = assignments };
+            },
             cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
@@ -284,12 +285,15 @@ public sealed partial class MainWindowViewModel
 
             var profileId = SelectedLiveAssignmentProfile.Id;
             var profileName = SelectedLiveAssignmentProfile.Name;
-            var assignments = new Dictionary<string, string>(_thresholdSettingsStore.Current.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
-            var hadExistingAssignment = assignments.ContainsKey(exeName);
-            assignments[exeName] = profileId;
-
-            await _thresholdSettingsStore.SaveAsync(
-                _thresholdSettingsStore.Current with { AppProfileAssignments = assignments },
+            var hadExistingAssignment = false;
+            await _thresholdSettingsStore.UpdateAsync(
+                settings =>
+                {
+                    var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
+                    hadExistingAssignment = assignments.ContainsKey(exeName);
+                    assignments[exeName] = profileId;
+                    return settings with { AppProfileAssignments = assignments };
+                },
                 cancellationToken);
 
             LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
@@ -321,18 +325,24 @@ public sealed partial class MainWindowViewModel
         }
 
         var exeName = SelectedAppProfileAssignment.ExeName;
-        var assignments = new Dictionary<string, string>(_thresholdSettingsStore.Current.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
+        var removed = false;
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
+            {
+                var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
+                removed = assignments.Remove(exeName);
+                return removed
+                    ? settings with { AppProfileAssignments = assignments }
+                    : settings;
+            },
+            cancellationToken);
 
-        if (!assignments.Remove(exeName))
+        if (!removed)
         {
             ThresholdSettingsStatusText = $"{exeName} is already using global fallback.";
             LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
             return;
         }
-
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { AppProfileAssignments = assignments },
-            cancellationToken);
 
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
         AssignmentExeNameText = exeName;
@@ -355,17 +365,15 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var profiles = _thresholdSettingsStore.Current.Profiles
-            .Select(profile => string.Equals(profile.Id, defaultProfile.Id, StringComparison.OrdinalIgnoreCase)
-                ? defaultProfile
-                : profile)
-            .ToList();
-
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
                 SelectedProfileId = defaultProfile.Id,
-                Profiles = profiles
+                Profiles = settings.Profiles
+                    .Select(profile => string.Equals(profile.Id, defaultProfile.Id, StringComparison.OrdinalIgnoreCase)
+                        ? defaultProfile
+                        : profile)
+                    .ToList()
             },
             cancellationToken);
 
@@ -376,19 +384,21 @@ public sealed partial class MainWindowViewModel
     public async Task ResetAllThresholdSettingsAsync(CancellationToken cancellationToken = default)
     {
         var defaults = ThresholdProfileDefaults.CreateSettings();
-        await _thresholdSettingsStore.SaveAsync(
-            defaults with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => defaults with
             {
-                AntiNoise = _thresholdSettingsStore.Current.AntiNoise,
-                Capture = _thresholdSettingsStore.Current.Capture,
-                Retention = _thresholdSettingsStore.Current.Retention,
-                Export = _thresholdSettingsStore.Current.Export,
-                Recommendations = _thresholdSettingsStore.Current.Recommendations,
-                WatchJournal = _thresholdSettingsStore.Current.WatchJournal,
-                SuspiciousWatchlist = _thresholdSettingsStore.Current.SuspiciousWatchlist,
-                ProcessBans = _thresholdSettingsStore.Current.ProcessBans,
-                Updates = _thresholdSettingsStore.Current.Updates,
-                Behavior = _thresholdSettingsStore.Current.Behavior
+                AntiNoise = settings.AntiNoise,
+                Capture = settings.Capture,
+                Retention = settings.Retention,
+                Export = settings.Export,
+                Recommendations = settings.Recommendations,
+                WatchJournal = settings.WatchJournal,
+                SuspiciousWatchlist = settings.SuspiciousWatchlist,
+                ProcessBans = settings.ProcessBans,
+                Updates = settings.Updates,
+                Behavior = settings.Behavior,
+                Language = settings.Language,
+                Feedback = settings.Feedback
             },
             cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current);
@@ -404,8 +414,8 @@ public sealed partial class MainWindowViewModel
         }
 
         var retention = new RetentionSettings { RetentionDays = SelectedRetentionOption.Days };
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { Retention = retention },
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with { Retention = retention },
             cancellationToken);
         var deleted = await ApplyRetentionPolicyAsync(retention, cancellationToken);
         await ReloadSessionsAsync(cancellationToken: cancellationToken);
@@ -428,8 +438,8 @@ public sealed partial class MainWindowViewModel
             directory = Path.GetFullPath(directory);
             Directory.CreateDirectory(directory);
             _exportService.SetExportDirectory(directory);
-            await _thresholdSettingsStore.SaveAsync(
-                _thresholdSettingsStore.Current with
+            await _thresholdSettingsStore.UpdateAsync(
+                settings => settings with
                 {
                     Export = new ExportSettings { ExportDirectory = directory }
                 },
@@ -450,8 +460,8 @@ public sealed partial class MainWindowViewModel
         {
             Directory.CreateDirectory(_defaultExportDirectory);
             _exportService.SetExportDirectory(_defaultExportDirectory);
-            await _thresholdSettingsStore.SaveAsync(
-                _thresholdSettingsStore.Current with { Export = new ExportSettings() },
+            await _thresholdSettingsStore.UpdateAsync(
+                settings => settings with { Export = new ExportSettings() },
                 cancellationToken);
             ExportDirectoryText = _defaultExportDirectory;
             ExportStatusText = $"Export folder reset to default: {_defaultExportDirectory}";
@@ -519,9 +529,11 @@ public sealed partial class MainWindowViewModel
 
     public async Task SaveUpdateSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var updates = ReadUpdateSettingsFromUi(_thresholdSettingsStore.Current.Updates.LastCheckedAt);
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with { Updates = updates },
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
+            {
+                Updates = ReadUpdateSettingsFromUi(settings.Updates.LastCheckedAt, settings.Updates.SkippedVersion)
+            },
             cancellationToken);
         ApplyUpdateSettingsToUi(_thresholdSettingsStore.Current.Updates);
         UpdateStatusText = GetText("Ui_UpdateSettingsSaved");
@@ -533,12 +545,14 @@ public sealed partial class MainWindowViewModel
     {
         var feedbackText = BugReportText.Trim();
         var context = CreateFeedbackReportContext();
+        var feedbackSettings = await SaveFeedbackSettingsCoreAsync(cancellationToken);
         var path = await _feedbackReportService.SaveAsync(
             "bug-report",
             BugReportText,
             screenshotPath,
             context,
             IncludeLatestSessionInFeedback,
+            feedbackSettings,
             cancellationToken);
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -546,21 +560,25 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var delivery = await _feedbackReportService.TrySendAsync(
-            "Bug report",
-            "warning,bug",
-            "bug-report",
-            feedbackText,
-            screenshotPath,
-            context,
-            IncludeLatestSessionInFeedback,
-            cancellationToken);
+        var delivery = feedbackSettings.SendRemoteFeedback
+            ? await _feedbackReportService.TrySendAsync(
+                "Bug report",
+                "warning,bug",
+                "bug-report",
+                feedbackText,
+                screenshotPath,
+                context,
+                IncludeLatestSessionInFeedback,
+                cancellationToken)
+            : new FeedbackDeliveryResult(false, GetText("Ui_FeedbackRemoteOff"));
 
         AddFeedbackDeliveryHistory(GetText("Ui_FeedbackKindBugReport"), delivery.Sent, path, delivery.Error);
         BugReportText = string.Empty;
         FeedbackStatusText = delivery.Sent
             ? GetText("Ui_FeedbackThanksSent")
-            : FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"));
+            : feedbackSettings.SendRemoteFeedback
+                ? FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"))
+                : GetText("Ui_FeedbackThanksSavedLocalOnly");
     }
 
     public async Task SaveFeatureFeedbackAsync(
@@ -569,12 +587,14 @@ public sealed partial class MainWindowViewModel
     {
         var feedbackText = FeatureFeedbackText.Trim();
         var context = CreateFeedbackReportContext();
+        var feedbackSettings = await SaveFeedbackSettingsCoreAsync(cancellationToken);
         var path = await _feedbackReportService.SaveAsync(
             "feature-idea",
             FeatureFeedbackText,
             screenshotPath,
             context,
             IncludeLatestSessionInFeedback,
+            feedbackSettings,
             cancellationToken);
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -582,21 +602,31 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var delivery = await _feedbackReportService.TrySendAsync(
-            "Feature idea",
-            "bulb,sparkles",
-            "feature-idea",
-            feedbackText,
-            screenshotPath,
-            context,
-            IncludeLatestSessionInFeedback,
-            cancellationToken);
+        var delivery = feedbackSettings.SendRemoteFeedback
+            ? await _feedbackReportService.TrySendAsync(
+                "Feature idea",
+                "bulb,sparkles",
+                "feature-idea",
+                feedbackText,
+                screenshotPath,
+                context,
+                IncludeLatestSessionInFeedback,
+                cancellationToken)
+            : new FeedbackDeliveryResult(false, GetText("Ui_FeedbackRemoteOff"));
 
         AddFeedbackDeliveryHistory(GetText("Ui_FeedbackKindFeatureIdea"), delivery.Sent, path, delivery.Error);
         FeatureFeedbackText = string.Empty;
         FeedbackStatusText = delivery.Sent
             ? GetText("Ui_FeedbackThanksSent")
-            : FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"));
+            : feedbackSettings.SendRemoteFeedback
+                ? FormatText("Ui_FeedbackThanksSavedOnly", delivery.Error ?? GetText("Ui_StatusUnknown"))
+                : GetText("Ui_FeedbackThanksSavedLocalOnly");
+    }
+
+    public async Task SaveFeedbackSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await SaveFeedbackSettingsCoreAsync(cancellationToken);
+        FeedbackStatusText = GetText("Ui_FeedbackSettingsSaved");
     }
 
     public Task OpenFeedbackDirectoryAsync(CancellationToken cancellationToken = default)
@@ -604,7 +634,7 @@ public sealed partial class MainWindowViewModel
         cancellationToken.ThrowIfCancellationRequested();
         var directory = _feedbackReportService.GetFeedbackDirectory();
         _feedbackReportService.OpenFeedbackDirectory();
-        FeedbackStatusText = $"Opened feedback folder: {directory}";
+        FeedbackStatusText = FormatText("Ui_FeedbackFolderOpened", directory);
         return Task.CompletedTask;
     }
 
@@ -614,7 +644,7 @@ public sealed partial class MainWindowViewModel
         var latest = _feedbackReportService.FindLatestReport();
         if (latest is null)
         {
-            FeedbackStatusText = "No saved feedback report found.";
+            FeedbackStatusText = GetText("Ui_FeedbackNoSavedReport");
             return Task.CompletedTask;
         }
 
@@ -623,7 +653,7 @@ public sealed partial class MainWindowViewModel
             FileName = latest.FullName,
             UseShellExecute = true
         });
-        FeedbackStatusText = $"Opened latest feedback report: {latest.FullName}";
+        FeedbackStatusText = FormatText("Ui_FeedbackLatestOpened", latest.FullName);
         return Task.CompletedTask;
     }
 
@@ -632,13 +662,13 @@ public sealed partial class MainWindowViewModel
         var latest = _feedbackReportService.FindLatestReport();
         if (latest is null)
         {
-            FeedbackStatusText = "No saved feedback report found.";
+            FeedbackStatusText = GetText("Ui_FeedbackNoSavedReport");
             return;
         }
 
         var text = await File.ReadAllTextAsync(latest.FullName, cancellationToken);
         Clipboard.SetText(text);
-        FeedbackStatusText = $"Copied latest feedback report: {latest.FullName}";
+        FeedbackStatusText = FormatText("Ui_FeedbackLatestCopied", latest.FullName);
     }
 
     public Task CheckForUpdatesAsync(CancellationToken cancellationToken = default) =>
@@ -653,10 +683,10 @@ public sealed partial class MainWindowViewModel
         }
 
         var skippedVersion = _availableUpdateManifest.Version.Trim().TrimStart('v', 'V');
-        await _thresholdSettingsStore.SaveAsync(
-            _thresholdSettingsStore.Current with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
             {
-                Updates = ReadUpdateSettingsFromUi(_thresholdSettingsStore.Current.Updates.LastCheckedAt) with
+                Updates = ReadUpdateSettingsFromUi(settings.Updates.LastCheckedAt, settings.Updates.SkippedVersion) with
                 {
                     SkippedVersion = skippedVersion
                 }
@@ -762,6 +792,7 @@ public sealed partial class MainWindowViewModel
         StartMinimizedToTray = settings.Behavior.StartMinimizedToTray;
         TrustExplainerDismissed = settings.Behavior.TrustExplainerDismissed;
         ApplyLanguageSettingsToUi(settings.Language);
+        SendRemoteFeedback = settings.Feedback.SendRemoteFeedback;
         SelectedRetentionOption = RetentionOptions.FirstOrDefault(option => option.Days == settings.Retention.RetentionDays)
             ?? RetentionOptions.FirstOrDefault(option => option.Days == 30)
             ?? RetentionOptions.FirstOrDefault();
@@ -858,7 +889,9 @@ public sealed partial class MainWindowViewModel
         }
     }
 
-    private AppUpdateSettings ReadUpdateSettingsFromUi(DateTimeOffset? lastCheckedAt = null) => new()
+    private AppUpdateSettings ReadUpdateSettingsFromUi(
+        DateTimeOffset? lastCheckedAt = null,
+        string? skippedVersion = null) => new()
     {
         AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates,
         AutomaticallyInstallUpdatesOnStartup = AutomaticallyInstallUpdatesOnStartup,
@@ -866,8 +899,20 @@ public sealed partial class MainWindowViewModel
             ? null
             : UpdateManifestUrlText.Trim(),
         LastCheckedAt = lastCheckedAt,
-        SkippedVersion = _thresholdSettingsStore.Current.Updates.SkippedVersion
+        SkippedVersion = skippedVersion
     };
+
+    private async Task<FeedbackSettings> SaveFeedbackSettingsCoreAsync(CancellationToken cancellationToken)
+    {
+        var updated = await _thresholdSettingsStore.UpdateAsync(
+            settings => settings with
+            {
+                Feedback = settings.Feedback with { SendRemoteFeedback = SendRemoteFeedback }
+            },
+            cancellationToken);
+        SendRemoteFeedback = updated.Feedback.SendRemoteFeedback;
+        return updated.Feedback;
+    }
 
     private void ApplyStartupRegistration(AppBehaviorSettings behavior)
     {
@@ -979,10 +1024,10 @@ public sealed partial class MainWindowViewModel
             IsUpdateAvailable = result.IsUpdateAvailable && result.Manifest is not null;
             ApplyUpdateCheckResult(result);
 
-            await _thresholdSettingsStore.SaveAsync(
-                _thresholdSettingsStore.Current with
+            await _thresholdSettingsStore.UpdateAsync(
+                settings => settings with
                 {
-                    Updates = ReadUpdateSettingsFromUi(DateTimeOffset.UtcNow)
+                    Updates = ReadUpdateSettingsFromUi(DateTimeOffset.UtcNow, settings.Updates.SkippedVersion)
                 },
                 cancellationToken);
 
@@ -1066,10 +1111,10 @@ public sealed partial class MainWindowViewModel
                 }
             }
 
-            await _thresholdSettingsStore.SaveAsync(
-                _thresholdSettingsStore.Current with
+            await _thresholdSettingsStore.UpdateAsync(
+                settings => settings with
                 {
-                    Updates = ReadUpdateSettingsFromUi(DateTimeOffset.UtcNow)
+                    Updates = ReadUpdateSettingsFromUi(DateTimeOffset.UtcNow, settings.Updates.SkippedVersion)
                 },
                 cancellationToken);
         }

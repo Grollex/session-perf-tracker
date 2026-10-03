@@ -16,6 +16,7 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
     private readonly string _dbPath;
     private readonly string? _legacyJsonPath;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private readonly SemaphoreSlim _settingsLock = new(1, 1);
     private bool _initialized;
 
     public SqliteThresholdSettingsStore(string dbPath, string? legacyJsonPath = null)
@@ -29,24 +30,62 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
     public async Task<CpuRamThresholdSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        await using var connection = await OpenConnectionAsync(cancellationToken);
-        var loaded = await LoadCoreAsync(connection, cancellationToken);
-        if (loaded is null)
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
         {
-            loaded = await LoadLegacyOrDefaultAsync(cancellationToken);
-            await SaveCoreAsync(connection, loaded, cancellationToken);
-        }
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var loaded = await LoadCoreAsync(connection, cancellationToken);
+            if (loaded is null)
+            {
+                loaded = await LoadLegacyOrDefaultAsync(cancellationToken);
+                await SaveCoreAsync(connection, loaded, cancellationToken);
+            }
 
-        Current = JsonThresholdSettingsStore.Normalize(loaded);
-        return Current;
+            Current = JsonThresholdSettingsStore.Normalize(loaded);
+            return Current;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
     }
 
     public async Task SaveAsync(CpuRamThresholdSettings settings, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken);
-        Current = JsonThresholdSettingsStore.Normalize(settings);
-        await using var connection = await OpenConnectionAsync(cancellationToken);
-        await SaveCoreAsync(connection, Current, cancellationToken);
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Current = JsonThresholdSettingsStore.Normalize(settings);
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            await SaveCoreAsync(connection, Current, cancellationToken);
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+    }
+
+    public async Task<CpuRamThresholdSettings> UpdateAsync(
+        Func<CpuRamThresholdSettings, CpuRamThresholdSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        await EnsureInitializedAsync(cancellationToken);
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken);
+            var loaded = await LoadCoreAsync(connection, cancellationToken)
+                ?? await LoadLegacyOrDefaultAsync(cancellationToken);
+            Current = JsonThresholdSettingsStore.Normalize(update(JsonThresholdSettingsStore.Normalize(loaded)));
+            await SaveCoreAsync(connection, Current, cancellationToken);
+            return Current;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
     }
 
     public ThresholdLimitValues ResolveThresholds(TargetDescriptor target)
@@ -183,6 +222,9 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
         var language = settingsRows.TryGetValue("language", out var languageJson)
             ? Deserialize<AppLanguageSettings>(languageJson) ?? new AppLanguageSettings()
             : new AppLanguageSettings();
+        var feedback = settingsRows.TryGetValue("feedback", out var feedbackJson)
+            ? Deserialize<FeedbackSettings>(feedbackJson) ?? new FeedbackSettings()
+            : new FeedbackSettings();
         var selectedProfileId = settingsRows.TryGetValue("selected_profile_id", out var selectedProfileJson)
             ? Deserialize<string>(selectedProfileJson) ?? ThresholdProfileDefaults.BrowsersChatsId
             : ThresholdProfileDefaults.BrowsersChatsId;
@@ -206,7 +248,8 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
             ProcessBans = processBans,
             Updates = updates,
             Behavior = behavior,
-            Language = language
+            Language = language,
+            Feedback = feedback
         };
     }
 
@@ -239,6 +282,7 @@ public sealed class SqliteThresholdSettingsStore : IThresholdSettingsStore
         await InsertSettingAsync(connection, transaction, "updates", settings.Updates, cancellationToken);
         await InsertSettingAsync(connection, transaction, "behavior", settings.Behavior, cancellationToken);
         await InsertSettingAsync(connection, transaction, "language", settings.Language, cancellationToken);
+        await InsertSettingAsync(connection, transaction, "feedback", settings.Feedback, cancellationToken);
 
         for (var index = 0; index < settings.Profiles.Count; index++)
         {

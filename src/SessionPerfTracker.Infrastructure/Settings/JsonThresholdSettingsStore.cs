@@ -13,6 +13,7 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
     };
 
     private readonly string _filePath;
+    private readonly SemaphoreSlim _settingsLock = new(1, 1);
 
     public JsonThresholdSettingsStore(string filePath)
     {
@@ -23,31 +24,77 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
 
     public async Task<CpuRamThresholdSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-
-        if (!File.Exists(_filePath))
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
         {
-            await SaveAsync(Current, cancellationToken);
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+
+            if (!File.Exists(_filePath))
+            {
+                Current = Normalize(Current);
+                await WriteCoreAsync(Current, cancellationToken);
+                return Current;
+            }
+
+            Current = await ReadCoreAsync(cancellationToken);
             return Current;
         }
-
-        await using var stream = File.OpenRead(_filePath);
-        Current = await JsonSerializer.DeserializeAsync<CpuRamThresholdSettings>(
-            stream,
-            SerializerOptions,
-            cancellationToken) ?? new CpuRamThresholdSettings();
-
-        Current = Normalize(Current);
-        return Current;
+        finally
+        {
+            _settingsLock.Release();
+        }
     }
 
     public async Task SaveAsync(CpuRamThresholdSettings settings, CancellationToken cancellationToken = default)
     {
-        Current = Normalize(settings);
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Current = Normalize(settings);
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            await WriteCoreAsync(Current, cancellationToken);
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+    }
 
+    public async Task<CpuRamThresholdSettings> UpdateAsync(
+        Func<CpuRamThresholdSettings, CpuRamThresholdSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+            var current = File.Exists(_filePath)
+                ? await ReadCoreAsync(cancellationToken)
+                : Normalize(Current);
+            Current = Normalize(update(current));
+            await WriteCoreAsync(Current, cancellationToken);
+            return Current;
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
+    }
+
+    private async Task<CpuRamThresholdSettings> ReadCoreAsync(CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(_filePath);
+        return Normalize(await JsonSerializer.DeserializeAsync<CpuRamThresholdSettings>(
+            stream,
+            SerializerOptions,
+            cancellationToken) ?? new CpuRamThresholdSettings());
+    }
+
+    private async Task WriteCoreAsync(CpuRamThresholdSettings settings, CancellationToken cancellationToken)
+    {
         await using var stream = File.Create(_filePath);
-        await JsonSerializer.SerializeAsync(stream, Current, SerializerOptions, cancellationToken);
+        await JsonSerializer.SerializeAsync(stream, settings, SerializerOptions, cancellationToken);
     }
 
     public ThresholdLimitValues ResolveThresholds(TargetDescriptor target)
@@ -89,7 +136,8 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             ProcessBans = NormalizeProcessBans(settings.ProcessBans),
             Updates = NormalizeUpdates(settings.Updates),
             Behavior = NormalizeBehavior(settings.Behavior),
-            Language = NormalizeLanguage(settings.Language)
+            Language = NormalizeLanguage(settings.Language),
+            Feedback = NormalizeFeedback(settings.Feedback)
         };
     }
 
@@ -190,13 +238,12 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
         var manifestUrl = string.IsNullOrWhiteSpace(settings.ManifestUrl)
             ? AppUpdateSettings.DefaultManifestUrl
             : settings.ManifestUrl.Trim();
-        var automaticallyCheck = settings.AutomaticallyCheckForUpdates || settings.LastCheckedAt is null;
         var skippedVersion = string.IsNullOrWhiteSpace(settings.SkippedVersion)
             ? null
             : settings.SkippedVersion.Trim().TrimStart('v', 'V');
         return settings with
         {
-            AutomaticallyCheckForUpdates = automaticallyCheck,
+            AutomaticallyCheckForUpdates = settings.AutomaticallyCheckForUpdates,
             AutomaticallyInstallUpdatesOnStartup = settings.AutomaticallyInstallUpdatesOnStartup,
             ManifestUrl = manifestUrl,
             SkippedVersion = skippedVersion
@@ -227,6 +274,16 @@ public sealed class JsonThresholdSettingsStore : IThresholdSettingsStore
             LanguageCode = languageCode.Equals("ru-RU", StringComparison.OrdinalIgnoreCase)
                 ? "ru-RU"
                 : AppLanguageSettings.DefaultLanguageCode
+        };
+    }
+
+    private static FeedbackSettings NormalizeFeedback(FeedbackSettings? settings)
+    {
+        settings ??= new FeedbackSettings();
+        return settings with
+        {
+            MaxLocalReports = Math.Clamp(settings.MaxLocalReports, 1, 500),
+            MaxLocalReportAgeDays = Math.Clamp(settings.MaxLocalReportAgeDays, 1, 3650)
         };
     }
 

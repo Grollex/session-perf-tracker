@@ -618,6 +618,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="14" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -625,7 +627,32 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Style="{StaticResource Panel}">
+                <Border Grid.ColumnSpan="3"
+                        Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource Ui_FeedbackDeliverySettings}"
+                                   Style="{StaticResource SectionTitle}"
+                                   Margin="0,0,0,10" />
+                        <TextBlock Text="{DynamicResource Ui_FeedbackDeliverySettingsHint}"
+                                   Style="{StaticResource MutedText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10" />
+                        <WrapPanel>
+                            <CheckBox Content="{DynamicResource Ui_SendRemoteFeedback}"
+                                      IsChecked="{Binding SendRemoteFeedback}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,14,8" />
+                            <Button Content="{DynamicResource Ui_SaveFeedbackSettings}"
+                                    Click="SaveFeedbackSettings_Click"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource ToolbarButton}"
+                                    Margin="0,0,8,8" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Style="{StaticResource Panel}">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_ReportBug}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_ReportBugHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
@@ -652,7 +679,9 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource Panel}">
+                <Border Grid.Row="2"
+                        Grid.Column="2"
+                        Style="{StaticResource Panel}">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_SendIdea}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />
                         <TextBlock Text="{DynamicResource Ui_SendIdeaHint}" Style="{StaticResource MutedText}" Margin="0,0,0,10" />
@@ -680,7 +709,7 @@
                 </Border>
 
                 <Border Grid.ColumnSpan="3"
-                        Grid.Row="2"
+                        Grid.Row="4"
                         Style="{StaticResource Panel}">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource Ui_FeedbackFolder}" Style="{StaticResource SectionTitle}" Margin="0,0,0,10" />

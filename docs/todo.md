@@ -80,3 +80,14 @@
 - [x] Settings sub-tabs risk after adding Health: apply compact Settings sub-tab style and verify tab bounds with DPI-aware UIA.
 - [x] Russian UI still shows the quick `Report bug` button in English.
 - [x] External screenshot automation captures WPF content as blank/white; add an internal `--visual-qa-dir` screenshot path for visual checks.
+
+## Review Follow-Ups 2026-07-04
+
+- [x] 1. Release version discipline: keep `VERSION`, app assembly metadata, release tags, and GitHub assets in sync.
+- [ ] 2. Update settings bug: do not re-enable automatic update checks just because `LastCheckedAt` is empty.
+- [x] 3. Trust defaults: make startup auto-install and Start with Windows opt-in for self-signed builds.
+- [ ] 4. Settings write safety: serialize settings updates or add an atomic update API so background Global Watch writes cannot overwrite UI settings.
+- [ ] 5. Update service testability: use the injected `HttpClient` for manifest checks as well as installer downloads.
+- [ ] 6. Feedback privacy and retention: make remote feedback configurable/opt-in and cap local markdown feedback reports.
+- [x] 7. ViewModel size reduction: extract Global Watch, update, feedback, process-ban, recommendation, and health coordination services.
+- [ ] 8. Release workflow assets: publish `SHA256SUMS.txt` and run release artifact smoke checks in GitHub Actions release workflow.

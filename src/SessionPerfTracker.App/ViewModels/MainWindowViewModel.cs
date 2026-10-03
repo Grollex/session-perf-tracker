@@ -191,6 +191,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _selfUninstallStatusText = string.Empty;
     private bool _includeLatestSessionInFeedback = true;
     private bool _includeScreenshotInFeedback;
+    private bool _sendRemoteFeedback;
     private string _liveAssignmentStatusText = "select target";
     private string _liveWarningText = string.Empty;
     private string _selfMonitoringStatusText = "warmup";
@@ -1079,6 +1080,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         get => _includeScreenshotInFeedback;
         set => SetProperty(ref _includeScreenshotInFeedback, value);
+    }
+
+    public bool SendRemoteFeedback
+    {
+        get => _sendRemoteFeedback;
+        set => SetProperty(ref _sendRemoteFeedback, value);
     }
 
     public bool HasFeedbackDeliveryHistory => FeedbackDeliveryHistory.Count > 0;

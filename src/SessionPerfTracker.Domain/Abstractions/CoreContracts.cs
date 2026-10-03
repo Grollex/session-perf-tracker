@@ -150,6 +150,9 @@ public interface IThresholdSettingsStore : IThresholdSettingsProvider
 {
     Task<CpuRamThresholdSettings> LoadAsync(CancellationToken cancellationToken = default);
     Task SaveAsync(CpuRamThresholdSettings settings, CancellationToken cancellationToken = default);
+    Task<CpuRamThresholdSettings> UpdateAsync(
+        Func<CpuRamThresholdSettings, CpuRamThresholdSettings> update,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record SelfMonitoringSample(

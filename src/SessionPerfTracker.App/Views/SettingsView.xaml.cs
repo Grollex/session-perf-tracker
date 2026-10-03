@@ -259,6 +259,14 @@ public partial class SettingsView : System.Windows.Controls.UserControl
         }
     }
 
+    private async void SaveFeedbackSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.SaveFeedbackSettingsAsync();
+        }
+    }
+
     private async void OpenFeedbackDirectory_Click(object sender, RoutedEventArgs e)
     {
         if (ViewModel is not null)

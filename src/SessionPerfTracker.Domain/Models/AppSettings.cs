@@ -20,6 +20,7 @@ public sealed record CpuRamThresholdSettings
     public AppUpdateSettings Updates { get; init; } = new();
     public AppBehaviorSettings Behavior { get; init; } = new();
     public AppLanguageSettings Language { get; init; } = new();
+    public FeedbackSettings Feedback { get; init; } = new();
 
     public ThresholdLimitValues ToGlobalLimits() => new()
     {
@@ -96,6 +97,13 @@ public sealed record AppLanguageSettings
     public const string DefaultLanguageCode = "en-US";
 
     public string LanguageCode { get; init; } = DefaultLanguageCode;
+}
+
+public sealed record FeedbackSettings
+{
+    public bool SendRemoteFeedback { get; init; }
+    public int MaxLocalReports { get; init; } = 80;
+    public int MaxLocalReportAgeDays { get; init; } = 90;
 }
 
 public sealed record UpdateManifest

@@ -88,6 +88,12 @@ jobs:
           .\scripts\test-packaged-app.ps1 `
             -ExecutablePath .\artifacts\release\win-x64\publish\SessionPerfTracker.App.exe
 
+      - name: Smoke test release artifacts
+        shell: pwsh
+        run: |
+          .\scripts\test-release-artifacts.ps1 `
+            -Version "${{ steps.version.outputs.version }}"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -97,3 +103,4 @@ jobs:
           files: |
             artifacts/release/installer/SessionPerfTracker-${{ steps.version.outputs.version }}-win-x64-setup.exe
             artifacts/release/update/version.json
+            artifacts/release/dist/SHA256SUMS.txt

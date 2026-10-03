@@ -161,7 +161,7 @@ public sealed class HttpUpdateService : IUpdateService
         return Task.CompletedTask;
     }
 
-    private static async Task<(string Json, string Source)> ReadManifestAsync(
+    private async Task<(string Json, string Source)> ReadManifestAsync(
         string manifestUrl,
         CancellationToken cancellationToken)
     {
@@ -181,8 +181,7 @@ public sealed class HttpUpdateService : IUpdateService
             return (await File.ReadAllTextAsync(uri.LocalPath, cancellationToken), uri.LocalPath);
         }
 
-        using var client = new HttpClient();
-        return (await client.GetStringAsync(uri, cancellationToken), manifestUrl);
+        return (await _httpClient.GetStringAsync(uri, cancellationToken), manifestUrl);
     }
 
     private static string ResolveInstallerUrl(string manifestSource, string installerUrl)

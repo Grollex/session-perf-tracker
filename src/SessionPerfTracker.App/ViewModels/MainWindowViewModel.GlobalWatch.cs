@@ -272,26 +272,28 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var watchlist = settings.SuspiciousWatchlist;
-        var items = watchlist.Items
-            .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        items.Insert(0, new SuspiciousWatchItem
-        {
-            NormalizedPath = target.NormalizedFullPath,
-            ExeName = NormalizeExeNameForAssignment(target.ExeName),
-            ProductName = target.ProductName,
-            CompanyName = target.CompanyName,
-            SignerStatus = target.SignerStatus,
-            MarkedAt = DateTimeOffset.UtcNow,
-            Note = $"Marked from Process Inspector ({target.SourceText})."
-        });
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                SuspiciousWatchlist = watchlist with { Items = items }
+                var watchlist = settings.SuspiciousWatchlist;
+                var items = watchlist.Items
+                    .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                items.Insert(0, new SuspiciousWatchItem
+                {
+                    NormalizedPath = target.NormalizedFullPath,
+                    ExeName = NormalizeExeNameForAssignment(target.ExeName),
+                    ProductName = target.ProductName,
+                    CompanyName = target.CompanyName,
+                    SignerStatus = target.SignerStatus,
+                    MarkedAt = DateTimeOffset.UtcNow,
+                    Note = $"Marked from Process Inspector ({target.SourceText})."
+                });
+
+                return settings with
+                {
+                    SuspiciousWatchlist = watchlist with { Items = items }
+                };
             },
             cancellationToken);
         RefreshSuspiciousWatchCollections();
@@ -382,17 +384,20 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase)
-        {
-            [exeName] = SelectedLiveAssignmentProfile.Id
-        };
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with { AppProfileAssignments = assignments },
+        var profileId = SelectedLiveAssignmentProfile.Id;
+        var profileName = SelectedLiveAssignmentProfile.Name;
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
+            {
+                var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase)
+                {
+                    [exeName] = profileId
+                };
+                return settings with { AppProfileAssignments = assignments };
+            },
             cancellationToken);
         LoadThresholdSettingsIntoUi(_thresholdSettingsStore.Current, SelectedThresholdProfile?.Id);
-        GlobalWatchStatusText = $"{exeName} assigned to {SelectedLiveAssignmentProfile.Name}. Refreshing profile health on next scan.";
+        GlobalWatchStatusText = $"{exeName} assigned to {profileName}. Refreshing profile health on next scan.";
     }
 
     public void OpenRecommendationsForSelectedGlobalProcess()
@@ -573,28 +578,30 @@ public sealed partial class MainWindowViewModel
         }
 
         var denied = SelectedDeniedProfileRecommendation.Denied;
-        var settings = _thresholdSettingsStore.Current;
-        var recommendationSettings = settings.Recommendations;
-        var deniedItems = recommendationSettings.Denied
-            .Where(item => !string.Equals(item.ExeName, denied.ExeName, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(item.SuggestedProfileId, denied.SuggestedProfileId, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var history = ProfileRecommendationCoordinator.AddHistory(
-            recommendationSettings.History,
-            "recommendation_deny_removed",
-            denied.ExeName,
-            denied.SuggestedProfileId,
-            denied.SuggestedProfileName,
-            $"Deny removed for {denied.ExeName} -> {denied.SuggestedProfileName}.");
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                Recommendations = recommendationSettings with
+                var recommendationSettings = settings.Recommendations;
+                var deniedItems = recommendationSettings.Denied
+                    .Where(item => !string.Equals(item.ExeName, denied.ExeName, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(item.SuggestedProfileId, denied.SuggestedProfileId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var history = ProfileRecommendationCoordinator.AddHistory(
+                    recommendationSettings.History,
+                    "recommendation_deny_removed",
+                    denied.ExeName,
+                    denied.SuggestedProfileId,
+                    denied.SuggestedProfileName,
+                    $"Deny removed for {denied.ExeName} -> {denied.SuggestedProfileName}.");
+
+                return settings with
                 {
-                    Denied = deniedItems,
-                    History = history
-                }
+                    Recommendations = recommendationSettings with
+                    {
+                        Denied = deniedItems,
+                        History = history
+                    }
+                };
             },
             cancellationToken);
         RefreshRecommendationCollections();
@@ -617,25 +624,27 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var watchlist = settings.SuspiciousWatchlist;
-        var items = watchlist.Items
-            .Where(item => !string.Equals(item.NormalizedPath, selected.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        items.Insert(0, new SuspiciousWatchItem
-        {
-            NormalizedPath = selected.NormalizedFullPath,
-            ExeName = NormalizeExeNameForAssignment(selected.ExeName),
-            ProductName = selected.ProductName,
-            CompanyName = selected.CompanyName,
-            SignerStatus = selected.SignerStatus,
-            MarkedAt = DateTimeOffset.UtcNow
-        });
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                SuspiciousWatchlist = watchlist with { Items = items }
+                var watchlist = settings.SuspiciousWatchlist;
+                var items = watchlist.Items
+                    .Where(item => !string.Equals(item.NormalizedPath, selected.NormalizedFullPath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                items.Insert(0, new SuspiciousWatchItem
+                {
+                    NormalizedPath = selected.NormalizedFullPath,
+                    ExeName = NormalizeExeNameForAssignment(selected.ExeName),
+                    ProductName = selected.ProductName,
+                    CompanyName = selected.CompanyName,
+                    SignerStatus = selected.SignerStatus,
+                    MarkedAt = DateTimeOffset.UtcNow
+                });
+
+                return settings with
+                {
+                    SuspiciousWatchlist = watchlist with { Items = items }
+                };
             },
             cancellationToken);
         RefreshSuspiciousWatchCollections();
@@ -744,34 +753,36 @@ public sealed partial class MainWindowViewModel
         }
 
         var selected = SelectedProcessBan.Rule;
-        var settings = _thresholdSettingsStore.Current;
-        var processBans = settings.ProcessBans;
-        var active = processBans.Active
-            .Where(item => !string.Equals(item.Id, selected.Id, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var history = processBans.History.ToList();
-        history.Insert(0, new ProcessBanEvent
-        {
-            Id = $"ban_event_{Guid.NewGuid():N}",
-            Timestamp = DateTimeOffset.UtcNow,
-            NormalizedPath = selected.NormalizedPath,
-            ExeName = selected.ExeName,
-            ProductName = selected.ProductName,
-            CompanyName = selected.CompanyName,
-            SignerStatus = selected.SignerStatus,
-            Action = "ban_removed",
-            DurationLabel = selected.DurationLabel,
-            Details = "Manual allow/remove from Bans tab."
-        });
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                ProcessBans = processBans with
+                var processBans = settings.ProcessBans;
+                var active = processBans.Active
+                    .Where(item => !string.Equals(item.Id, selected.Id, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var history = processBans.History.ToList();
+                history.Insert(0, new ProcessBanEvent
                 {
-                    Active = active,
-                    History = history
-                }
+                    Id = $"ban_event_{Guid.NewGuid():N}",
+                    Timestamp = DateTimeOffset.UtcNow,
+                    NormalizedPath = selected.NormalizedPath,
+                    ExeName = selected.ExeName,
+                    ProductName = selected.ProductName,
+                    CompanyName = selected.CompanyName,
+                    SignerStatus = selected.SignerStatus,
+                    Action = "ban_removed",
+                    DurationLabel = selected.DurationLabel,
+                    Details = "Manual allow/remove from Bans tab."
+                });
+
+                return settings with
+                {
+                    ProcessBans = processBans with
+                    {
+                        Active = active,
+                        History = history
+                    }
+                };
             },
             cancellationToken);
         _processBanCoordinator.ClearRunningMatch(selected.NormalizedPath);
@@ -1014,11 +1025,6 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
-        var settings = _thresholdSettingsStore.Current;
-        var processBans = settings.ProcessBans;
-        var active = processBans.Active
-            .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedPath, StringComparison.OrdinalIgnoreCase))
-            .ToList();
         var rule = new ProcessBanRule
         {
             Id = $"ban_{Guid.NewGuid():N}",
@@ -1032,29 +1038,37 @@ public sealed partial class MainWindowViewModel
             DurationLabel = duration.Label,
             Reason = FormatText("Ui_ManualBanFrom", origin)
         };
-        active.Insert(0, rule);
 
-        var history = processBans.History.ToList();
-        history.Insert(0, _processBanCoordinator.CreateEvent(
-            rule,
-            "ban_created",
-            activeRow,
-            terminatedCount: 0,
-            details: killAfterBan
-                ? FormatText("Ui_AuditConfirmedFromKillWhenAvailable", origin)
-                : FormatText("Ui_AuditConfirmedFrom", origin)));
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                ProcessBans = processBans with
+                var processBans = settings.ProcessBans;
+                var active = processBans.Active
+                    .Where(item => !string.Equals(item.NormalizedPath, target.NormalizedPath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                active.Insert(0, rule);
+
+                var history = processBans.History.ToList();
+                history.Insert(0, _processBanCoordinator.CreateEvent(
+                    rule,
+                    "ban_created",
+                    activeRow,
+                    terminatedCount: 0,
+                    details: killAfterBan
+                        ? FormatText("Ui_AuditConfirmedFromKillWhenAvailable", origin)
+                        : FormatText("Ui_AuditConfirmedFrom", origin)));
+
+                return settings with
                 {
-                    Active = active,
-                    History = history
-                        .OrderByDescending(entry => entry.Timestamp)
-                        .Take(processBans.MaxHistory)
-                        .ToList()
-                }
+                    ProcessBans = processBans with
+                    {
+                        Active = active,
+                        History = history
+                            .OrderByDescending(entry => entry.Timestamp)
+                            .Take(processBans.MaxHistory)
+                            .ToList()
+                    }
+                };
             },
             cancellationToken);
 
@@ -1078,27 +1092,30 @@ public sealed partial class MainWindowViewModel
                 ? GetText("Ui_ReasonManualInspectorBanPlusKill")
                 : GetText("Ui_ReasonManualBanPlusKill"),
             cancellationToken);
-        var latestSettings = _thresholdSettingsStore.Current;
-        var latestProcessBans = latestSettings.ProcessBans;
-        var latestHistory = latestProcessBans.History.ToList();
-        latestHistory.Insert(0, _processBanCoordinator.CreateEvent(
-            rule,
-            "ban_kill",
-            activeRow,
-            result.TerminatedCount,
-            result.Messages.Count == 0
-                ? GetText("Ui_BanKillExecutedImmediately")
-                : string.Join(" ", result.Messages.Take(3))));
-        await _thresholdSettingsStore.SaveAsync(
-            latestSettings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                ProcessBans = latestProcessBans with
+                var processBans = settings.ProcessBans;
+                var history = processBans.History.ToList();
+                history.Insert(0, _processBanCoordinator.CreateEvent(
+                    rule,
+                    "ban_kill",
+                    activeRow,
+                    result.TerminatedCount,
+                    result.Messages.Count == 0
+                        ? GetText("Ui_BanKillExecutedImmediately")
+                        : string.Join(" ", result.Messages.Take(3))));
+
+                return settings with
                 {
-                    History = latestHistory
-                        .OrderByDescending(entry => entry.Timestamp)
-                        .Take(latestProcessBans.MaxHistory)
-                        .ToList()
-                }
+                    ProcessBans = processBans with
+                    {
+                        History = history
+                            .OrderByDescending(entry => entry.Timestamp)
+                            .Take(processBans.MaxHistory)
+                            .ToList()
+                    }
+                };
             },
             cancellationToken);
         RefreshProcessBanCollections();
@@ -1216,10 +1233,7 @@ public sealed partial class MainWindowViewModel
         string details,
         CancellationToken cancellationToken)
     {
-        var settings = _thresholdSettingsStore.Current;
-        var processBans = settings.ProcessBans;
-        var history = processBans.History.ToList();
-        history.Insert(0, new ProcessBanEvent
+        var eventEntry = new ProcessBanEvent
         {
             Id = $"ban_event_{Guid.NewGuid():N}",
             Timestamp = DateTimeOffset.UtcNow,
@@ -1234,18 +1248,25 @@ public sealed partial class MainWindowViewModel
             ProcessName = target.TargetText,
             TerminatedCount = terminatedCount,
             Details = details
-        });
+        };
 
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                ProcessBans = processBans with
+                var processBans = settings.ProcessBans;
+                var history = processBans.History.ToList();
+                history.Insert(0, eventEntry);
+
+                return settings with
                 {
-                    History = history
-                        .OrderByDescending(entry => entry.Timestamp)
-                        .Take(processBans.MaxHistory)
-                        .ToList()
-                }
+                    ProcessBans = processBans with
+                    {
+                        History = history
+                            .OrderByDescending(entry => entry.Timestamp)
+                            .Take(processBans.MaxHistory)
+                            .ToList()
+                    }
+                };
             },
             cancellationToken);
         RefreshProcessBanCollections();
@@ -1353,37 +1374,39 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var recommendationSettings = settings.Recommendations;
-        var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
-        var active = recommendationSettings.Active.ToList();
-        var history = recommendationSettings.History.ToList();
-
-        foreach (var item in selected)
-        {
-            var recommendation = item.Recommendation;
-            assignments[recommendation.ExeName] = recommendation.SuggestedProfileId;
-            _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
-            active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
-            history = ProfileRecommendationCoordinator.AddHistory(
-                history,
-                "recommendation_promoted",
-                recommendation.ExeName,
-                recommendation.SuggestedProfileId,
-                recommendation.SuggestedProfileName,
-                $"{recommendation.ExeName} promoted to {recommendation.SuggestedProfileName}.",
-                recommendation.FullPath);
-        }
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                AppProfileAssignments = assignments,
-                Recommendations = recommendationSettings with
+                var recommendationSettings = settings.Recommendations;
+                var assignments = new Dictionary<string, string>(settings.AppProfileAssignments, StringComparer.OrdinalIgnoreCase);
+                var active = recommendationSettings.Active.ToList();
+                var history = recommendationSettings.History.ToList();
+
+                foreach (var item in selected)
                 {
-                    Active = active,
-                    History = history
+                    var recommendation = item.Recommendation;
+                    assignments[recommendation.ExeName] = recommendation.SuggestedProfileId;
+                    _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
+                    active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
+                    history = ProfileRecommendationCoordinator.AddHistory(
+                        history,
+                        "recommendation_promoted",
+                        recommendation.ExeName,
+                        recommendation.SuggestedProfileId,
+                        recommendation.SuggestedProfileName,
+                        $"{recommendation.ExeName} promoted to {recommendation.SuggestedProfileName}.",
+                        recommendation.FullPath);
                 }
+
+                return settings with
+                {
+                    AppProfileAssignments = assignments,
+                    Recommendations = recommendationSettings with
+                    {
+                        Active = active,
+                        History = history
+                    }
+                };
             },
             cancellationToken);
 
@@ -1407,50 +1430,53 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var recommendationSettings = settings.Recommendations;
-        var active = recommendationSettings.Active.ToList();
-        var denied = recommendationSettings.Denied.ToList();
-        var history = recommendationSettings.History.ToList();
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var item in selected)
-        {
-            var recommendation = item.Recommendation;
-            _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
-            active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
-            if (!denied.Any(deniedItem => string.Equals(deniedItem.ExeName, recommendation.ExeName, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(deniedItem.SuggestedProfileId, recommendation.SuggestedProfileId, StringComparison.OrdinalIgnoreCase)))
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                denied.Add(new DeniedProfileRecommendation
-                {
-                    ExeName = recommendation.ExeName,
-                    SuggestedProfileId = recommendation.SuggestedProfileId,
-                    SuggestedProfileName = recommendation.SuggestedProfileName,
-                    DeniedAt = now,
-                    Reason = recommendation.Reason
-                });
-            }
+                var recommendationSettings = settings.Recommendations;
+                var active = recommendationSettings.Active.ToList();
+                var denied = recommendationSettings.Denied.ToList();
+                var history = recommendationSettings.History.ToList();
 
-            history = ProfileRecommendationCoordinator.AddHistory(
-                history,
-                "recommendation_denied",
-                recommendation.ExeName,
-                recommendation.SuggestedProfileId,
-                recommendation.SuggestedProfileName,
-                $"{recommendation.ExeName} recommendation ignored: {recommendation.Reason}",
-                recommendation.FullPath);
-        }
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                Recommendations = recommendationSettings with
+                foreach (var item in selected)
                 {
-                    Active = active,
-                    Denied = denied.OrderByDescending(item => item.DeniedAt).ToList(),
-                    History = history
+                    var recommendation = item.Recommendation;
+                    _profileRecommendationCoordinator.ResetWarnings(recommendation.ExeName);
+                    active.RemoveAll(activeItem => string.Equals(activeItem.Id, recommendation.Id, StringComparison.OrdinalIgnoreCase));
+                    if (!denied.Any(deniedItem => string.Equals(deniedItem.ExeName, recommendation.ExeName, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(deniedItem.SuggestedProfileId, recommendation.SuggestedProfileId, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        denied.Add(new DeniedProfileRecommendation
+                        {
+                            ExeName = recommendation.ExeName,
+                            SuggestedProfileId = recommendation.SuggestedProfileId,
+                            SuggestedProfileName = recommendation.SuggestedProfileName,
+                            DeniedAt = now,
+                            Reason = recommendation.Reason
+                        });
+                    }
+
+                    history = ProfileRecommendationCoordinator.AddHistory(
+                        history,
+                        "recommendation_denied",
+                        recommendation.ExeName,
+                        recommendation.SuggestedProfileId,
+                        recommendation.SuggestedProfileName,
+                        $"{recommendation.ExeName} recommendation ignored: {recommendation.Reason}",
+                        recommendation.FullPath);
                 }
+
+                return settings with
+                {
+                    Recommendations = recommendationSettings with
+                    {
+                        Active = active,
+                        Denied = denied.OrderByDescending(item => item.DeniedAt).ToList(),
+                        History = history
+                    }
+                };
             },
             cancellationToken);
 
@@ -1573,24 +1599,27 @@ public sealed partial class MainWindowViewModel
 
     private async Task RemoveSuspiciousPathAsync(string normalizedPath, CancellationToken cancellationToken)
     {
-        var settings = _thresholdSettingsStore.Current;
-        var watchlist = settings.SuspiciousWatchlist;
-        var items = watchlist.Items
-            .Where(item => !string.Equals(item.NormalizedPath, normalizedPath, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (items.Count == watchlist.Items.Count)
+        var removed = false;
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
+            {
+                var watchlist = settings.SuspiciousWatchlist;
+                var items = watchlist.Items
+                    .Where(item => !string.Equals(item.NormalizedPath, normalizedPath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                removed = items.Count != watchlist.Items.Count;
+                return removed
+                    ? settings with { SuspiciousWatchlist = watchlist with { Items = items } }
+                    : settings;
+            },
+            cancellationToken);
+        if (!removed)
         {
             SuspiciousWatchStatusText = "Selected item is not marked suspicious.";
             return;
         }
 
         _runningSuspiciousPaths.Remove(normalizedPath);
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                SuspiciousWatchlist = watchlist with { Items = items }
-            },
-            cancellationToken);
         RefreshSuspiciousWatchCollections();
         NotifySelectedGlobalProcessProperties();
         SuspiciousWatchStatusText = "Suspicious mark removed. Existing launch history is kept for review.";
@@ -2111,15 +2140,17 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        var settings = _thresholdSettingsStore.Current;
-        var journal = settings.WatchJournal;
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                WatchJournal = journal with
+                var journal = settings.WatchJournal;
+                return settings with
                 {
-                    Entries = _globalWatchJournalCoordinator.TrimEntries(entriesToAdd.Concat(journal.Entries), journal.MaxEntries)
-                }
+                    WatchJournal = journal with
+                    {
+                        Entries = _globalWatchJournalCoordinator.TrimEntries(entriesToAdd.Concat(journal.Entries), journal.MaxEntries)
+                    }
+                };
             },
             cancellationToken);
 
@@ -2135,70 +2166,74 @@ public sealed partial class MainWindowViewModel
         DateTimeOffset capturedAt,
         CancellationToken cancellationToken)
     {
-        var settings = _thresholdSettingsStore.Current;
-        var watchlist = settings.SuspiciousWatchlist;
-        if (watchlist.Items.Count == 0)
-        {
-            _runningSuspiciousPaths.Clear();
-            return;
-        }
-
-        var suspiciousByPath = watchlist.Items
-            .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedPath))
-            .ToDictionary(item => item.NormalizedPath, StringComparer.OrdinalIgnoreCase);
-        var runningByPath = rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath)
-                && suspiciousByPath.ContainsKey(row.NormalizedFullPath))
-            .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.CpuPercent ?? 0).First(), StringComparer.OrdinalIgnoreCase);
-
         var entriesToAdd = new List<SuspiciousLaunchEntry>();
-        foreach (var item in suspiciousByPath.Values)
-        {
-            if (!runningByPath.TryGetValue(item.NormalizedPath, out var row))
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
             {
-                _runningSuspiciousPaths.Remove(item.NormalizedPath);
-                continue;
-            }
+                var watchlist = settings.SuspiciousWatchlist;
+                if (watchlist.Items.Count == 0)
+                {
+                    _runningSuspiciousPaths.Clear();
+                    return settings;
+                }
 
-            if (!_runningSuspiciousPaths.Add(item.NormalizedPath))
-            {
-                continue;
-            }
+                var suspiciousByPath = watchlist.Items
+                    .Where(item => !string.IsNullOrWhiteSpace(item.NormalizedPath))
+                    .ToDictionary(item => item.NormalizedPath, StringComparer.OrdinalIgnoreCase);
+                var runningByPath = rows
+                    .Where(row => !string.IsNullOrWhiteSpace(row.NormalizedFullPath)
+                        && suspiciousByPath.ContainsKey(row.NormalizedFullPath))
+                    .GroupBy(row => row.NormalizedFullPath, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(group => group.Key, group => group.OrderByDescending(row => row.CpuPercent ?? 0).First(), StringComparer.OrdinalIgnoreCase);
 
-            entriesToAdd.Add(new SuspiciousLaunchEntry
-            {
-                Id = $"suspicious_launch_{Guid.NewGuid():N}",
-                Timestamp = capturedAt,
-                NormalizedPath = item.NormalizedPath,
-                ExeName = item.ExeName,
-                ProductName = string.IsNullOrWhiteSpace(row.ProductName) ? item.ProductName : row.ProductName,
-                CompanyName = string.IsNullOrWhiteSpace(row.CompanyName) ? item.CompanyName : row.CompanyName,
-                SignerStatus = string.IsNullOrWhiteSpace(row.SignerStatus) ? item.SignerStatus : row.SignerStatus,
-                WatchMode = SelectedGlobalWatchMode,
-                ParentProcessId = row.Process.ParentProcessId,
-                ParentProcessName = row.Process.ParentProcessName
-            });
-        }
+                foreach (var item in suspiciousByPath.Values)
+                {
+                    if (!runningByPath.TryGetValue(item.NormalizedPath, out var row))
+                    {
+                        _runningSuspiciousPaths.Remove(item.NormalizedPath);
+                        continue;
+                    }
+
+                    if (!_runningSuspiciousPaths.Add(item.NormalizedPath))
+                    {
+                        continue;
+                    }
+
+                    entriesToAdd.Add(new SuspiciousLaunchEntry
+                    {
+                        Id = $"suspicious_launch_{Guid.NewGuid():N}",
+                        Timestamp = capturedAt,
+                        NormalizedPath = item.NormalizedPath,
+                        ExeName = item.ExeName,
+                        ProductName = string.IsNullOrWhiteSpace(row.ProductName) ? item.ProductName : row.ProductName,
+                        CompanyName = string.IsNullOrWhiteSpace(row.CompanyName) ? item.CompanyName : row.CompanyName,
+                        SignerStatus = string.IsNullOrWhiteSpace(row.SignerStatus) ? item.SignerStatus : row.SignerStatus,
+                        WatchMode = SelectedGlobalWatchMode,
+                        ParentProcessId = row.Process.ParentProcessId,
+                        ParentProcessName = row.Process.ParentProcessName
+                    });
+                }
+
+                return entriesToAdd.Count == 0
+                    ? settings
+                    : settings with
+                    {
+                        SuspiciousWatchlist = watchlist with
+                        {
+                            LaunchHistory = entriesToAdd
+                                .Concat(watchlist.LaunchHistory)
+                                .OrderByDescending(item => item.Timestamp)
+                                .Take(watchlist.MaxLaunchHistory)
+                                .ToList()
+                        }
+                    };
+            },
+            cancellationToken);
 
         if (entriesToAdd.Count == 0)
         {
             return;
         }
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                SuspiciousWatchlist = watchlist with
-                {
-                    LaunchHistory = entriesToAdd
-                        .Concat(watchlist.LaunchHistory)
-                        .OrderByDescending(item => item.Timestamp)
-                        .Take(watchlist.MaxLaunchHistory)
-                        .ToList()
-                }
-            },
-            cancellationToken);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {
@@ -2223,11 +2258,8 @@ public sealed partial class MainWindowViewModel
             return;
         }
 
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                ProcessBans = result.ProcessBans
-            },
+        await _thresholdSettingsStore.UpdateAsync(
+            latestSettings => latestSettings with { ProcessBans = result.ProcessBans },
             cancellationToken);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -2245,25 +2277,31 @@ public sealed partial class MainWindowViewModel
         DateTimeOffset capturedAt,
         CancellationToken cancellationToken)
     {
-        var settings = _thresholdSettingsStore.Current;
-        var update = _profileRecommendationCoordinator.Update(
-            settings,
-            rows,
-            capturedAt,
-            GlobalModeApplications,
-            GlobalModeProcesses);
-        if (!update.Changed)
+        var changed = false;
+        await _thresholdSettingsStore.UpdateAsync(
+            settings =>
+            {
+                var update = _profileRecommendationCoordinator.Update(
+                    settings,
+                    rows,
+                    capturedAt,
+                    GlobalModeApplications,
+                    GlobalModeProcesses);
+                changed = update.Changed;
+                return update.Changed
+                    ? settings with
+                    {
+                        Recommendations = update.Recommendations,
+                        WatchJournal = update.WatchJournal
+                    }
+                    : settings;
+            },
+            cancellationToken);
+
+        if (!changed)
         {
             return;
         }
-
-        await _thresholdSettingsStore.SaveAsync(
-            settings with
-            {
-                Recommendations = update.Recommendations,
-                WatchJournal = update.WatchJournal
-            },
-            cancellationToken);
 
         await Application.Current.Dispatcher.InvokeAsync(() =>
         {

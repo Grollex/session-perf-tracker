@@ -15,6 +15,7 @@ public sealed class SettingsTrustDefaultsTests
         Assert.False(settings.Updates.AutomaticallyInstallUpdatesOnStartup);
         Assert.False(settings.Behavior.StartWithWindows);
         Assert.True(settings.Behavior.StartMinimizedToTray);
+        Assert.False(settings.Feedback.SendRemoteFeedback);
     }
 
     [Fact]
@@ -76,5 +77,47 @@ public sealed class SettingsTrustDefaultsTests
 
         Assert.True(store.Current.Updates.AutomaticallyInstallUpdatesOnStartup);
         Assert.True(store.Current.Behavior.StartWithWindows);
+    }
+
+    [Fact]
+    public async Task Explicit_update_auto_check_opt_out_is_preserved_without_last_check()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "spt-trust-defaults-tests", Guid.NewGuid().ToString("N"));
+        var store = new JsonThresholdSettingsStore(Path.Combine(directory, "settings.json"));
+        var settings = ThresholdProfileDefaults.CreateSettings() with
+        {
+            Updates = new AppUpdateSettings
+            {
+                AutomaticallyCheckForUpdates = false,
+                AutomaticallyInstallUpdatesOnStartup = false,
+                LastCheckedAt = null,
+                ManifestUrl = AppUpdateSettings.DefaultManifestUrl
+            }
+        };
+
+        await store.SaveAsync(settings);
+
+        Assert.False(store.Current.Updates.AutomaticallyCheckForUpdates);
+        Assert.Null(store.Current.Updates.LastCheckedAt);
+    }
+
+    [Fact]
+    public async Task Atomic_settings_updates_preserve_changes_from_latest_state()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "spt-trust-defaults-tests", Guid.NewGuid().ToString("N"));
+        var store = new JsonThresholdSettingsStore(Path.Combine(directory, "settings.json"));
+        await store.LoadAsync();
+
+        await store.UpdateAsync(settings => settings with
+        {
+            WatchJournal = settings.WatchJournal with { MaxEntries = 123 }
+        });
+        await store.UpdateAsync(settings => settings with
+        {
+            Updates = settings.Updates with { AutomaticallyCheckForUpdates = false }
+        });
+
+        Assert.Equal(123, store.Current.WatchJournal.MaxEntries);
+        Assert.False(store.Current.Updates.AutomaticallyCheckForUpdates);
     }
 }

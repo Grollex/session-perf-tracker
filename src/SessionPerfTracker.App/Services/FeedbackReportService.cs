@@ -12,14 +12,16 @@ public sealed class FeedbackReportService
     private static readonly Uri DefaultNtfyUri = new($"https://ntfy.sh/{DefaultNtfyTopic}");
     private readonly HttpClient _httpClient;
     private readonly Uri _feedbackUri;
+    private readonly string? _feedbackDirectory;
 
-    public FeedbackReportService(HttpClient? httpClient = null, Uri? feedbackUri = null)
+    public FeedbackReportService(HttpClient? httpClient = null, Uri? feedbackUri = null, string? feedbackDirectory = null)
     {
         _httpClient = httpClient ?? new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(12)
         };
         _feedbackUri = feedbackUri ?? DefaultNtfyUri;
+        _feedbackDirectory = string.IsNullOrWhiteSpace(feedbackDirectory) ? null : feedbackDirectory;
     }
 
     public async Task<string?> SaveAsync(
@@ -28,6 +30,7 @@ public sealed class FeedbackReportService
         string? screenshotPath,
         FeedbackReportContext context,
         bool includeLatestSession,
+        FeedbackSettings feedbackSettings,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -38,7 +41,8 @@ public sealed class FeedbackReportService
         var directory = GetFeedbackDirectory();
         Directory.CreateDirectory(directory);
         var timestamp = DateTimeOffset.Now;
-        var fileName = $"{timestamp:yyyyMMdd_HHmmss}_{kind}.md";
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var fileName = $"{timestamp:yyyyMMdd_HHmmss_fff}_{kind}_{suffix}.md";
         var path = Path.Combine(directory, fileName);
         var content = BuildReport(
             kind,
@@ -49,6 +53,7 @@ public sealed class FeedbackReportService
             includeLatestSession: includeLatestSession,
             context: context);
         await File.WriteAllTextAsync(path, content, cancellationToken);
+        PruneReports(directory, feedbackSettings);
         PruneScreenshots(directory);
         return path;
     }
@@ -105,7 +110,8 @@ public sealed class FeedbackReportService
     }
 
     public string GetFeedbackDirectory() =>
-        Path.Combine(
+        _feedbackDirectory
+        ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SessionPerfTracker",
             "feedback");
@@ -247,6 +253,44 @@ public sealed class FeedbackReportService
             foreach (var file in screenshots
                          .Where(file => file.LastWriteTimeUtc < oldestAllowed.UtcDateTime)
                          .Concat(screenshots.Skip(maxScreenshotFiles))
+                         .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    file.Delete();
+                }
+                catch
+                {
+                    // Feedback cleanup must never block saving or sending a report.
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void PruneReports(string directory, FeedbackSettings settings)
+    {
+        var normalized = settings with
+        {
+            MaxLocalReports = Math.Clamp(settings.MaxLocalReports, 1, 500),
+            MaxLocalReportAgeDays = Math.Clamp(settings.MaxLocalReportAgeDays, 1, 3650)
+        };
+        var oldestAllowed = DateTimeOffset.Now.AddDays(-normalized.MaxLocalReportAgeDays);
+
+        try
+        {
+            var reports = Directory
+                .EnumerateFiles(directory, "*.md", SearchOption.TopDirectoryOnly)
+                .Select(path => new FileInfo(path))
+                .Where(file => file.Exists)
+                .OrderByDescending(file => file.LastWriteTimeUtc)
+                .ToArray();
+
+            foreach (var file in reports
+                         .Where(file => file.LastWriteTimeUtc < oldestAllowed.UtcDateTime)
+                         .Concat(reports.Skip(normalized.MaxLocalReports))
                          .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase))
             {
                 try
