@@ -23,6 +23,7 @@
 - Generic file descriptions such as `Microsoft® Windows® Operating System` hid real app names in Global Watch.
 - Around 110 status and hint messages were English-only in the Russian UI; they are localized now.
 - Exit reasons, stability reasons, session notes, recommendation evidence and identity values (signer, `Unavailable`) were stored and shown in English; they are translated at display time now.
+- `scripts/test-packaged-app.ps1` tried to isolate data by overriding `LOCALAPPDATA`, which .NET ignores, so every smoke test ran against the developer's real database; it now passes `--data-dir`.
 - The tag-triggered GitHub release workflow overwrote the locally signed installer and `version.json`, leaving `SHA256SUMS.txt` of 1.5.4/1.5.5 out of sync with the published installer; the workflow now leaves existing releases alone.
 - Settings writes rewrote every key; only changed keys are written.
 

@@ -13,10 +13,12 @@ $process = $null
 
 try {
     New-Item -ItemType Directory -Path $temporaryProfile -Force | Out-Null
+    # .NET resolves LocalApplicationData through the Known Folder API and ignores this variable;
+    # --data-dir (1.6.0+) is what actually keeps the smoke test away from the user's real data.
     $env:LOCALAPPDATA = $temporaryProfile
 
     Write-Host "Starting packaged application: $resolvedExecutable"
-    $process = Start-Process -FilePath $resolvedExecutable -PassThru
+    $process = Start-Process -FilePath $resolvedExecutable -ArgumentList "--data-dir `"$temporaryProfile`"" -PassThru
 
     $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadline) {
