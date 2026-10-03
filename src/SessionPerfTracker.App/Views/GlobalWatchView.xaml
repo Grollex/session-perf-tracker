@@ -104,651 +104,562 @@
             ItemContainerStyle="{StaticResource SubTabItem}">
     <TabItem Header="{DynamicResource Ui_Overview}">
         <Grid>
-    <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="8" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="10" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="10" />
-        <RowDefinition Height="*" />
-    </Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-    <Border Grid.Row="0" Style="{StaticResource Panel}">
-        <Grid>
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="{DynamicResource Ui_GlobalWatch}"
-                           FontSize="20"
-                           FontWeight="SemiBold"
-                           Margin="0,0,18,0" />
-                <TextBlock Text="{Binding GlobalWatchLastScanText}"
-                           Style="{StaticResource MutedText}"
-                           VerticalAlignment="Center" />
-            </StackPanel>
-        </Grid>
-    </Border>
-
-    <Border Grid.Row="2" Style="{StaticResource Panel}">
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock Text="{DynamicResource Ui_TopCpu}" Style="{StaticResource MutedText}" Margin="0,0,0,6" />
-                <ItemsControl ItemsSource="{Binding TopCpuOffenders}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="0,0,0,3">
-                                <Border DockPanel.Dock="Right"
-                                        Padding="6,1"
-                                        CornerRadius="6"
-                                        BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#142A1D" />
-                                            <Setter Property="BorderBrush" Value="#2E8D62" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Near">
-                                                    <Setter Property="Background" Value="#2A2512" />
-                                                    <Setter Property="BorderBrush" Value="#A88423" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Over">
-                                                    <Setter Property="Background" Value="#2A1F14" />
-                                                    <Setter Property="BorderBrush" Value="#B66D2A" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Critical">
-                                                    <Setter Property="Background" Value="#2B1719" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding HealthBadgeText}" FontSize="11" />
-                                </Border>
-                                <TextBlock Text="{Binding TopCpuText}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-            <StackPanel Grid.Column="2">
-                <TextBlock Text="{DynamicResource Ui_TopRam}" Style="{StaticResource MutedText}" Margin="0,0,0,6" />
-                <ItemsControl ItemsSource="{Binding TopRamOffenders}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="0,0,0,3">
-                                <Border DockPanel.Dock="Right"
-                                        Padding="6,1"
-                                        CornerRadius="6"
-                                        BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#142A1D" />
-                                            <Setter Property="BorderBrush" Value="#2E8D62" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Near">
-                                                    <Setter Property="Background" Value="#2A2512" />
-                                                    <Setter Property="BorderBrush" Value="#A88423" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Over">
-                                                    <Setter Property="Background" Value="#2A1F14" />
-                                                    <Setter Property="BorderBrush" Value="#B66D2A" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Critical">
-                                                    <Setter Property="Background" Value="#2B1719" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding HealthBadgeText}" FontSize="11" />
-                                </Border>
-                                <TextBlock Text="{Binding TopRamText}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-            <StackPanel Grid.Column="4">
-                <TextBlock Text="{DynamicResource Ui_TopDisk}" Style="{StaticResource MutedText}" Margin="0,0,0,6" />
-                <ItemsControl ItemsSource="{Binding TopDiskOffenders}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="0,0,0,3">
-                                <Border DockPanel.Dock="Right"
-                                        Padding="6,1"
-                                        CornerRadius="6"
-                                        BorderThickness="1">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Setter Property="Background" Value="#142A1D" />
-                                            <Setter Property="BorderBrush" Value="#2E8D62" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Near">
-                                                    <Setter Property="Background" Value="#2A2512" />
-                                                    <Setter Property="BorderBrush" Value="#A88423" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Over">
-                                                    <Setter Property="Background" Value="#2A1F14" />
-                                                    <Setter Property="BorderBrush" Value="#B66D2A" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Critical">
-                                                    <Setter Property="Background" Value="#2B1719" />
-                                                    <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding HealthBadgeText}" FontSize="11" />
-                                </Border>
-                                <TextBlock Text="{Binding TopDiskText}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </DockPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Grid>
-    </Border>
-
-    <Border Grid.Row="4" Style="{StaticResource ToolbarPanel}">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="8" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="14" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <Grid>
-            <TextBox Text="{Binding GlobalWatchFilterText, UpdateSourceTrigger=PropertyChanged}"
-                     MinHeight="32" />
-            <TextBlock Text="{DynamicResource Ui_SearchProcessName}"
-                       IsHitTestVisible="False"
-                       Foreground="{StaticResource PlaceholderBrush}"
-                       VerticalAlignment="Center"
-                       Margin="10,0,0,0">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding GlobalWatchFilterText}" Value="">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
-        </Grid>
-        <StackPanel Grid.Column="2"
-                    Orientation="Horizontal"
-                    VerticalAlignment="Center">
-            <TextBlock Text="{DynamicResource Ui_Mode}"
-                       Style="{StaticResource MutedText}"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0" />
-            <ComboBox ItemsSource="{Binding GlobalWatchModes}"
-                      SelectedItem="{Binding SelectedGlobalWatchMode}"
-                      Width="140"
-                      Margin="0,0,10,0" />
-            <Button Content="{DynamicResource Ui_Refresh}"
-                    Click="RefreshGlobalWatch_Click"
-                    Style="{StaticResource ToolbarButton}" />
-        </StackPanel>
-        <StackPanel Grid.Row="2"
-                    Grid.ColumnSpan="3"
-                    Orientation="Horizontal">
-            <CheckBox Content="{DynamicResource Ui_OnlyOverLimit}"
-                      IsChecked="{Binding GlobalWatchOnlyOverLimit}"
-                      Margin="0,0,18,0" />
-            <CheckBox Content="{DynamicResource Ui_OnlyCritical}"
-                      IsChecked="{Binding GlobalWatchOnlyCritical}"
-                      Margin="0,0,18,0" />
-            <CheckBox Content="{DynamicResource Ui_OnlyNearLimit}"
-                      IsChecked="{Binding GlobalWatchOnlyNearLimit}"
-                      Margin="0,0,18,0" />
-            <CheckBox Content="{DynamicResource Ui_OnlyUnassigned}"
-                      IsChecked="{Binding GlobalWatchOnlyUnassigned}" />
-        </StackPanel>
-    </Grid>
-    </Border>
-
-    <Grid Grid.Row="6">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="12" />
-            <ColumnDefinition Width="320" />
-        </Grid.ColumnDefinitions>
-
-        <Border Grid.Column="0" Style="{StaticResource Panel}">
-            <Grid>
-                <ListView ItemsSource="{Binding GlobalWatchProcesses}"
-                          SelectedItem="{Binding SelectedGlobalProcess, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                          SelectedValuePath="SelectionKey"
-                          IsSynchronizedWithCurrentItem="False"
-                          Style="{StaticResource DataListView}">
-                    <ListView.View>
-                        <GridView>
-                            <GridViewColumn Width="235">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchProcessHeaderButton"
-                                            Content="{Binding GlobalWatchProcessHeaderText}"
-                                            Click="SortGlobalWatchProcess_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <GridViewColumn Width="90" DisplayMemberBinding="{Binding PidOrCountText}">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchPidHeaderButton"
-                                            Content="{Binding GlobalWatchPidHeaderText}"
-                                            Click="SortGlobalWatchPid_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                            </GridViewColumn>
-                            <GridViewColumn Width="78" DisplayMemberBinding="{Binding CpuText}">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchCpuHeaderButton"
-                                            Content="{Binding GlobalWatchCpuHeaderText}"
-                                            Click="SortGlobalWatchCpu_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                            </GridViewColumn>
-                            <GridViewColumn Width="104" DisplayMemberBinding="{Binding MemoryText}">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchRamHeaderButton"
-                                            Content="{Binding GlobalWatchRamHeaderText}"
-                                            Click="SortGlobalWatchRam_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                            </GridViewColumn>
-                            <GridViewColumn Width="104" DisplayMemberBinding="{Binding DiskTotalText}">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchDiskHeaderButton"
-                                            Content="{Binding GlobalWatchDiskHeaderText}"
-                                            Click="SortGlobalWatchDisk_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                            </GridViewColumn>
-                            <GridViewColumn Width="98">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchProfileHeaderButton"
-                                            Content="{Binding GlobalWatchProfileHeaderText}"
-                                            Click="SortGlobalWatchProfile_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="7,2"
-                                                CornerRadius="7"
-                                                Background="#1B2630"
-                                                BorderBrush="#34566A"
-                                                BorderThickness="1">
-                                            <TextBlock Text="{Binding ProfileBadgeText}"
-                                                       FontSize="11"
-                                                       HorizontalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </Border>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                            <GridViewColumn Width="88">
-                                <GridViewColumn.Header>
-                                    <Button x:Name="GlobalWatchHealthHeaderButton"
-                                            Content="{Binding GlobalWatchHealthHeaderText}"
-                                            Click="SortGlobalWatchHealth_Click"
-                                            Style="{StaticResource TableHeaderSortButton}" />
-                                </GridViewColumn.Header>
-                                <GridViewColumn.CellTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="7,2"
-                                                CornerRadius="7"
-                                                BorderThickness="1">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="#142A1D" />
-                                                    <Setter Property="BorderBrush" Value="#2E8D62" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding HealthBadgeText}" Value="Near">
-                                                            <Setter Property="Background" Value="#2A2512" />
-                                                            <Setter Property="BorderBrush" Value="#A88423" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HealthBadgeText}" Value="Over">
-                                                            <Setter Property="Background" Value="#2A1F14" />
-                                                            <Setter Property="BorderBrush" Value="#B66D2A" />
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding HealthBadgeText}" Value="Critical">
-                                                            <Setter Property="Background" Value="#2B1719" />
-                                                            <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <TextBlock Text="{Binding HealthBadgeText}"
-                                                       FontSize="11"
-                                                       FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center" />
-                                        </Border>
-                                    </DataTemplate>
-                                </GridViewColumn.CellTemplate>
-                            </GridViewColumn>
-                        </GridView>
-                    </ListView.View>
-                </ListView>
-                <Border Padding="14"
-                        CornerRadius="7"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding HasGlobalWatchRows}" Value="False">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                    <TextBlock Text="{Binding GlobalWatchEmptyStateText}"
-                               Style="{StaticResource MutedText}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </Border>
-            </Grid>
-        </Border>
-
-        <Border Grid.Column="2" Style="{StaticResource Panel}">
-            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          CanContentScroll="False"
-                          PanningMode="VerticalOnly">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <StackPanel>
-                    <TextBlock Text="{Binding SelectedGlobalProcessPanelTitle}"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,12" />
-                    <TextBlock Text="{Binding SelectedGlobalProcessTitle}"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               TextWrapping="Wrap"
-                               TextTrimming="CharacterEllipsis"
-                               MaxHeight="42"
-                               ToolTip="{Binding SelectedGlobalProcessTitle}" />
-                    <TextBlock Text="{Binding SelectedGlobalProcessHint}"
-                               Style="{StaticResource MutedText}"
-                               TextWrapping="Wrap"
-                               Margin="0,4,0,14" />
-
-                    <TextBlock Text="{DynamicResource Ui_Identity}"
-                               Style="{StaticResource MutedText}"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,8" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="92" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="8" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Text="{DynamicResource Ui_Product}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding SelectedGlobalProcessProductText}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding SelectedGlobalProcessProductText}" />
-                        <TextBlock Grid.Row="2" Text="{DynamicResource Ui_Exe}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedGlobalProcessExeText}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Row="4" Text="{DynamicResource Ui_Path}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="4"
-                                   Grid.Column="1"
-                                   Text="{Binding SelectedGlobalProcessPathText}"
-                                   FontFamily="Consolas"
+            <!-- Whole-system load. -->
+            <Border Grid.Row="0" Style="{StaticResource Panel}" Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_SystemCpu}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemCpuText}" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemCpuPercent, Mode=OneWay}" Foreground="{StaticResource CpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_SystemRam}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemRamText}" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemRamPercent, Mode=OneWay}" Foreground="{StaticResource RamAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" ToolTip="{Binding SystemGpuNameText}">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_GpuShort}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemGpuText}" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemGpuPercent, Mode=OneWay}" Foreground="{StaticResource GpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="6" ToolTip="{Binding SystemGpuNameText}">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_VramShort}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemVramText}" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemVramPercent, Mode=OneWay}" Foreground="{StaticResource GpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="8" VerticalAlignment="Center" MinWidth="170">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <TextBlock Text="{DynamicResource Ui_GpuTemperatureShort}" Style="{StaticResource MetricLabel}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding SystemGpuTemperatureText}" FontWeight="SemiBold" TextWrapping="NoWrap" Margin="0,0,14,0" />
+                            <TextBlock Text="{DynamicResource Ui_ProcessesShort}" Style="{StaticResource MetricLabel}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding SystemProcessCountText}" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding GlobalWatchLastScanText}"
+                                   Style="{StaticResource MutedText}"
                                    FontSize="11"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   TextWrapping="Wrap"
-                                   MaxHeight="58"
-                                   ToolTip="{Binding SelectedGlobalProcessPathText}" />
-                        <TextBlock Grid.Row="6" Text="{DynamicResource Ui_Description}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="6"
-                                   Grid.Column="1"
-                                   Text="{Binding SelectedGlobalProcessDescriptionText}"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip="{Binding SelectedGlobalProcessDescriptionText}" />
-                        <TextBlock Grid.Row="8" Text="{DynamicResource Ui_Company}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding SelectedGlobalProcessCompanyText}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Row="10" Text="{DynamicResource Ui_Signer}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding SelectedGlobalProcessSignerText}" />
-                        <TextBlock Grid.Row="12" Text="{DynamicResource Ui_Parent}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding SelectedGlobalProcessParentText}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Row="14" Text="{DynamicResource Ui_Tree}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="14" Grid.Column="1" Text="{Binding SelectedGlobalProcessDescendantsText}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="16" Text="{DynamicResource Ui_CPU}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="16" Grid.Column="1" Text="{Binding SelectedGlobalProcessCpuText}" />
-                        <TextBlock Grid.Row="18" Text="{DynamicResource Ui_RAM}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="18" Grid.Column="1" Text="{Binding SelectedGlobalProcessRamText}" />
-                        <TextBlock Grid.Row="20" Text="{DynamicResource Ui_DiskReadWrite}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="20" Grid.Column="1" Text="{Binding SelectedGlobalProcessDiskText}" />
-                        <TextBlock Grid.Row="22" Text="{DynamicResource Ui_Profile}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="22" Grid.Column="1" Text="{Binding SelectedGlobalProcessProfileText}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="24" Text="{DynamicResource Ui_Health}" Style="{StaticResource MutedText}" />
-                        <Border Grid.Row="24"
-                                Grid.Column="1"
-                                Padding="7,2"
-                                CornerRadius="7"
-                                HorizontalAlignment="Left"
-                                BorderThickness="1">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Background" Value="#142A1D" />
-                                    <Setter Property="BorderBrush" Value="#2E8D62" />
+                                   HorizontalAlignment="Right"
+                                   TextWrapping="NoWrap"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Toolbar: search, mode, filter chips. -->
+            <Border Grid.Row="2" Style="{StaticResource ToolbarPanel}" Padding="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="260" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <TextBox Text="{Binding GlobalWatchFilterText, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                                 MinHeight="30" />
+                        <TextBlock Text="{DynamicResource Ui_SearchProcessName}"
+                                   IsHitTestVisible="False"
+                                   Foreground="{StaticResource PlaceholderBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SelectedGlobalProcessHealthText}" Value="Near">
-                                            <Setter Property="Background" Value="#2A2512" />
-                                            <Setter Property="BorderBrush" Value="#A88423" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding SelectedGlobalProcessHealthText}" Value="Over">
-                                            <Setter Property="Background" Value="#2A1F14" />
-                                            <Setter Property="BorderBrush" Value="#B66D2A" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding SelectedGlobalProcessHealthText}" Value="Critical">
-                                            <Setter Property="Background" Value="#2B1719" />
-                                            <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+                                        <DataTrigger Binding="{Binding GlobalWatchFilterText}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Border.Style>
-                            <TextBlock Text="{Binding SelectedGlobalProcessHealthText}" FontWeight="SemiBold" />
-                        </Border>
-                        <TextBlock Grid.Row="26" Text="{DynamicResource Ui_Reason}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="26" Grid.Column="1" Text="{Binding SelectedGlobalProcessReasonText}" TextWrapping="Wrap" />
-                        <TextBlock Grid.Row="28" Text="{DynamicResource Ui_Included}" Style="{StaticResource MutedText}" />
-                        <TextBlock Grid.Row="28"
-                                   Grid.Column="1"
-                                   Text="{Binding SelectedGlobalProcessIncludedText}"
-                                   TextWrapping="Wrap" />
+                            </TextBlock.Style>
+                        </TextBlock>
                     </Grid>
-                </StackPanel>
+                    <ComboBox Grid.Column="2"
+                              ItemsSource="{Binding GlobalWatchModes}"
+                              SelectedItem="{Binding SelectedGlobalWatchMode}"
+                              Width="170"
+                              Margin="0" />
+                    <WrapPanel Grid.Column="4" VerticalAlignment="Center">
+                        <CheckBox Content="{DynamicResource Ui_OnlyOverLimit}" IsChecked="{Binding GlobalWatchOnlyOverLimit}" Style="{StaticResource ChipToggle}" />
+                        <CheckBox Content="{DynamicResource Ui_OnlyCritical}" IsChecked="{Binding GlobalWatchOnlyCritical}" Style="{StaticResource ChipToggle}" />
+                        <CheckBox Content="{DynamicResource Ui_OnlyNearLimit}" IsChecked="{Binding GlobalWatchOnlyNearLimit}" Style="{StaticResource ChipToggle}" />
+                        <CheckBox Content="{DynamicResource Ui_OnlyUnassigned}" IsChecked="{Binding GlobalWatchOnlyUnassigned}" Style="{StaticResource ChipToggle}" />
+                    </WrapPanel>
+                    <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding GlobalWatchRowCountText}"
+                                   Style="{StaticResource MutedText}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0" />
+                        <Button Content="{DynamicResource Ui_Refresh}"
+                                Click="RefreshGlobalWatch_Click"
+                                Style="{StaticResource ToolbarButton}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
 
-                <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                    <TextBlock Text="{DynamicResource Ui_Actions}"
-                               Style="{StaticResource MutedText}"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,8" />
-                    <Button Content="{DynamicResource Ui_MonitorProcessGroup}"
-                            Click="MonitorGlobalProcess_Click"
-                            IsEnabled="{Binding CanMonitorSelectedGlobalProcess}"
-                            Style="{StaticResource PrimaryButton}" />
-                    <Button Content="{DynamicResource Ui_ViewDetails}"
-                            Click="OpenGlobalProcessInspector_Click"
-                            IsEnabled="{Binding CanInspectSelectedGlobalProcess}"
-                            Style="{StaticResource CompactButton}"
-                            Margin="0,8,0,0" />
-                     <DockPanel Margin="0,10,0,0">
-                         <Button DockPanel.Dock="Right"
-                                 Content="{DynamicResource Ui_Assign}"
-                                 Click="AssignGlobalWatchProfile_Click"
-                                IsEnabled="{Binding CanAssignSelectedGlobalProcessProfile}"
-                                MinHeight="30"
-                                Padding="10,0"
-                                Margin="8,0,0,0" />
-                        <ComboBox ItemsSource="{Binding ThresholdProfiles}"
-                                  SelectedItem="{Binding SelectedLiveAssignmentProfile}"
-                                  DisplayMemberPath="DisplayName"
-                                   IsEnabled="{Binding CanAssignSelectedGlobalProcessProfile}" />
-                     </DockPanel>
-                    <Border Style="{StaticResource DangerPanel}"
-                            Margin="0,12,0,0">
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="330" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Panel}" Padding="12">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Top consumers in the current scan. -->
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Ui_TopCpu}" Style="{StaticResource MetricLabel}" Margin="0,0,0,4" />
+                                <ItemsControl ItemsSource="{Binding TopCpuOffenders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding TopCpuText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding TopCpuText}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="{DynamicResource Ui_TopRam}" Style="{StaticResource MetricLabel}" Margin="0,0,0,4" />
+                                <ItemsControl ItemsSource="{Binding TopRamOffenders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding TopRamText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding TopRamText}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="{DynamicResource Ui_TopGpu}" Style="{StaticResource MetricLabel}" Margin="0,0,0,4" />
+                                <ItemsControl ItemsSource="{Binding TopGpuOffenders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding TopGpuText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding TopGpuText}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <StackPanel Grid.Column="6">
+                                <TextBlock Text="{DynamicResource Ui_TopDisk}" Style="{StaticResource MetricLabel}" Margin="0,0,0,4" />
+                                <ItemsControl ItemsSource="{Binding TopDiskOffenders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding TopDiskText}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding TopDiskText}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Grid>
+
+                        <ListView Grid.Row="2"
+                                  ItemsSource="{Binding GlobalWatchProcesses}"
+                                  SelectedItem="{Binding SelectedGlobalProcess, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectedValuePath="SelectionKey"
+                                  IsSynchronizedWithCurrentItem="False"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  Style="{StaticResource DataListView}">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Width="204">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchProcessHeaderText}"
+                                                    Click="SortGlobalWatchProcess_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayName}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding FullPath}" />
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="72" DisplayMemberBinding="{Binding PidOrCountText}">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchPidHeaderText}"
+                                                    Click="SortGlobalWatchPid_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="82">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchCpuHeaderText}"
+                                                    Click="SortGlobalWatchCpu_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Width="64">
+                                                    <TextBlock Text="{Binding CpuText}" TextWrapping="NoWrap" />
+                                                    <ProgressBar Style="{StaticResource ThinMeter}"
+                                                                 Height="3"
+                                                                 Margin="0,2,0,0"
+                                                                 Foreground="{StaticResource CpuAccentBrush}"
+                                                                 Value="{Binding CpuPercent, Mode=OneWay, TargetNullValue=0, FallbackValue=0}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="94" DisplayMemberBinding="{Binding MemoryText}">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchRamHeaderText}"
+                                                    Click="SortGlobalWatchRam_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="84">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchGpuHeaderText}"
+                                                    Click="SortGlobalWatchGpu_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Width="66" ToolTip="{Binding GpuMemoryText}">
+                                                    <TextBlock Text="{Binding GpuText}" TextWrapping="NoWrap" />
+                                                    <ProgressBar Style="{StaticResource ThinMeter}"
+                                                                 Height="3"
+                                                                 Margin="0,2,0,0"
+                                                                 Foreground="{StaticResource GpuAccentBrush}"
+                                                                 Value="{Binding GpuPercent, Mode=OneWay, TargetNullValue=0, FallbackValue=0}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="88" DisplayMemberBinding="{Binding DiskTotalText}">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchDiskHeaderText}"
+                                                    Click="SortGlobalWatchDisk_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="84">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchProfileHeaderText}"
+                                                    Click="SortGlobalWatchProfile_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="7,1"
+                                                        CornerRadius="8"
+                                                        Background="#18222E"
+                                                        BorderBrush="#2E4258"
+                                                        BorderThickness="1"
+                                                        HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding ProfileBadgeText}"
+                                                               FontSize="11"
+                                                               TextWrapping="NoWrap"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Width="80">
+                                        <GridViewColumn.Header>
+                                            <Button Content="{Binding GlobalWatchHealthHeaderText}"
+                                                    Click="SortGlobalWatchHealth_Click"
+                                                    Style="{StaticResource TableHeaderSortButton}" />
+                                        </GridViewColumn.Header>
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Padding="7,1"
+                                                        CornerRadius="8"
+                                                        BorderThickness="1"
+                                                        HorizontalAlignment="Left">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#11261D" />
+                                                            <Setter Property="BorderBrush" Value="#24664B" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Near">
+                                                                    <Setter Property="Background" Value="#2A2210" />
+                                                                    <Setter Property="BorderBrush" Value="#8A6A1C" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Over">
+                                                                    <Setter Property="Background" Value="#2B1D12" />
+                                                                    <Setter Property="BorderBrush" Value="#A3622A" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding HealthBadgeText}" Value="Critical">
+                                                                    <Setter Property="Background" Value="#2A1618" />
+                                                                    <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding HealthDisplayText}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="NoWrap" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                        <Border Grid.Row="2" Style="{StaticResource EmptyState}">
+                            <Border.Visibility>
+                                <Binding Path="HasGlobalWatchRows">
+                                    <Binding.Converter>
+                                        <local:InverseBoolToVisibilityConverter xmlns:local="clr-namespace:SessionPerfTracker.App.Controls" />
+                                    </Binding.Converter>
+                                </Binding>
+                            </Border.Visibility>
+                            <TextBlock Text="{Binding GlobalWatchEmptyStateText}"
+                                       Style="{StaticResource MutedText}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Selected row: identity, numbers and actions. -->
+                <Border Grid.Column="2" Style="{StaticResource Panel}" Padding="14">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  CanContentScroll="False"
+                                  PanningMode="VerticalOnly">
                         <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Actions}"
+                            <TextBlock Text="{Binding SelectedGlobalProcessPanelTitle}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock Text="{Binding SelectedGlobalProcessTitle}"
+                                       FontSize="15"
                                        FontWeight="SemiBold"
-                                       Margin="0,0,0,4" />
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxHeight="44"
+                                       Margin="0,4,0,0"
+                                       ToolTip="{Binding SelectedGlobalProcessTitle}" />
                             <TextBlock Text="{Binding SelectedGlobalProcessHint}"
                                        Style="{StaticResource MutedText}"
-                                       TextWrapping="Wrap" />
-                            <UniformGrid Columns="2" Margin="0,8,0,0">
-                                <Button Content="{DynamicResource Ui_KillPid}"
-                                        Click="KillGlobalProcess_Click"
-                                        IsEnabled="{Binding CanKillSelectedGlobalProcess}"
-                                        Style="{StaticResource DangerButton}"
-                                        Margin="0,0,6,0" />
-                                <Button Content="{Binding SelectedGlobalProcessKillTreeLabel}"
-                                        Click="KillGlobalProcessTree_Click"
-                                        IsEnabled="{Binding CanKillSelectedGlobalProcess}"
-                                        Style="{StaticResource DangerButton}" />
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12" />
+
+                            <UniformGrid Columns="2" Margin="0,0,0,12">
+                                <Border Style="{StaticResource MetricCard}" Padding="10,8" Margin="0,0,6,6">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource Ui_CPU}" Style="{StaticResource MetricLabel}" />
+                                        <TextBlock Text="{Binding SelectedGlobalProcessCpuText}" FontSize="15" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource MetricCard}" Padding="10,8" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource Ui_RAM}" Style="{StaticResource MetricLabel}" />
+                                        <TextBlock Text="{Binding SelectedGlobalProcessRamText}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource MetricCard}" Padding="10,8" Margin="0,0,6,0">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource Ui_GpuShort}" Style="{StaticResource MetricLabel}" />
+                                        <TextBlock Text="{Binding SelectedGlobalProcessGpuText}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource MetricCard}" Padding="10,8">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource Ui_Disk}" Style="{StaticResource MetricLabel}" />
+                                        <TextBlock Text="{Binding SelectedGlobalProcessDiskText}" FontSize="13" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Border>
                             </UniformGrid>
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource DangerPanel}"
-                            Margin="0,10,0,0">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_ProcessBan}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,4" />
-                            <TextBlock Text="{Binding SelectedGlobalProcessBanText}"
-                                       Style="{StaticResource MutedText}"
-                                       TextWrapping="Wrap" />
-                            <ComboBox ItemsSource="{Binding ProcessBanDurationOptions}"
-                                      SelectedItem="{Binding SelectedProcessBanDurationOption}"
-                                      DisplayMemberPath="Label"
-                                      IsEnabled="{Binding CanBanSelectedGlobalProcess}"
-                                      Margin="0,8,0,0" />
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="84" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.Resources>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                        <Setter Property="Margin" Value="0,0,0,7" />
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    </Style>
+                                </Grid.Resources>
+                                <TextBlock Text="{DynamicResource Ui_Product}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Column="1" Text="{Binding SelectedGlobalProcessProductText}" ToolTip="{Binding SelectedGlobalProcessProductText}" />
+                                <TextBlock Grid.Row="1" Text="{DynamicResource Ui_Company}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedGlobalProcessCompanyText}" ToolTip="{Binding SelectedGlobalProcessCompanyText}" />
+                                <TextBlock Grid.Row="2" Text="{DynamicResource Ui_Signer}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedGlobalProcessSignerText}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="3" Text="{DynamicResource Ui_Path}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="3"
+                                           Grid.Column="1"
+                                           Text="{Binding SelectedGlobalProcessPathText}"
+                                           FontFamily="Consolas"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MutedBrush}"
+                                           TextWrapping="Wrap"
+                                           MaxHeight="46"
+                                           ToolTip="{Binding SelectedGlobalProcessPathText}" />
+                                <TextBlock Grid.Row="4" Text="{DynamicResource Ui_Parent}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedGlobalProcessParentText}" />
+                                <TextBlock Grid.Row="5" Text="{DynamicResource Ui_Tree}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedGlobalProcessDescendantsText}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="6" Text="{DynamicResource Ui_Profile}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedGlobalProcessProfileText}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Row="7" Text="{DynamicResource Ui_Reason}" Style="{StaticResource MutedText}" />
+                                <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedGlobalProcessReasonText}" TextWrapping="Wrap" />
+                            </Grid>
+
                             <UniformGrid Columns="2" Margin="0,8,0,0">
-                                <Button Content="{DynamicResource Ui_Ban}"
-                                        Click="BanGlobalProcess_Click"
-                                        IsEnabled="{Binding CanBanSelectedGlobalProcess}"
-                                        Style="{StaticResource DangerButton}"
+                                <Button Content="{DynamicResource Ui_CopyPath}"
+                                        Click="CopyGlobalProcessPath_Click"
+                                        IsEnabled="{Binding CanCopySelectedGlobalProcessPath}"
+                                        Style="{StaticResource TertiaryButton}"
                                         Margin="0,0,6,0" />
-                                <Button Content="{DynamicResource Ui_BanKill}"
-                                        Click="BanAndKillGlobalProcess_Click"
-                                        IsEnabled="{Binding CanBanSelectedGlobalProcess}"
-                                        Style="{StaticResource DangerButton}" />
-                            </UniformGrid>
-                        </StackPanel>
-                    </Border>
-                    <Border Margin="0,10,0,0"
-                            Padding="9"
-                            CornerRadius="8"
-                            Background="#12191F"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_SuspiciousWatchlist}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,4" />
-                            <TextBlock Text="{Binding SelectedGlobalProcessSuspiciousText}"
-                                       Style="{StaticResource MutedText}"
-                                       TextWrapping="Wrap" />
-                            <UniformGrid Columns="2" Margin="0,8,0,0">
-                                <Button Content="{DynamicResource Ui_Mark}"
-                                        Click="MarkGlobalWatchSuspicious_Click"
-                                        IsEnabled="{Binding CanMarkSelectedGlobalProcessSuspicious}"
-                                        Style="{StaticResource CompactButton}"
-                                        Margin="0,0,6,0" />
-                                <Button Content="{DynamicResource Ui_Remove}"
-                                        Click="RemoveGlobalWatchSuspicious_Click"
-                                        IsEnabled="{Binding CanRemoveSelectedGlobalProcessSuspicious}"
+                                <Button Content="{DynamicResource Ui_OpenFileLocation}"
+                                        Click="OpenGlobalProcessLocation_Click"
+                                        IsEnabled="{Binding CanOpenSelectedGlobalProcessFileLocation}"
                                         Style="{StaticResource TertiaryButton}" />
                             </UniformGrid>
-                        </StackPanel>
-                    </Border>
-                     <Border Margin="0,10,0,0"
-                             Padding="9"
-                             CornerRadius="8"
-                            Background="#12191F"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Recommendation}"
-                                       FontWeight="SemiBold"
-                                       Margin="0,0,0,4" />
-                            <TextBlock Text="{Binding SelectedGlobalProcessRecommendationText}"
-                                       Style="{StaticResource MutedText}" />
-                            <Button Content="{DynamicResource Ui_OpenRecommendations}"
-                                    Click="OpenRecommendationsForGlobalWatch_Click"
-                                    IsEnabled="{Binding SelectedGlobalProcessHasRecommendation}"
+
+                            <TextBlock Text="{DynamicResource Ui_Actions}" Style="{StaticResource MetricLabel}" Margin="0,16,0,6" />
+                            <Button Content="{DynamicResource Ui_MonitorProcessGroup}"
+                                    Click="MonitorGlobalProcess_Click"
+                                    IsEnabled="{Binding CanMonitorSelectedGlobalProcess}"
+                                    Style="{StaticResource PrimaryButton}" />
+                            <Button Content="{DynamicResource Ui_ViewDetails}"
+                                    Click="OpenGlobalProcessInspector_Click"
+                                    IsEnabled="{Binding CanInspectSelectedGlobalProcess}"
                                     Style="{StaticResource CompactButton}"
                                     Margin="0,8,0,0" />
+                            <DockPanel Margin="0,8,0,0">
+                                <Button DockPanel.Dock="Right"
+                                        Content="{DynamicResource Ui_Assign}"
+                                        Click="AssignGlobalWatchProfile_Click"
+                                        IsEnabled="{Binding CanAssignSelectedGlobalProcessProfile}"
+                                        Style="{StaticResource CompactButton}"
+                                        Margin="8,6,0,0" />
+                                <ComboBox ItemsSource="{Binding ThresholdProfiles}"
+                                          SelectedItem="{Binding SelectedLiveAssignmentProfile}"
+                                          DisplayMemberPath="DisplayName"
+                                          IsEnabled="{Binding CanAssignSelectedGlobalProcessProfile}" />
+                            </DockPanel>
+
+                            <Border Margin="0,12,0,0"
+                                    Padding="10"
+                                    CornerRadius="8"
+                                    Background="{StaticResource SurfaceSunkenBrush}"
+                                    BorderBrush="{StaticResource BorderBrushSoft}"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource Ui_SuspiciousWatchlist}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding SelectedGlobalProcessSuspiciousText}"
+                                               Style="{StaticResource MutedText}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,2,0,0" />
+                                    <UniformGrid Columns="2" Margin="0,8,0,0">
+                                        <Button Content="{DynamicResource Ui_Mark}"
+                                                Click="MarkGlobalWatchSuspicious_Click"
+                                                IsEnabled="{Binding CanMarkSelectedGlobalProcessSuspicious}"
+                                                Style="{StaticResource CompactButton}"
+                                                Margin="0,0,6,0" />
+                                        <Button Content="{DynamicResource Ui_Remove}"
+                                                Click="RemoveGlobalWatchSuspicious_Click"
+                                                IsEnabled="{Binding CanRemoveSelectedGlobalProcessSuspicious}"
+                                                Style="{StaticResource TertiaryButton}" />
+                                    </UniformGrid>
+                                    <Button Content="{DynamicResource Ui_OpenRecommendations}"
+                                            Click="OpenRecommendationsForGlobalWatch_Click"
+                                            IsEnabled="{Binding SelectedGlobalProcessHasRecommendation}"
+                                            Style="{StaticResource TertiaryButton}"
+                                            Margin="0,8,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource DangerPanel}" Margin="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource Ui_DangerZone}" FontWeight="SemiBold" Foreground="{StaticResource BadBrush}" />
+                                    <UniformGrid Columns="2" Margin="0,8,0,0">
+                                        <Button Content="{DynamicResource Ui_KillPid}"
+                                                Click="KillGlobalProcess_Click"
+                                                IsEnabled="{Binding CanKillSelectedGlobalProcess}"
+                                                Style="{StaticResource DangerButton}"
+                                                Margin="0,0,6,0" />
+                                        <Button Content="{Binding SelectedGlobalProcessKillTreeLabel}"
+                                                Click="KillGlobalProcessTree_Click"
+                                                IsEnabled="{Binding CanKillSelectedGlobalProcess}"
+                                                Style="{StaticResource DangerButton}" />
+                                    </UniformGrid>
+                                    <TextBlock Text="{Binding SelectedGlobalProcessBanText}"
+                                               Style="{StaticResource MutedText}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,10,0,0" />
+                                    <ComboBox ItemsSource="{Binding ProcessBanDurationOptions}"
+                                              SelectedItem="{Binding SelectedProcessBanDurationOption}"
+                                              DisplayMemberPath="Label"
+                                              IsEnabled="{Binding CanBanSelectedGlobalProcess}" />
+                                    <UniformGrid Columns="2" Margin="0,8,0,0">
+                                        <Button Content="{DynamicResource Ui_Ban}"
+                                                Click="BanGlobalProcess_Click"
+                                                IsEnabled="{Binding CanBanSelectedGlobalProcess}"
+                                                Style="{StaticResource DangerButton}"
+                                                Margin="0,0,6,0" />
+                                        <Button Content="{DynamicResource Ui_BanKill}"
+                                                Click="BanAndKillGlobalProcess_Click"
+                                                IsEnabled="{Binding CanBanSelectedGlobalProcess}"
+                                                Style="{StaticResource DangerButton}" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{Binding GlobalWatchStatusText}"
+                                       Style="{StaticResource MutedText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,10,0,0" />
                         </StackPanel>
-                    </Border>
-                    <TextBlock Text="{Binding GlobalWatchStatusText}"
-                               Style="{StaticResource MutedText}"
-                               TextWrapping="Wrap"
-                               Margin="0,10,0,0" />
-                </StackPanel>
+                    </ScrollViewer>
+                </Border>
             </Grid>
-            </ScrollViewer>
-        </Border>
-    </Grid>
         </Grid>
     </TabItem>
 
@@ -906,7 +817,7 @@
                                         </Expander.Header>
                                         <ListView ItemsSource="{Binding Entries}"
                                                   MaxHeight="220"
-                                                  Background="#11171C"
+                                                  Background="#11151B"
                                                   BorderBrush="{StaticResource BorderBrushSoft}"
                                                   Foreground="{StaticResource TextBrush}"
                                                   ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -945,7 +856,7 @@
                     </ScrollViewer>
                     <Border Padding="18"
                             CornerRadius="8"
-                            Background="#11171C"
+                            Background="#11151B"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1">
                         <Border.Style>
@@ -1099,7 +1010,7 @@
                          ItemsSource="{Binding ProfileRecommendations}"
                          SelectedItem="{Binding SelectedProfileRecommendation}"
                          SelectionMode="Extended"
-                         Background="#11171C"
+                         Background="#11151B"
                          BorderThickness="0"
                          Foreground="{StaticResource TextBrush}"
                          MinHeight="44"
@@ -1193,7 +1104,7 @@
                                     </Grid>
                                 </Expander.Header>
                                 <Border Padding="24,6,8,10"
-                                        Background="#12191F"
+                                        Background="#12171E"
                                         BorderBrush="{StaticResource BorderBrushSoft}"
                                         BorderThickness="0,1,0,0">
                                     <Grid>
@@ -1290,7 +1201,7 @@
                      DisplayMemberPath="DisplayText"
                      MinHeight="86"
                      MaxHeight="180"
-                     Background="#11171C"
+                     Background="#11151B"
                      BorderBrush="{StaticResource BorderBrushSoft}"
                      Foreground="{StaticResource TextBrush}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto" />
@@ -1331,17 +1242,34 @@
                                        Margin="0,4,0,0"
                                        TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="2"
-                                    Orientation="Horizontal"
-                                    VerticalAlignment="Top">
+                        <WrapPanel Grid.Column="2"
+                                   Orientation="Horizontal"
+                                   VerticalAlignment="Top"
+                                   MaxWidth="560"
+                                   HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource Ui_AddExe}"
+                                    Click="AddSuspiciousExecutable_Click"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
+                            <Button Content="{DynamicResource Ui_VerifyPaths}"
+                                    Click="VerifyTrackedPaths_Click"
+                                    IsEnabled="{Binding CanVerifyTrackedPaths}"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
+                            <Button Content="{DynamicResource Ui_LocateExe}"
+                                    Click="LocateSuspiciousExecutable_Click"
+                                    IsEnabled="{Binding CanRelocateSelectedSuspiciousItem}"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
                             <Button Content="{DynamicResource Ui_ViewDetails}"
                                     Click="InspectSuspiciousWatchItem_Click"
                                     Style="{StaticResource CompactButton}"
-                                    Margin="0,0,8,0" />
+                                    Margin="0,0,8,6" />
                             <Button Content="{DynamicResource Ui_RemoveSelected}"
                                     Click="RemoveSelectedSuspiciousWatchItem_Click"
-                                    Style="{StaticResource CompactButton}" />
-                        </StackPanel>
+                                    Style="{StaticResource TertiaryButton}"
+                                    Margin="0,0,0,6" />
+                        </WrapPanel>
                     </Grid>
 
                     <ListView Grid.Row="2"
@@ -1352,6 +1280,33 @@
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn Header="{DynamicResource Ui_Exe}" Width="150" DisplayMemberBinding="{Binding ExeName}" />
+                                <GridViewColumn Header="{DynamicResource Ui_PathStatus}" Width="120">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Tracking.StatusText}"
+                                                       ToolTip="{Binding Tracking.TooltipText}"
+                                                       TextWrapping="NoWrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="present">
+                                                                <Setter Property="Foreground" Value="{StaticResource GoodBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="relocated">
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="missing">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarnBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="{DynamicResource Ui_LastSeenRunning}" Width="140" DisplayMemberBinding="{Binding Tracking.LastSeenText}" />
                                 <GridViewColumn Header="{DynamicResource Ui_Product}" Width="190">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -1382,7 +1337,7 @@
                     <Border Grid.Row="2"
                             Padding="18"
                             CornerRadius="8"
-                            Background="#11171C"
+                            Background="#11151B"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1">
                         <Border.Style>
@@ -1401,9 +1356,17 @@
                                    VerticalAlignment="Center" />
                     </Border>
 
-                    <TextBlock Grid.Row="4"
-                               Text="{Binding SuspiciousWatchStatusText}"
-                               Style="{StaticResource MutedText}" />
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Text="{Binding SuspiciousWatchStatusText}"
+                                   Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding TrackedPathsStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="{Binding SelectedSuspiciousWatchItem.Tracking.FingerprintText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SelectedSuspiciousWatchItem.Tracking.TooltipText}" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -1447,7 +1410,7 @@
                     <Border Grid.Row="2"
                             Padding="18"
                             CornerRadius="8"
-                            Background="#11171C"
+                            Background="#11151B"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1">
                         <Border.Style>
@@ -1496,12 +1459,30 @@
                                        Style="{StaticResource MutedText}"
                                        Margin="0,4,0,0" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Right"
-                                Content="{DynamicResource Ui_RemoveSelected}"
-                                Click="RemoveSelectedProcessBan_Click"
-                                IsEnabled="{Binding CanRemoveSelectedProcessBan}"
-                                Style="{StaticResource CompactButton}"
-                                VerticalAlignment="Top" />
+                        <WrapPanel DockPanel.Dock="Right"
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Right"
+                                   MaxWidth="520">
+                            <Button Content="{DynamicResource Ui_AddExe}"
+                                    Click="AddBanExecutable_Click"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
+                            <Button Content="{DynamicResource Ui_VerifyPaths}"
+                                    Click="VerifyTrackedPaths_Click"
+                                    IsEnabled="{Binding CanVerifyTrackedPaths}"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
+                            <Button Content="{DynamicResource Ui_LocateExe}"
+                                    Click="LocateBanExecutable_Click"
+                                    IsEnabled="{Binding CanRelocateSelectedProcessBan}"
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="0,0,8,6" />
+                            <Button Content="{DynamicResource Ui_RemoveSelected}"
+                                    Click="RemoveSelectedProcessBan_Click"
+                                    IsEnabled="{Binding CanRemoveSelectedProcessBan}"
+                                    Style="{StaticResource TertiaryButton}"
+                                    Margin="0,0,0,6" />
+                        </WrapPanel>
                     </DockPanel>
 
                     <ListView Grid.Row="2"
@@ -1512,8 +1493,35 @@
                         <ListView.View>
                             <GridView>
                                 <GridViewColumn Header="{DynamicResource Ui_Exe}" Width="150" DisplayMemberBinding="{Binding ExeName}" />
+                                <GridViewColumn Header="{DynamicResource Ui_PathStatus}" Width="120">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Tracking.StatusText}"
+                                                       ToolTip="{Binding Tracking.TooltipText}"
+                                                       TextWrapping="NoWrap">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="present">
+                                                                <Setter Property="Foreground" Value="{StaticResource GoodBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="relocated">
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Tracking.StatusKey}" Value="missing">
+                                                                <Setter Property="Foreground" Value="{StaticResource WarnBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
                                 <GridViewColumn Header="{DynamicResource Ui_Duration}" Width="100" DisplayMemberBinding="{Binding DurationText}" />
                                 <GridViewColumn Header="{DynamicResource Ui_Expires}" Width="150" DisplayMemberBinding="{Binding ExpiresText}" />
+                                <GridViewColumn Header="{DynamicResource Ui_LastSeenRunning}" Width="140" DisplayMemberBinding="{Binding Tracking.LastSeenText}" />
                                 <GridViewColumn Header="{DynamicResource Ui_Company}" Width="170">
                                     <GridViewColumn.CellTemplate>
                                         <DataTemplate>
@@ -1536,7 +1544,7 @@
                     <Border Grid.Row="2"
                             Padding="18"
                             CornerRadius="8"
-                            Background="#11171C"
+                            Background="#11151B"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1">
                         <Border.Style>
@@ -1555,9 +1563,17 @@
                                    VerticalAlignment="Center" />
                     </Border>
 
-                    <TextBlock Grid.Row="4"
-                               Text="{Binding ProcessBanStatusText}"
-                               Style="{StaticResource MutedText}" />
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Text="{Binding ProcessBanStatusText}"
+                                   Style="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding TrackedPathsStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock Text="{Binding SelectedProcessBan.Tracking.FingerprintText}"
+                                   Style="{StaticResource MutedText}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding SelectedProcessBan.Tracking.TooltipText}" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -1622,7 +1638,7 @@
                     <Border Grid.Row="2"
                             Padding="18"
                             CornerRadius="8"
-                            Background="#11171C"
+                            Background="#11151B"
                             BorderBrush="{StaticResource BorderBrushSoft}"
                             BorderThickness="1">
                         <Border.Style>

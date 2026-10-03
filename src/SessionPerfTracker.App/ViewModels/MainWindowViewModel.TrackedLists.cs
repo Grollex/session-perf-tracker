@@ -30,6 +30,13 @@ public sealed partial class MainWindowViewModel
 
     public bool CanVerifyTrackedPaths => !IsVerifyingTrackedPaths;
 
+    public string UiTitleAddSuspicious => GetText("Ui_AddSuspiciousExeTitle");
+    public string UiTitleAddBan => GetText("Ui_AddBanExeTitle");
+    public string UiTitleLocateExecutable => GetText("Ui_LocateExeTitle");
+
+    public bool CanRelocateSelectedProcessBan => SelectedProcessBan is not null;
+    public bool CanRelocateSelectedSuspiciousItem => SelectedSuspiciousWatchItem is not null;
+
     public string TrackedPathsStatusText
     {
         get => _trackedPathsStatusText;
@@ -230,6 +237,60 @@ public sealed partial class MainWindowViewModel
             cancellationToken);
         RefreshProcessBanCollections();
         ProcessBanStatusText = FormatText("Ui_ProcessBannedForDuration", rule.ExeName, rule.DurationLabel);
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _signerTextByPath = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Signature checks are too expensive for every scanned process, so they run lazily for the
+    /// row the user actually looks at; the result is cached per file for later scans.
+    /// </summary>
+    private string ResolveSelectedSignerText()
+    {
+        var selected = SelectedGlobalProcess;
+        if (selected is null)
+        {
+            return "n/a";
+        }
+
+        if (!TryGetSelectedGlobalProcessUsablePath(out var path))
+        {
+            return selected.SignerStatus;
+        }
+
+        if (_signerTextByPath.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+
+        _signerTextByPath[path] = GetText("Ui_SignerChecking");
+        _ = Task.Run(async () =>
+        {
+            string text;
+            try
+            {
+                var fingerprint = await _identityProvider.DescribeAsync(path, includeSignature: true, includeHash: false).ConfigureAwait(false);
+                text = fingerprint?.SignerStatus is null
+                    ? GetText("Ui_StatusUnknown")
+                    : string.IsNullOrWhiteSpace(fingerprint.SignerSubject)
+                        ? fingerprint.SignerStatus
+                        : $"{fingerprint.SignerStatus} — {fingerprint.SignerSubject}";
+            }
+            catch
+            {
+                text = GetText("Ui_StatusUnknown");
+            }
+
+            _signerTextByPath[path] = text;
+            if (_signerTextByPath.Count > 2048)
+            {
+                _signerTextByPath.Clear();
+            }
+
+            await Application.Current.Dispatcher.InvokeAsync(() => OnPropertyChanged(nameof(SelectedGlobalProcessSignerText)));
+        });
+
+        return _signerTextByPath[path];
     }
 
     /// <summary>Captures version/signature/hash for newly added entries without blocking the UI.</summary>

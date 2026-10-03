@@ -480,7 +480,7 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        var preferApplications = group.ModeText.Contains("Applications", StringComparison.OrdinalIgnoreCase)
+        var preferApplications = Services.GlobalWatchJournalCoordinator.IsApplicationsMode(group.ModeText)
             || group.Entries.Count > 1
             || group.ProcessId is null;
 
@@ -504,7 +504,7 @@ public sealed partial class MainWindowViewModel
             return false;
         }
 
-        var preferApplications = group.ModeText.Contains("Applications", StringComparison.OrdinalIgnoreCase)
+        var preferApplications = Services.GlobalWatchJournalCoordinator.IsApplicationsMode(group.ModeText)
             || group.Entries.Count > 1
             || group.ProcessId is null;
 
@@ -2414,6 +2414,7 @@ public sealed partial class MainWindowViewModel
         OnPropertyChanged(nameof(SelectedGlobalProcessCpuText));
         OnPropertyChanged(nameof(SelectedGlobalProcessRamText));
         OnPropertyChanged(nameof(SelectedGlobalProcessDiskText));
+        OnPropertyChanged(nameof(SelectedGlobalProcessGpuText));
         OnPropertyChanged(nameof(SelectedGlobalProcessStatusText));
         OnPropertyChanged(nameof(SelectedGlobalProcessProfileText));
         OnPropertyChanged(nameof(SelectedGlobalProcessHealthText));

@@ -91,8 +91,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string GlobalSortPid => GetText("Ui_PidOrCount");
     private string GlobalSortProfile => GetText("Ui_Profile");
     private string GlobalSortHealth => GetText("Ui_Health");
-    private string GlobalModeApplications => GetText("Ui_AssignedAppsProfiles");
-    private string GlobalModeProcesses => GetText("Ui_IncludedProcesses");
+    private string GlobalModeApplications => GetText("Ui_GlobalModeApplications");
+    private string GlobalModeProcesses => GetText("Ui_GlobalModeProcesses");
 
     private enum LiveSessionUiState
     {
@@ -587,7 +587,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public SuspiciousWatchItemViewModel? SelectedSuspiciousWatchItem
     {
         get => _selectedSuspiciousWatchItem;
-        set => SetProperty(ref _selectedSuspiciousWatchItem, value);
+        set
+        {
+            if (SetProperty(ref _selectedSuspiciousWatchItem, value))
+            {
+                OnPropertyChanged(nameof(CanRelocateSelectedSuspiciousItem));
+            }
+        }
     }
 
     public ProcessBanRuleViewModel? SelectedProcessBan
@@ -598,6 +604,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedProcessBan, value))
             {
                 OnPropertyChanged(nameof(CanRemoveSelectedProcessBan));
+                OnPropertyChanged(nameof(CanRelocateSelectedProcessBan));
             }
         }
     }
@@ -1629,7 +1636,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public string SelectedGlobalProcessProductText => SelectedGlobalProcess?.ProductName ?? "n/a";
     public string SelectedGlobalProcessDescriptionText => SelectedGlobalProcess?.FileDescription ?? "n/a";
     public string SelectedGlobalProcessCompanyText => SelectedGlobalProcess?.CompanyName ?? "n/a";
-    public string SelectedGlobalProcessSignerText => SelectedGlobalProcess?.SignerStatus ?? "n/a";
+    public string SelectedGlobalProcessSignerText => ResolveSelectedSignerText();
     public string SelectedGlobalProcessVersionText => SelectedGlobalProcess?.Version ?? "n/a";
     public string SelectedGlobalProcessOriginalFileText => SelectedGlobalProcess?.OriginalFileName ?? "n/a";
     public string SelectedGlobalProcessParentText => SelectedGlobalProcess?.ParentProcessText ?? "n/a";
@@ -1646,6 +1653,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ? "n/a"
         : $"{SelectedGlobalProcess.MemoryText} ({SelectedGlobalProcess.MemoryDeltaText})";
     public string SelectedGlobalProcessDiskText => SelectedGlobalProcess?.DiskReadWriteText ?? "n/a";
+    public string SelectedGlobalProcessGpuText => SelectedGlobalProcess is null
+        ? "n/a"
+        : $"{SelectedGlobalProcess.GpuText} · {SelectedGlobalProcess.GpuMemoryText}";
     public string SelectedGlobalProcessStatusText => SelectedGlobalProcess?.StateText ?? "not selected";
     public string SelectedGlobalProcessProfileText => SelectedGlobalProcess?.ProfileSourceText ?? "n/a";
     public string SelectedGlobalProcessHealthText => SelectedGlobalProcess?.HealthBadgeText ?? "n/a";

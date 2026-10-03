@@ -7,17 +7,17 @@
         MinWidth="820"
         MinHeight="560"
         WindowStartupLocation="CenterOwner"
-        Background="#101317"
+        Background="#0E1116"
         FontFamily="Segoe UI">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
-        <SolidColorBrush x:Key="PanelBrush" Color="#171C21" />
-        <SolidColorBrush x:Key="PanelStrongBrush" Color="#20262D" />
+        <SolidColorBrush x:Key="PanelBrush" Color="#151A21" />
+        <SolidColorBrush x:Key="PanelStrongBrush" Color="#1B212A" />
         <SolidColorBrush x:Key="BorderBrushSoft" Color="#303941" />
         <SolidColorBrush x:Key="TextBrush" Color="#EDF2F5" />
         <SolidColorBrush x:Key="MutedBrush" Color="#AAB6C0" />
-        <SolidColorBrush x:Key="GoodBrush" Color="#3EE079" />
+        <SolidColorBrush x:Key="GoodBrush" Color="#34D399" />
         <SolidColorBrush x:Key="BadBrush" Color="#F05D5E" />
 
         <Style TargetType="TextBlock">
@@ -92,19 +92,19 @@
         <Style TargetType="ComboBox">
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#121920" />
+            <Setter Property="Background" Value="#12171E" />
             <Setter Property="BorderBrush" Value="#3A4650" />
             <Setter Property="Padding" Value="8,4" />
         </Style>
 
         <Style TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="Background" Value="#121920" />
+            <Setter Property="Background" Value="#12171E" />
             <Setter Property="Padding" Value="8,6" />
         </Style>
 
         <Style TargetType="ListView">
-            <Setter Property="Background" Value="#11171C" />
+            <Setter Property="Background" Value="#11151B" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
             <Setter Property="BorderThickness" Value="1" />

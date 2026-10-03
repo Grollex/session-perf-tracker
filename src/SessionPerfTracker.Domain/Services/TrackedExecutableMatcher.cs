@@ -15,6 +15,7 @@ public sealed record ExecutableCandidate(
 public static class TrackedExecutableMatcher
 {
     public const int SameBinaryScore = 100;
+    public const int MaxMetadataScore = 95;
     public const int RelocationThreshold = 75;
 
     public static int Score(ITrackedExecutable item, ExecutableCandidate candidate)
@@ -47,16 +48,17 @@ public static class TrackedExecutableMatcher
 
         if (SameText(known?.CompanyName ?? item.CompanyName, other?.CompanyName))
         {
-            score += 15;
+            score += 12;
         }
 
         if (SameText(known?.SignerSubject, other?.SignerSubject))
         {
-            score += 10;
+            score += 8;
         }
 
-        // A file name alone (no metadata on either side) must not move a ban to an unrelated binary.
-        return score;
+        // Metadata alone tops out at 95: only an identical hash proves "the same binary".
+        // A file name alone (no metadata on either side) never reaches the relocation threshold.
+        return Math.Min(score, MaxMetadataScore);
     }
 
     public static bool MatchesPath(ITrackedExecutable item, string? normalizedPath)

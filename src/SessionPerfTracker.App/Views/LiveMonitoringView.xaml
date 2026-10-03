@@ -3,43 +3,98 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:SessionPerfTracker.App.Controls"
              mc:Ignorable="d">
     <UserControl.Resources>
-        <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/SessionPerfTracker.App;component/Themes/MainWindowResources.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="TileSparkline" TargetType="controls:Sparkline">
+                <Setter Property="Height" Value="40" />
+                <Setter Property="Margin" Value="0,10,0,0" />
+                <Setter Property="Capacity" Value="90" />
+                <Setter Property="Stroke" Value="{StaticResource CpuAccentBrush}" />
+                <Setter Property="Fill" Value="{StaticResource CpuFillBrush}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Accent}" Value="ram">
+                        <Setter Property="Stroke" Value="{StaticResource RamAccentBrush}" />
+                        <Setter Property="Fill" Value="{StaticResource RamFillBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Accent}" Value="gpu">
+                        <Setter Property="Stroke" Value="{StaticResource GpuAccentBrush}" />
+                        <Setter Property="Fill" Value="{StaticResource GpuFillBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Accent}" Value="disk">
+                        <Setter Property="Stroke" Value="{StaticResource DiskAccentBrush}" />
+                        <Setter Property="Fill" Value="{StaticResource DiskFillBrush}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="TileAccentBar" TargetType="Border">
+                <Setter Property="Width" Value="3" />
+                <Setter Property="Height" Value="12" />
+                <Setter Property="CornerRadius" Value="1.5" />
+                <Setter Property="Margin" Value="0,0,7,0" />
+                <Setter Property="Background" Value="{StaticResource CpuAccentBrush}" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Accent}" Value="ram">
+                        <Setter Property="Background" Value="{StaticResource RamAccentBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Accent}" Value="gpu">
+                        <Setter Property="Background" Value="{StaticResource GpuAccentBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Accent}" Value="disk">
+                        <Setter Property="Background" Value="{StaticResource DiskAccentBrush}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="SectionHeader" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,14,0,6" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+            </Style>
+        </ResourceDictionary>
     </UserControl.Resources>
+
 <ScrollViewer Style="{StaticResource PageScrollViewer}">
     <Grid Margin="16,0,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="360" />
+            <ColumnDefinition Width="340" />
+            <ColumnDefinition Width="14" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <!-- Session header: state, target and the primary actions. -->
         <Border Grid.Row="0"
-                Grid.ColumnSpan="2"
-                Padding="12"
+                Grid.ColumnSpan="3"
+                Padding="16,14"
                 CornerRadius="8"
-                BorderThickness="1"
-                Margin="0,0,0,0">
+                BorderThickness="1">
             <Border.Style>
                 <Style TargetType="Border">
-                    <Setter Property="Background" Value="#171C21" />
+                    <Setter Property="Background" Value="{StaticResource PanelBrush}" />
                     <Setter Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="recording">
-                            <Setter Property="Background" Value="#13241B" />
-                            <Setter Property="BorderBrush" Value="#2E8D62" />
+                            <Setter Property="BorderBrush" Value="#2C7A5B" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="warning">
-                            <Setter Property="Background" Value="#28230F" />
-                            <Setter Property="BorderBrush" Value="#A88423" />
+                            <Setter Property="BorderBrush" Value="#8A6A1C" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="danger">
-                            <Setter Property="Background" Value="#2B1719" />
                             <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
                         </DataTrigger>
                     </Style.Triggers>
@@ -50,125 +105,230 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel>
+                <StackPanel VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <Border Padding="8,3"
-                                CornerRadius="8"
-                                BorderThickness="1"
-                                Margin="0,0,10,0"
-                                Background="#20262D"
-                                BorderBrush="{StaticResource BorderBrushSoft}">
-                            <TextBlock Text="{Binding LiveSessionStateText}"
-                                       FontWeight="SemiBold"
-                                       FontSize="12" />
+                        <Border Margin="0,0,12,0" VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource StatusPill}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="recording">
+                                            <Setter Property="Background" Value="#123326" />
+                                            <Setter Property="BorderBrush" Value="#2C7A5B" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="warning">
+                                            <Setter Property="Background" Value="#2A2210" />
+                                            <Setter Property="BorderBrush" Value="#8A6A1C" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="danger">
+                                            <Setter Property="Background" Value="#2A1618" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="{StaticResource MutedBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="recording">
+                                                    <Setter Property="Fill" Value="{StaticResource GoodBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="warning">
+                                                    <Setter Property="Fill" Value="{StaticResource WarnBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding LiveSessionStateTone}" Value="danger">
+                                                    <Setter Property="Fill" Value="{StaticResource BadBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock Text="{Binding LiveSessionStateText}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="NoWrap" />
+                            </StackPanel>
                         </Border>
                         <TextBlock Text="{Binding LiveSessionTargetText}"
-                                   FontSize="18"
+                                   FontSize="19"
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"
+                                   TextWrapping="NoWrap"
                                    TextTrimming="CharacterEllipsis"
-                                   MaxWidth="680"
+                                   MaxWidth="720"
                                    ToolTip="{Binding LiveSessionTargetText}" />
                     </StackPanel>
                     <TextBlock Text="{Binding LiveSessionMetaText}"
                                Style="{StaticResource MutedText}"
+                               TextWrapping="NoWrap"
                                TextTrimming="CharacterEllipsis"
                                ToolTip="{Binding LiveSessionMetaText}"
-                               Margin="0,6,0,0" />
+                               Margin="0,8,0,0" />
                     <TextBlock Text="{Binding LiveSessionHintText}"
                                Style="{StaticResource MutedText}"
                                TextWrapping="Wrap"
                                Margin="0,2,0,0" />
                 </StackPanel>
-                <UniformGrid Grid.Column="1"
-                             Columns="4"
-                             Margin="18,0,0,0"
-                             VerticalAlignment="Center">
-                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Version}" Style="{StaticResource MutedText}" />
-                            <TextBlock Text="{Binding AppVersionBadgeText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Duration}" Style="{StaticResource MutedText}" />
-                            <TextBlock Text="{Binding DurationText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource KpiTile}" Margin="0,0,10,0">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Samples}" Style="{StaticResource MutedText}" />
-                            <TextBlock Text="{Binding SampleCountText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
-                        </StackPanel>
-                    </Border>
-                    <Border Style="{StaticResource KpiTile}">
-                        <StackPanel>
-                            <TextBlock Text="{DynamicResource Ui_Events}" Style="{StaticResource MutedText}" />
-                            <TextBlock Text="{Binding EventCountText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}" TextWrapping="NoWrap" />
-                        </StackPanel>
-                    </Border>
-                </UniformGrid>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="20,0,0,0">
+                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Ui_Duration}" Style="{StaticResource MetricLabel}" />
+                        <TextBlock Text="{Binding DurationText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,18,0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Ui_Samples}" Style="{StaticResource MetricLabel}" />
+                        <TextBlock Text="{Binding SampleCountText}" FontSize="16" FontWeight="SemiBold" TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,22,0" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource Ui_Events}" Style="{StaticResource MetricLabel}" />
+                        <TextBlock Text="{Binding EventCountText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource WarnBrush}" TextWrapping="NoWrap" />
+                    </StackPanel>
+                    <Button Content="{DynamicResource Ui_Start}"
+                            Click="StartRecording_Click"
+                            IsEnabled="{Binding CanStart}"
+                            Style="{StaticResource HeroPrimaryButton}"
+                            MinWidth="112"
+                            Margin="0,0,8,0" />
+                    <Button Content="{DynamicResource Ui_Stop}"
+                            Click="StopRecording_Click"
+                            Style="{StaticResource HeroDangerButton}"
+                            IsEnabled="{Binding CanStop}"
+                            MinWidth="112" />
+                </StackPanel>
             </Grid>
         </Border>
 
-        <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource Panel}" Margin="0,0,14,0">
+        <!-- KPI tiles with short live history. -->
+        <Grid Grid.Row="2" Grid.ColumnSpan="3">
+            <ItemsControl ItemsSource="{Binding LiveTiles}"
+                          Visibility="{Binding HasActiveLiveMetrics, Converter={StaticResource BoolToVisibilityConverter}}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="4" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource MetricCard}"
+                                Tag="{Binding Tone}"
+                                Margin="0,0,10,0">
+                            <Border.Resources>
+                                <Style TargetType="StackPanel">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                            <Setter Property="Opacity" Value="0.5" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Resources>
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Style="{StaticResource TileAccentBar}" />
+                                    <TextBlock Text="{Binding Label}" Style="{StaticResource MetricLabel}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding ValueText}" Style="{StaticResource MetricValue}" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding DetailText}"
+                                           Style="{StaticResource MutedText}"
+                                           TextWrapping="NoWrap"
+                                           TextTrimming="CharacterEllipsis"
+                                           FontSize="11" />
+                                <controls:Sparkline Values="{Binding History}"
+                                                    Maximum="{Binding ScaleMaximum}"
+                                                    Style="{StaticResource TileSparkline}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Visibility="{Binding ShowLiveSnapshotEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Style="{StaticResource EmptyState}"
+                    Padding="16,14">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding LiveSnapshotTitle}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding LiveSnapshotEmptyText}" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
+                        <TextBlock Text="{Binding LiveSnapshotScopeText}" Style="{StaticResource MutedText}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding LiveConfigCollectorsText}"
+                               Style="{StaticResource MutedText}"
+                               VerticalAlignment="Center"
+                               Margin="16,0,0,0" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Setup column. -->
+        <Border Grid.Row="4" Grid.Column="0" Style="{StaticResource Panel}" VerticalAlignment="Top">
             <StackPanel>
                 <Border Visibility="{Binding HasLiveWarning, Converter={StaticResource BoolToVisibilityConverter}}"
                         Margin="0,0,0,12"
                         Padding="10"
                         CornerRadius="8"
-                        Background="#2B1719"
+                        Background="#2A1618"
                         BorderBrush="{StaticResource BadBrush}"
                         BorderThickness="1">
                     <TextBlock Text="{Binding LiveWarningText}"
                                Foreground="{StaticResource BadBrush}"
                                FontWeight="SemiBold" />
                 </Border>
-                <TextBlock Text="{DynamicResource Ui_Target}" FontSize="13" FontWeight="SemiBold" Margin="0,2,0,6" />
+
+                <TextBlock Text="{DynamicResource Ui_Target}" FontSize="14" FontWeight="SemiBold" />
+                <TextBlock Text="{DynamicResource Ui_TargetSource}" Style="{StaticResource SectionHeader}" Margin="0,10,0,0" />
+                <ComboBox ItemsSource="{Binding TargetModes}"
+                          SelectedItem="{Binding SelectedTargetMode}"
+                          Margin="0,4,0,0" />
 
                 <StackPanel Visibility="{Binding IsRunningProcessMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <DockPanel>
-                        <TextBlock Text="{DynamicResource Ui_RunningProcess}" Style="{StaticResource MutedText}" />
+                    <DockPanel Margin="0,12,0,0">
                         <Button DockPanel.Dock="Right"
                                 Content="{DynamicResource Ui_Refresh}"
                                 Click="RefreshProcesses_Click"
-                                MinHeight="26"
-                                Padding="8,0" />
+                                Style="{StaticResource CompactButton}" />
+                        <Grid Margin="0,0,8,0">
+                            <TextBox Text="{Binding ProcessFilterText, UpdateSourceTrigger=PropertyChanged}"
+                                     MinHeight="30" />
+                            <TextBlock Text="{DynamicResource Ui_SearchProcesses}"
+                                       IsHitTestVisible="False"
+                                       Foreground="{StaticResource PlaceholderBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="10,0,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ProcessFilterText}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
                     </DockPanel>
-                    <Grid Margin="0,6,0,0">
-                        <TextBox Text="{Binding ProcessFilterText, UpdateSourceTrigger=PropertyChanged}"
-                                 MinHeight="32" />
-                        <TextBlock Text="{DynamicResource Ui_SearchProcesses}"
-                                   IsHitTestVisible="False"
-                                   Foreground="{StaticResource PlaceholderBrush}"
-                                   VerticalAlignment="Center"
-                                   Margin="10,0,0,0">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ProcessFilterText}" Value="">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
                     <ComboBox ItemsSource="{Binding RunningTargets}"
                               SelectedItem="{Binding SelectedRunningTarget}"
-                              DisplayMemberPath="DisplayName" />
+                              DisplayMemberPath="DisplayName"
+                              MaxDropDownHeight="420" />
                 </StackPanel>
 
                 <StackPanel Visibility="{Binding IsAssignedAppsMode, Converter={StaticResource BoolToVisibilityConverter}}">
                     <DockPanel Margin="0,12,0,0">
-                        <TextBlock Text="{DynamicResource Ui_AssignedAppsProfiles}" Style="{StaticResource MutedText}" />
                         <Button DockPanel.Dock="Right"
                                 Content="{DynamicResource Ui_Refresh}"
                                 Click="RefreshProcesses_Click"
-                                MinHeight="26"
-                                Padding="8,0" />
+                                Style="{StaticResource CompactButton}" />
+                        <TextBlock Text="{DynamicResource Ui_AssignedAppsProfiles}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                     </DockPanel>
                     <ComboBox ItemsSource="{Binding AssignedTargets}"
                               SelectedItem="{Binding SelectedAssignedTarget}"
@@ -179,49 +339,32 @@
                 </StackPanel>
 
                 <StackPanel Visibility="{Binding IsExecutableMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="{DynamicResource Ui_ManualExecutableLaunch}" Style="{StaticResource MutedText}" Margin="0,14,0,0" />
                     <Button Content="{DynamicResource Ui_ChooseExe}"
                             Click="BrowseExecutable_Click"
-                            Margin="0,6,0,0" />
+                            Margin="0,12,0,0" />
                     <TextBlock Text="{Binding SelectedExecutableDisplay}"
                                Style="{StaticResource MutedText}"
                                TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding SelectedExecutableDisplay}"
                                Margin="0,6,0,0" />
                 </StackPanel>
-                <TextBlock Text="{DynamicResource Ui_Session}" FontSize="13" FontWeight="SemiBold" Margin="0,18,0,6" />
+
+                <TextBlock Text="{DynamicResource Ui_Session}" Style="{StaticResource SectionHeader}" Margin="0,18,0,0" />
                 <TextBlock Text="{DynamicResource Ui_SessionProfile}" Style="{StaticResource MutedText}" />
                 <ComboBox ItemsSource="{Binding SessionProfileOptions}"
                           SelectedItem="{Binding SelectedSessionProfileOption}"
                           DisplayMemberPath="DisplayName" />
-                <TextBlock Text="{DynamicResource Ui_Sampling}" Style="{StaticResource MutedText}" Margin="0,12,0,0" />
+                <TextBlock Text="{DynamicResource Ui_Sampling}" Style="{StaticResource MutedText}" Margin="0,10,0,0" />
                 <ComboBox ItemsSource="{Binding SamplingOptions}"
                           SelectedItem="{Binding SelectedSamplingOption}"
                           DisplayMemberPath="Label" />
-                <CheckBox Content="{DynamicResource Ui_IncludeChildProcesses}" IsChecked="{Binding IncludeChildProcesses}" />
+                <CheckBox Content="{DynamicResource Ui_IncludeChildProcesses}" IsChecked="{Binding IncludeChildProcesses}" Margin="0,12,0,0" />
+                <CheckBox Content="{DynamicResource Ui_CaptureGpu}" IsChecked="{Binding CaptureGpu}" />
                 <CheckBox Content="{DynamicResource Ui_LiveMonitor}" IsChecked="{Binding IsLiveMonitorEnabled}" />
-                <Border Margin="0,14,0,0"
-                        Padding="12"
-                        CornerRadius="7"
-                        Background="#11171C"
-                        BorderBrush="{StaticResource BorderBrushSoft}"
-                        BorderThickness="1">
-                    <StackPanel>
-                        <TextBlock Text="{Binding RecordingStatusText}"
-                                   Style="{StaticResource MutedText}"
-                                   Margin="0,0,0,10" />
-                        <UniformGrid Columns="2">
-                            <Button Content="{DynamicResource Ui_Start}"
-                                    Click="StartRecording_Click"
-                                    IsEnabled="{Binding CanStart}"
-                                    Style="{StaticResource HeroPrimaryButton}"
-                                    Margin="0,0,8,0" />
-                            <Button Content="{DynamicResource Ui_Stop}"
-                                    Click="StopRecording_Click"
-                                    Style="{StaticResource HeroDangerButton}"
-                                    IsEnabled="{Binding CanStop}" />
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
+                <TextBlock Text="{Binding RecordingStatusText}"
+                           Style="{StaticResource MutedText}"
+                           TextWrapping="Wrap"
+                           Margin="0,12,0,0" />
 
                 <Expander Header="{DynamicResource Ui_Assignments}"
                           Foreground="{StaticResource TextBrush}"
@@ -233,9 +376,8 @@
                             <Button DockPanel.Dock="Right"
                                     Content="{DynamicResource Ui_Assign}"
                                     Click="AssignCurrentTargetProfile_Click"
-                                    MinHeight="30"
-                                    Padding="10,0"
-                                    Margin="8,0,0,0" />
+                                    Style="{StaticResource CompactButton}"
+                                    Margin="8,6,0,0" />
                             <ComboBox ItemsSource="{Binding ThresholdProfiles}"
                                       SelectedItem="{Binding SelectedLiveAssignmentProfile}"
                                       DisplayMemberPath="DisplayName" />
@@ -252,8 +394,8 @@
 
                 <Expander Header="{DynamicResource Ui_Diagnostics}"
                           Foreground="{StaticResource TextBrush}"
-                          Margin="0,16,0,0">
-                    <StackPanel Margin="0,8,0,0" Opacity="0.92">
+                          Margin="0,10,0,0">
+                    <StackPanel Margin="0,8,0,0">
                         <Button Content="{DynamicResource Ui_RamDiagnosticSnapshot}"
                                 Click="CaptureRamDiagnostic_Click"
                                 Style="{StaticResource TertiaryButton}" />
@@ -261,10 +403,12 @@
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
                                  TextWrapping="NoWrap"
+                                 FontFamily="Consolas"
+                                 FontSize="11"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  MinHeight="72"
-                                 MaxHeight="120"
+                                 MaxHeight="140"
                                  Margin="0,8,0,0" />
                         <Button Content="{DynamicResource Ui_SystemContextSnapshot}"
                                 Click="CaptureSystemContext_Click"
@@ -274,172 +418,134 @@
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
                                  TextWrapping="NoWrap"
+                                 FontFamily="Consolas"
+                                 FontSize="11"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  MinHeight="72"
-                                 MaxHeight="120"
+                                 MaxHeight="140"
                                  Margin="0,8,0,0" />
                     </StackPanel>
                 </Expander>
             </StackPanel>
         </Border>
 
-        <StackPanel Grid.Row="2" Grid.Column="1">
-        <Border Style="{StaticResource Panel}" Margin="0,0,0,14">
-            <StackPanel>
-                <DockPanel Margin="0,0,0,14" LastChildFill="False">
-                    <TextBlock Text="{Binding LiveSnapshotTitle}" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock DockPanel.Dock="Right" Text="{Binding LiveSnapshotStatusText}" Style="{StaticResource MutedText}" />
-                </DockPanel>
-                <ItemsControl ItemsSource="{Binding CurrentMetrics}"
-                              Visibility="{Binding HasActiveLiveMetrics, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <UniformGrid Columns="4" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource KpiTile}" Margin="0,0,10,10">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Label}" Style="{StaticResource MutedText}" />
-                                    <TextBlock Text="{Binding Value}" FontSize="20" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Reliability}" Style="{StaticResource MutedText}" />
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="{Binding LiveSnapshotScopeText}"
-                           Style="{StaticResource MutedText}"
-                           TextWrapping="Wrap"
-                           Margin="0,2,0,10"
-                           Visibility="{Binding HasActiveLiveMetrics, Converter={StaticResource BoolToVisibilityConverter}}" />
-                <Border Visibility="{Binding ShowLiveSnapshotEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Style="{StaticResource EmptyState}">
-                    <StackPanel>
-                        <TextBlock Text="{Binding LiveSnapshotEmptyText}"
-                                   Style="{StaticResource MutedText}" />
-                        <Expander Header="{DynamicResource Ui_CapturePreview}"
-                                  Foreground="{StaticResource TextBrush}"
-                                  Margin="0,8,0,0"
-                                  IsExpanded="False">
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,16,8">
-                                    <TextBlock Text="{DynamicResource Ui_Target}" Style="{StaticResource MutedText}" />
-                                    <TextBlock Text="{Binding LiveConfigTargetText}"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding LiveConfigTargetText}" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
-                                    <TextBlock Text="{DynamicResource Ui_Collectors}" Style="{StaticResource MutedText}" />
-                                    <TextBlock Text="{Binding LiveConfigCollectorsText}"
-                                               FontWeight="SemiBold"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,8">
-                                    <TextBlock Text="{DynamicResource Ui_Profile}" Style="{StaticResource MutedText}" />
-                                    <TextBlock Text="{Binding ActiveThresholdSourceText}"
-                                               FontWeight="SemiBold"
-                                               TextWrapping="Wrap"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding ActiveThresholdSourceText}" />
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
-                                    <TextBlock Text="{DynamicResource Ui_Capture}" Style="{StaticResource MutedText}" />
-                                    <TextBlock FontWeight="SemiBold">
-                                        <Run Text="{Binding LiveConfigSamplingText, Mode=OneWay}" />
-                                        <Run Text=" / " />
-                                        <Run Text="{Binding LiveConfigChildScopeText, Mode=OneWay}" />
-                                    </TextBlock>
-                                    <TextBlock Text="{Binding LiveConfigMonitorText}" Style="{StaticResource MutedText}" />
-                                </StackPanel>
-                                <TextBlock Grid.Row="2"
-                                           Grid.ColumnSpan="2"
-                                           Text="{Binding LiveSnapshotScopeText}"
-                                           Style="{StaticResource MutedText}"
-                                           TextWrapping="Wrap" />
-                            </Grid>
-                        </Expander>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-        </Border>
-
-        <Border Style="{StaticResource Panel}">
-            <StackPanel>
-                <Grid Margin="0,0,0,14">
+        <!-- Right column: whole-system load and events. -->
+        <StackPanel Grid.Row="4" Grid.Column="2">
+            <Border Style="{StaticResource Panel}" Padding="16,12" Margin="0,0,0,12">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{DynamicResource Ui_Events}" FontSize="16" FontWeight="SemiBold" />
-                    <Border Grid.Column="1"
-                            Padding="8,2"
-                            CornerRadius="6"
-                            Background="#11171C"
-                            BorderBrush="{StaticResource BorderBrushSoft}"
-                            BorderThickness="1">
-                        <TextBlock Text="{Binding EventCountText}"
-                                   Style="{StaticResource MutedText}"
-                                   MinWidth="18"
-                                   TextAlignment="Center" />
-                    </Border>
+                    <StackPanel>
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_SystemCpu}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemCpuText}" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemCpuPercent, Mode=OneWay}" Foreground="{StaticResource CpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_SystemRam}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemRamText}" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemRamPercent, Mode=OneWay}" Foreground="{StaticResource RamAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" ToolTip="{Binding SystemGpuNameText}">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_GpuShort}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemGpuText}" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemGpuPercent, Mode=OneWay}" Foreground="{StaticResource GpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="6">
+                        <DockPanel>
+                            <TextBlock Text="{DynamicResource Ui_VramShort}" Style="{StaticResource MetricLabel}" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SystemVramText}" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                        </DockPanel>
+                        <ProgressBar Style="{StaticResource ThinMeter}" Value="{Binding SystemVramPercent, Mode=OneWay}" Foreground="{StaticResource GpuAccentBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
                 </Grid>
-                <ItemsControl ItemsSource="{Binding VisibleEvents}"
-                              Visibility="{Binding HasLiveEvents, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Padding="12"
-                                    Margin="0,0,0,8"
-                                    CornerRadius="7"
-                                    Background="#141A1F"
-                                    BorderBrush="{StaticResource BorderBrushSoft}"
-                                    BorderThickness="1">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                        <TextBlock Style="{StaticResource MutedText}">
-                                            <Run Text="{Binding Kind, Mode=OneWay}" />
-                                            <Run Text=" / " />
-                                            <Run Text="{Binding Metric, Mode=OneWay}" />
-                                        </TextBlock>
-                                        <TextBlock Text="{Binding Details}" Style="{StaticResource MutedText}" />
-                                        <TextBlock Text="{Binding ContextSummaryText}"
-                                                   Style="{StaticResource MutedText}"
-                                                   Margin="0,6,0,0" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                                        <TextBlock Text="{Binding ObservedText}" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                        <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource MutedText}" HorizontalAlignment="Right" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Border Visibility="{Binding ShowLiveEventEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
-                        Style="{StaticResource EmptyState}">
-                    <TextBlock Text="{Binding LiveEventEmptyText}"
-                               Style="{StaticResource MutedText}" />
-                </Border>
-            </StackPanel>
-        </Border>
+            </Border>
+
+            <Border Style="{StaticResource Panel}">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource Ui_Events}" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding LiveSnapshotStatusText}"
+                                   Style="{StaticResource MutedText}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding VisibleEvents}"
+                                  Visibility="{Binding HasLiveEvents, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,10"
+                                        Margin="0,0,0,8"
+                                        CornerRadius="8"
+                                        Background="{StaticResource SurfaceSunkenBrush}"
+                                        BorderBrush="{StaticResource BorderBrushSoft}"
+                                        BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="3" CornerRadius="1.5" Margin="0,0,10,0">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{StaticResource WarnBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                            <Setter Property="Background" Value="{StaticResource BadBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="Info">
+                                                            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Style="{StaticResource MutedText}">
+                                                <Run Text="{Binding Kind, Mode=OneWay}" />
+                                                <Run Text=" · " />
+                                                <Run Text="{Binding Metric, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Details}" Style="{StaticResource MutedText}" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding ContextSummaryText}"
+                                                       Style="{StaticResource MutedText}"
+                                                       Margin="0,6,0,0" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding ObservedText}" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                                            <TextBlock Text="{Binding ElapsedText}" Style="{StaticResource MutedText}" HorizontalAlignment="Right" TextWrapping="NoWrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Visibility="{Binding ShowLiveEventEmptyState, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Style="{StaticResource EmptyState}">
+                        <TextBlock Text="{Binding LiveEventEmptyText}"
+                                   Style="{StaticResource MutedText}" />
+                    </Border>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Grid>
 </ScrollViewer>

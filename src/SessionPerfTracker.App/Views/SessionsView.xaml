@@ -149,7 +149,7 @@
                            Margin="0,0,0,12" />
                 <Border Padding="12"
                         CornerRadius="6"
-                        Background="#121920"
+                        Background="#12171E"
                         BorderBrush="{StaticResource BorderBrushSoft}"
                         BorderThickness="1"
                         Margin="0,0,0,10">

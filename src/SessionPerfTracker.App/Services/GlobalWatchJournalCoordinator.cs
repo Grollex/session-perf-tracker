@@ -67,6 +67,16 @@ public sealed class GlobalWatchJournalCoordinator
         };
     }
 
+    /// <summary>
+    /// Journal entries store the localized mode label of the build that wrote them; accept current and older labels.
+    /// </summary>
+    public static bool IsApplicationsMode(string? watchMode) =>
+        !string.IsNullOrWhiteSpace(watchMode)
+        && (string.Equals(watchMode, ViewModels.UiText.Get("Ui_GlobalModeApplications"), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(watchMode, ViewModels.UiText.Get("Ui_AssignedAppsProfiles"), StringComparison.OrdinalIgnoreCase)
+            || watchMode.Contains("Applications", StringComparison.OrdinalIgnoreCase)
+            || watchMode.Contains("apps", StringComparison.OrdinalIgnoreCase));
+
     public List<GlobalWatchJournalEntry> TrimEntries(
         IEnumerable<GlobalWatchJournalEntry> entries,
         int maxEntries)

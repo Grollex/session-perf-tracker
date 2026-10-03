@@ -473,7 +473,11 @@ public sealed class TrackedExecutableCoordinator
             LastSeenRunningAt = plan.LastSeenRunningAt ?? rule.LastSeenRunningAt,
             PathStatus = plan.PathStatus ?? rule.PathStatus,
             PathCheckedAt = plan.PathCheckedAt ?? rule.PathCheckedAt,
-            Fingerprint = plan.Fingerprint?.MergeMissingFrom(plan.NewPrimaryPath is null ? rule.Fingerprint : null) ?? rule.Fingerprint
+            Fingerprint = plan.Fingerprint?.MergeMissingFrom(plan.NewPrimaryPath is null ? rule.Fingerprint : null) ?? rule.Fingerprint,
+            // Fresh signature facts replace values captured by older builds (which reported every file as unsigned).
+            SignerStatus = plan.Fingerprint?.SignerStatus ?? rule.SignerStatus,
+            ProductName = rule.ProductName ?? plan.Fingerprint?.ProductName,
+            CompanyName = rule.CompanyName ?? plan.Fingerprint?.CompanyName
         };
 
         if (plan.NewPrimaryPath is { } newPath && !string.Equals(newPath, rule.NormalizedPath, StringComparison.OrdinalIgnoreCase))
@@ -514,7 +518,10 @@ public sealed class TrackedExecutableCoordinator
             LastSeenRunningAt = plan.LastSeenRunningAt ?? item.LastSeenRunningAt,
             PathStatus = plan.PathStatus ?? item.PathStatus,
             PathCheckedAt = plan.PathCheckedAt ?? item.PathCheckedAt,
-            Fingerprint = plan.Fingerprint?.MergeMissingFrom(plan.NewPrimaryPath is null ? item.Fingerprint : null) ?? item.Fingerprint
+            Fingerprint = plan.Fingerprint?.MergeMissingFrom(plan.NewPrimaryPath is null ? item.Fingerprint : null) ?? item.Fingerprint,
+            SignerStatus = plan.Fingerprint?.SignerStatus ?? item.SignerStatus,
+            ProductName = item.ProductName ?? plan.Fingerprint?.ProductName,
+            CompanyName = item.CompanyName ?? plan.Fingerprint?.CompanyName
         };
 
         if (plan.NewPrimaryPath is { } newPath && !string.Equals(newPath, item.NormalizedPath, StringComparison.OrdinalIgnoreCase))

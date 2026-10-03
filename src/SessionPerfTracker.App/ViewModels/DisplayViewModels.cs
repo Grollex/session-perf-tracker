@@ -430,7 +430,7 @@ public sealed class GlobalProcessRowViewModel
         profileName = UiText.ProfileName(profileId, profileName);
         Process = process;
         ExeName = exeName;
-        AppName = Prefer(process.ProductName, process.FileDescription, process.Name);
+        AppName = ResolveAppName(process.ProductName, process.FileDescription, process.Name);
         IsGroup = false;
         InstanceCount = 1;
         SelectionKey = $"pid:{process.ProcessId}";
@@ -484,6 +484,7 @@ public sealed class GlobalProcessRowViewModel
         var evaluation = EvaluateProfileState(process, profileLimits, isAssignedProfile);
         ProfileState = evaluation.State;
         HealthBadgeText = FormatHealthBadge(evaluation.State);
+        HealthDisplayText = FormatHealthDisplay(evaluation.State);
         ProfileReason = evaluation.Reason;
         RecommendationReason = evaluation.RecommendationReason;
         IsNearLimit = evaluation.State == StateNear;
@@ -527,7 +528,10 @@ public sealed class GlobalProcessRowViewModel
             ?? primary;
         Process = primary.Process;
         ExeName = exeName;
-        AppName = Prefer(identitySource.Process.ProductName, primary.Process.ProductName, primary.Process.FileDescription, exeName);
+        AppName = ResolveAppName(
+            identitySource.Process.ProductName ?? primary.Process.ProductName,
+            identitySource.Process.FileDescription ?? primary.Process.FileDescription,
+            exeName);
         IsGroup = true;
         InstanceCount = orderedRows.Length;
         SelectionKey = $"group:{exeName}";
@@ -598,6 +602,7 @@ public sealed class GlobalProcessRowViewModel
         var evaluation = EvaluateProfileState(aggregateSnapshot, profileLimits, isAssignedProfile);
         ProfileState = evaluation.State;
         HealthBadgeText = FormatHealthBadge(evaluation.State);
+        HealthDisplayText = FormatHealthDisplay(evaluation.State);
         ProfileReason = evaluation.Reason;
         RecommendationReason = evaluation.RecommendationReason;
         IsNearLimit = evaluation.State == StateNear;
@@ -681,6 +686,7 @@ public sealed class GlobalProcessRowViewModel
     public string StateText { get; }
     public string ProfileState { get; }
     public string HealthBadgeText { get; }
+    public string HealthDisplayText { get; }
     public string ProfileReason { get; }
     public string ProfileStatusText { get; }
     public string RecommendationReason { get; }
@@ -787,6 +793,14 @@ public sealed class GlobalProcessRowViewModel
         _ => "OK"
     };
 
+    private static string FormatHealthDisplay(string state) => state switch
+    {
+        StateNear => UiText.Get("Ui_HealthNear"),
+        StateOver => UiText.Get("Ui_HealthOver"),
+        StateCritical => UiText.Get("Ui_HealthCritical"),
+        _ => UiText.Get("Ui_HealthOk")
+    };
+
     private static int GetProfileSeverityRank(string state) => state switch
     {
         StateCritical => 3,
@@ -820,6 +834,20 @@ public sealed class GlobalProcessRowViewModel
         return Math.Abs(value.Value) < 0.05
             ? "0.0 MB"
             : $"{value.Value:+0.0;-0.0} MB";
+    }
+
+    /// <summary>
+    /// Windows components all report the product "Microsoft Windows Operating System"; for those the
+    /// file description ("Host Process for Windows Services") or exe name is far more useful.
+    /// </summary>
+    private static string ResolveAppName(string? productName, string? fileDescription, string fallback)
+    {
+        var isGenericWindowsProduct = !string.IsNullOrWhiteSpace(productName)
+            && productName.Contains("Microsoft", StringComparison.OrdinalIgnoreCase)
+            && productName.Contains("Windows", StringComparison.OrdinalIgnoreCase);
+        return isGenericWindowsProduct
+            ? Prefer(fileDescription, fallback)
+            : Prefer(productName, fileDescription, fallback);
     }
 
     private static string Prefer(params string?[] candidates)
@@ -1170,7 +1198,7 @@ public sealed class ProcessInspectorTargetViewModel
             "Loaded from grouped Global Watch journal history.",
             $"This branch was recorded {group.CountText} with health {group.HealthText}.",
             "Not captured.",
-            isGroup: group.ProcessId is null || group.ModeText.Contains("Applications", StringComparison.OrdinalIgnoreCase),
+            isGroup: group.ProcessId is null || Services.GlobalWatchJournalCoordinator.IsApplicationsMode(group.ModeText),
             isRunning: false);
     }
 
@@ -1476,8 +1504,10 @@ public sealed class SuspiciousWatchItemViewModel
         MarkedAtText = item.MarkedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         NoteText = string.IsNullOrWhiteSpace(item.Note) ? "No note" : item.Note;
         DisplayText = $"{ExeName} - {CompanyText} - {SignerText}";
+        Tracking = new TrackedPathPresentation(item);
     }
 
+    public TrackedPathPresentation Tracking { get; }
     public SuspiciousWatchItem Item { get; }
     public string ExeName { get; }
     public string PathText { get; }
@@ -1489,6 +1519,77 @@ public sealed class SuspiciousWatchItemViewModel
     public string DisplayText { get; }
 
     public override string ToString() => DisplayText;
+}
+
+/// <summary>Display facts about how a list entry's executable path is being tracked.</summary>
+public sealed class TrackedPathPresentation
+{
+    public TrackedPathPresentation(ITrackedExecutable item)
+    {
+        StatusKey = item.PathStatus ?? TrackedPathStatus.Unknown;
+        StatusText = StatusKey switch
+        {
+            TrackedPathStatus.Present => UiText.Get("Ui_PathStatusPresent"),
+            TrackedPathStatus.Missing => UiText.Get("Ui_PathStatusMissing"),
+            TrackedPathStatus.Relocated => UiText.Get("Ui_PathStatusRelocated"),
+            _ => UiText.Get("Ui_PathStatusUnknown")
+        };
+        LastSeenText = item.LastSeenRunningAt is null
+            ? UiText.Get("Ui_NeverSeenRunning")
+            : item.LastSeenRunningAt.Value.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+        CheckedText = item.PathCheckedAt is null
+            ? string.Empty
+            : UiText.Format("Ui_PathCheckedAt", item.PathCheckedAt.Value.ToLocalTime());
+
+        var fingerprint = item.Fingerprint;
+        var facts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(fingerprint?.FileVersion))
+        {
+            facts.Add(UiText.Format("Ui_FingerprintVersion", fingerprint.FileVersion));
+        }
+
+        if (!string.IsNullOrWhiteSpace(fingerprint?.SignerStatus))
+        {
+            facts.Add(string.IsNullOrWhiteSpace(fingerprint.SignerSubject)
+                ? fingerprint.SignerStatus
+                : $"{fingerprint.SignerStatus}: {fingerprint.SignerSubject}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(fingerprint?.Sha256))
+        {
+            facts.Add($"SHA-256 {fingerprint.Sha256[..12]}…");
+        }
+
+        FingerprintText = facts.Count == 0 ? UiText.Get("Ui_FingerprintPending") : string.Join(" · ", facts);
+        AlternatePathsText = item.AlternatePaths.Count == 0
+            ? string.Empty
+            : UiText.Format("Ui_AlsoCoversPaths", string.Join("; ", item.AlternatePaths));
+        HistoryText = item.PathHistory.Count == 0
+            ? UiText.Get("Ui_NoPathChanges")
+            : string.Join(Environment.NewLine, item.PathHistory.Take(5).Select(change =>
+                $"{change.ChangedAt.ToLocalTime():g}: {change.PreviousPath} → {change.NewPath} ({FormatReason(change.Reason)}, {change.Confidence}%)"));
+        TooltipText = string.Join(
+            Environment.NewLine,
+            new[] { CheckedText, FingerprintText, AlternatePathsText, HistoryText }.Where(text => !string.IsNullOrWhiteSpace(text)));
+    }
+
+    public string StatusKey { get; }
+    public string StatusText { get; }
+    public string LastSeenText { get; }
+    public string CheckedText { get; }
+    public string FingerprintText { get; }
+    public string AlternatePathsText { get; }
+    public string HistoryText { get; }
+    public string TooltipText { get; }
+
+    private static string FormatReason(string reason) => reason switch
+    {
+        TrackedPathChangeReason.RunningProcessMatch => UiText.Get("Ui_PathReasonRunning"),
+        TrackedPathChangeReason.FileSearch => UiText.Get("Ui_PathReasonSearch"),
+        TrackedPathChangeReason.Manual => UiText.Get("Ui_PathReasonManual"),
+        TrackedPathChangeReason.SameBinaryCopy => UiText.Get("Ui_PathReasonCopy"),
+        _ => reason
+    };
 }
 
 public sealed class SuspiciousLaunchEntryViewModel
@@ -1554,8 +1655,10 @@ public sealed class ProcessBanRuleViewModel
             : rule.ExpiresAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         DurationText = rule.DurationLabel;
         DisplayText = $"{ExeName} - {DurationText} - {ExpiresText}";
+        Tracking = new TrackedPathPresentation(rule);
     }
 
+    public TrackedPathPresentation Tracking { get; }
     public ProcessBanRule Rule { get; }
     public string ExeName { get; }
     public string PathText { get; }

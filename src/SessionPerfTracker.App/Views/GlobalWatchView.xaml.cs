@@ -29,6 +29,71 @@ public partial class GlobalWatchView : System.Windows.Controls.UserControl
 
     private void SortGlobalWatchHealth_Click(object sender, RoutedEventArgs e) => ViewModel?.SortGlobalWatchByHealth();
 
+    private void SortGlobalWatchGpu_Click(object sender, RoutedEventArgs e) => ViewModel?.SortGlobalWatchByGpu();
+
+    private void CopyGlobalProcessPath_Click(object sender, RoutedEventArgs e) => ViewModel?.CopySelectedGlobalProcessFullPath();
+
+    private async void OpenGlobalProcessLocation_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.OpenSelectedGlobalProcessFileLocationAsync();
+        }
+    }
+
+    private async void VerifyTrackedPaths_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null)
+        {
+            await ViewModel.VerifyTrackedPathsAsync();
+        }
+    }
+
+    private async void AddSuspiciousExecutable_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null && PickExecutable(ViewModel.UiTitleAddSuspicious) is { } path)
+        {
+            await ViewModel.AddSuspiciousExecutableAsync(path);
+        }
+    }
+
+    private async void LocateSuspiciousExecutable_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null && PickExecutable(ViewModel.UiTitleLocateExecutable) is { } path)
+        {
+            await ViewModel.RelocateSelectedSuspiciousItemAsync(path);
+        }
+    }
+
+    private async void AddBanExecutable_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null && PickExecutable(ViewModel.UiTitleAddBan) is { } path)
+        {
+            await ViewModel.AddBanForExecutableAsync(path);
+        }
+    }
+
+    private async void LocateBanExecutable_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not null && PickExecutable(ViewModel.UiTitleLocateExecutable) is { } path)
+        {
+            await ViewModel.RelocateSelectedProcessBanAsync(path);
+        }
+    }
+
+    private string? PickExecutable(string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "*.exe|*.exe",
+            CheckFileExists = true,
+            Multiselect = false,
+            Title = title
+        };
+
+        return dialog.ShowDialog(Window.GetWindow(this)) == true ? dialog.FileName : null;
+    }
+
     private void ShowProcessInspector()
     {
         if (ViewModel is null) return;

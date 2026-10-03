@@ -34,6 +34,7 @@
                             <CheckBox Content="{DynamicResource Ui_RAM}" IsChecked="{Binding CaptureRam}" />
                             <CheckBox Content="{DynamicResource Ui_DiskRead}" IsChecked="{Binding CaptureDiskRead}" />
                             <CheckBox Content="{DynamicResource Ui_DiskWrite}" IsChecked="{Binding CaptureDiskWrite}" />
+                            <CheckBox Content="{DynamicResource Ui_CaptureGpu}" IsChecked="{Binding CaptureGpu}" />
                         </UniformGrid>
                         <TextBlock Text="{DynamicResource Ui_UnsupportedCollectorsHint}" Style="{StaticResource MutedText}" Margin="0,0,0,12" />
                         <Button Content="{DynamicResource Ui_SaveCaptureScope}"
@@ -169,6 +170,8 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="10" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="160" />
@@ -196,6 +199,12 @@
                              Grid.Column="4"
                              Text="{Binding DiskWriteThresholdMbPerSecText, UpdateSourceTrigger=PropertyChanged}"
                              MinHeight="32" />
+                    <TextBlock Grid.Row="4" Text="{DynamicResource Ui_GpuPercent}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                    <TextBox Grid.Row="4"
+                             Grid.Column="1"
+                             Text="{Binding GpuThresholdPercentText, UpdateSourceTrigger=PropertyChanged}"
+                             MinHeight="32" />
+                    <TextBlock Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="3" Text="{DynamicResource Ui_GpuLimitHint}" Style="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,0,0" />
                     <Button Grid.Column="5"
                             Grid.RowSpan="3"
                             Content="{DynamicResource Ui_SaveFallback}"
@@ -208,6 +217,8 @@
 
                 <Grid Margin="0,0,0,18">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="10" />
                         <RowDefinition Height="Auto" />
@@ -262,6 +273,12 @@
                              Grid.Column="4"
                              Text="{Binding ProfileDiskWriteThresholdMbPerSecText, UpdateSourceTrigger=PropertyChanged}"
                              MinHeight="32" />
+                    <TextBlock Grid.Row="6" Text="{DynamicResource Ui_GpuPercent}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
+                    <TextBox Grid.Row="6"
+                             Grid.Column="1"
+                             Text="{Binding ProfileGpuThresholdPercentText, UpdateSourceTrigger=PropertyChanged}"
+                             MinHeight="32" />
+                    <TextBlock Grid.Row="6" Grid.Column="3" Grid.ColumnSpan="3" Text="{DynamicResource Ui_GpuLimitHint}" Style="{StaticResource MutedText}" VerticalAlignment="Center" />
                     <Button Grid.Row="4"
                             Grid.Column="5"
                             Content="{DynamicResource Ui_SaveProfile}"
@@ -305,7 +322,7 @@
                              DisplayMemberPath="DisplayText"
                              MinHeight="72"
                              MaxHeight="140"
-                             Background="#11171C"
+                             Background="#11151B"
                              BorderBrush="{StaticResource BorderBrushSoft}"
                              Foreground="{StaticResource TextBrush}"
                              ScrollViewer.VerticalScrollBarVisibility="Auto" />
@@ -414,7 +431,7 @@
                                  DisplayMemberPath="DisplayText"
                                  MinHeight="84"
                                  MaxHeight="220"
-                                 Background="#11171C"
+                                 Background="#11151B"
                                  BorderBrush="{StaticResource BorderBrushSoft}"
                                  Foreground="{StaticResource TextBrush}"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto" />

@@ -228,7 +228,7 @@
                                     <Ellipse Width="9"
                                              Height="9"
                                              Fill="{StaticResource ItemSelectedBorderBrush}"
-                                             Stroke="#101317"
+                                             Stroke="#0E1116"
                                              StrokeThickness="2"
                                              VerticalAlignment="Top"
                                              Margin="0,17,0,0" />

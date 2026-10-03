@@ -12,7 +12,7 @@
         MinWidth="1220"
         MinHeight="720"
         WindowStartupLocation="CenterScreen"
-        Background="#101317"
+        Background="#0E1116"
         FontFamily="Segoe UI">
     <Window.TaskbarItemInfo>
         <TaskbarItemInfo Description="{Binding AppWindowTitle}" />
@@ -32,7 +32,7 @@
 
         <Border Grid.Row="0"
                 Padding="14,9"
-                Background="#12191F"
+                Background="#12171E"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,0,1">
             <Grid>
@@ -69,7 +69,8 @@
                 Padding="14,7"
                 Background="#1B1710"
                 BorderBrush="#6C5931"
-                BorderThickness="0,0,0,1">
+                BorderThickness="0,0,0,1"
+                Visibility="{Binding ShowTrustExplainer, Converter={StaticResource BoolToVisibilityConverter}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="4" />
@@ -139,7 +140,7 @@
 
         <Border Grid.Row="3"
                 Padding="12,7"
-                Background="#12191F"
+                Background="#12171E"
                 BorderBrush="{StaticResource BorderBrushSoft}"
                 BorderThickness="0,0,0,1"
                 Visibility="{Binding HasCrossScreenMonitoringStrip, Converter={StaticResource BoolToVisibilityConverter}}">
