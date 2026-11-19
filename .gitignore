@@ -43,3 +43,12 @@ release.local.ps1
 # Agent session data
 ._agent_memory/
 _opencode_*/
+
+# Local agent notes (kept out of the public repo)
+AGENTS.md
+docs/project-memory.md
+docs/todo.md
+docs/task-plan.md
+docs/decisions.md
+docs/bugs.md
+docs/app-icon-redesign-notes.md
