@@ -4,6 +4,8 @@ A free Windows tool that records what an app or game was doing while it ran: CPU
 
 > Early version. If something breaks or looks confusing, use **Report bug** or **Settings → Feedback** in the app. Rough reports help too.
 
+![Live tab recording a Blender render: CPU, GPU, RAM, disk and a timeline](docs/screenshots/live.png)
+
 ## What it does
 
 - **Records a session** for a running process, an assigned app or an executable. Child processes are followed, also after the launcher itself exits (game launchers, installers, browsers).
@@ -19,7 +21,15 @@ The interface is in English and Russian.
 
 ## Overhead
 
-It takes one process snapshot per tick, writes sessions incrementally and doesn't draw the UI while minimized. On my 16-thread desktop (v1.7.0) that is about 0.3% CPU while recording every second, under 0.2% idle, and around 150–160 MB of RAM.
+It takes one process snapshot per tick, writes sessions incrementally and doesn't draw the UI while minimized. On my 16-thread desktop (v1.7.0), while recording a Blender render every second with Unreal Editor and a browser open and the CPU about 94% busy, the tracker itself used about 0.3% CPU and 200–250 MB of RAM. With the Live tab open and nothing heavy running it stays under 0.2% CPU.
+
+## Screenshots
+
+| Global Watch | Sessions |
+|---|---|
+| ![Global Watch: every running process with its load and publisher](docs/screenshots/global-watch.png) | ![Sessions: summary of a saved recording](docs/screenshots/sessions.png) |
+| **Compare** | **Settings** |
+| ![Compare: two runs side by side](docs/screenshots/compare.png) | ![Settings: capture options and the tracker's own overhead](docs/screenshots/settings.png) |
 
 ## Install
 
